@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const contractPath = resolve(
-  import.meta.dirname,
-  '../../docs/product/feature-contract-v1.md',
-);
+const contractPath = resolve(import.meta.dirname, '../../docs/product/feature-contract-v1.md');
 
 describe('Astra Feature 1-65 contract', () => {
   it('contains every feature ID exactly once', () => {

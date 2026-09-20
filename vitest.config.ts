@@ -28,6 +28,7 @@ const sourceAliases = {
   '@lyntar/test-utils': resolve(repositoryRoot, 'packages/test-utils/src/index.ts'),
   '@lyntar/workspace': resolve(repositoryRoot, 'packages/workspace/src/index.ts'),
   '@lyntar/codex-runtime': resolve(repositoryRoot, 'packages/codex-runtime/src/index.ts'),
+  '@lyntar/web-research': resolve(repositoryRoot, 'packages/web-research/src/index.ts'),
 };
 
 export default defineConfig({

@@ -41,6 +41,12 @@ import {
   type RemoteRelayBroker,
 } from '@lyntar/remote-protocol';
 import { registerRemoteRoutes } from './remote-route.js';
+import {
+  UnavailableWebSearchProvider,
+  WebResearchService,
+  type WebResearchService as WebResearchServiceType,
+} from '@lyntar/web-research';
+import { registerWebResearchRoutes } from './web-research-route.js';
 
 export interface ApiDependencies {
   catalog?: ModelCatalogStore;
@@ -68,6 +74,7 @@ export interface ApiDependencies {
   remote?: RemoteAccessPort;
   relaySecret?: string;
   relayBroker?: RemoteRelayBroker;
+  webResearch?: WebResearchServiceType;
 }
 
 const unavailableGateway: GatewayModelClient = {
@@ -101,6 +108,8 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       'POST /v1/devices/register': { limit: 10, windowMs: 10 * 60 * 1000 },
       'POST /v1/relay/grants': { limit: 30, windowMs: 10 * 60 * 1000 },
       'POST /v1/rooms/invitations/redeem': { limit: 10, windowMs: 10 * 60 * 1000 },
+      'POST /v1/web/search': { limit: 30, windowMs: 10 * 60 * 1000 },
+      'POST /v1/web/fetch': { limit: 30, windowMs: 10 * 60 * 1000 },
     };
     const prefixedLimits: Array<{
       method: string;
@@ -138,6 +147,9 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   const audit = dependencies.audit ?? new InMemoryAdminAuditStore();
   const admin = dependencies.admin ?? new AdminService({ billing, audit });
   const remote = dependencies.remote ?? new RemoteAccessService();
+  const webResearch =
+    dependencies.webResearch ??
+    new WebResearchService({ provider: new UnavailableWebSearchProvider() });
   app.get('/health', async () => ({ status: 'ok' }));
   void registerModelRoutes(app, {
     catalog,
@@ -202,6 +214,11 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       ...(dependencies.exposeDevelopmentTokens === undefined
         ? {}
         : { exposeDevelopmentTokens: dependencies.exposeDevelopmentTokens }),
+    });
+    void registerWebResearchRoutes(app, {
+      auth: dependencies.auth,
+      remote,
+      webResearch,
     });
   }
   return app;

@@ -4,8 +4,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
 /** The immutable Codex source identity selected during Phase 0. */
-export const PINNED_CODEX_SOURCE_SHA =
-  '5c5308fc9a9ee789049d646ef11e5400384b9c6f' as const;
+export const PINNED_CODEX_SOURCE_SHA = '5c5308fc9a9ee789049d646ef11e5400384b9c6f' as const;
 
 /**
  * This is the adapter identity, not a claim that a Codex artifact is present.
@@ -121,13 +120,18 @@ export function validateCodexRuntimeManifest(value: unknown): CodexRuntimeManife
 }
 
 async function sha256(path: string): Promise<string> {
-  return createHash('sha256').update(await readFile(path)).digest('hex');
+  return createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex');
 }
 
 function assertWithinRoot(root: string, candidate: string): void {
   const relativePath = relative(root, candidate);
   if (relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath))
-    throw new CodexRuntimeError('Codex artifact escapes the bundled runtime root', 'INVALID_MANIFEST');
+    throw new CodexRuntimeError(
+      'Codex artifact escapes the bundled runtime root',
+      'INVALID_MANIFEST',
+    );
 }
 
 function createIsolatedEnvironment(
@@ -186,7 +190,9 @@ class ManagedCodexSession implements CodexRuntimeSession {
 
   request(method: string, params?: unknown): Promise<unknown> {
     if (this.stopped || !this.child.stdin.writable)
-      return Promise.reject(new CodexRuntimeError('Codex runtime is not running', 'RUNTIME_EXITED'));
+      return Promise.reject(
+        new CodexRuntimeError('Codex runtime is not running', 'RUNTIME_EXITED'),
+      );
     const id = String(this.nextRequestId++);
     const message = { jsonrpc: '2.0', id, method, ...(params === undefined ? {} : { params }) };
     return new Promise((resolvePromise, reject) => {
@@ -227,13 +233,17 @@ class ManagedCodexSession implements CodexRuntimeSession {
       value = JSON.parse(line);
     } catch {
       this.failPending(
-        new CodexRuntimeError('Codex runtime emitted invalid JSON-RPC data', 'RUNTIME_PROTOCOL_ERROR'),
+        new CodexRuntimeError(
+          'Codex runtime emitted invalid JSON-RPC data',
+          'RUNTIME_PROTOCOL_ERROR',
+        ),
       );
       return;
     }
     if (!value || typeof value !== 'object') return;
     const message = value as Record<string, unknown>;
-    const id = typeof message.id === 'string' || typeof message.id === 'number' ? String(message.id) : null;
+    const id =
+      typeof message.id === 'string' || typeof message.id === 'number' ? String(message.id) : null;
     if (id && this.pending.has(id)) {
       const pending = this.pending.get(id);
       this.pending.delete(id);
@@ -279,7 +289,10 @@ export class CodexRuntimeSupervisor {
       );
     }
     if ((await sha256(executable)) !== manifest.artifactSha256)
-      throw new CodexRuntimeError('Pinned Codex artifact hash does not match its manifest', 'ARTIFACT_IDENTITY_MISMATCH');
+      throw new CodexRuntimeError(
+        'Pinned Codex artifact hash does not match its manifest',
+        'ARTIFACT_IDENTITY_MISMATCH',
+      );
     const codexHome = join(this.options.userDataPath, 'runtime', 'codex');
     await mkdir(codexHome, { recursive: true });
     const environment = createIsolatedEnvironment(

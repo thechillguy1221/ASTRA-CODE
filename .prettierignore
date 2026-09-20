@@ -5,3 +5,4 @@ apps/desktop/release/
 apps/desktop/release-unsigned/
 apps/desktop/.vite/
 **/tsconfig.tsbuildinfo
+vendor/upstream/

@@ -12,7 +12,9 @@ import {
 } from '@lyntar/codex-runtime';
 
 async function hash(path: string): Promise<string> {
-  return createHash('sha256').update(await readFile(path)).digest('hex');
+  return createHash('sha256')
+    .update(await readFile(path))
+    .digest('hex');
 }
 
 describe('CodexRuntimeSupervisor', () => {

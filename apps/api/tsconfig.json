@@ -16,7 +16,8 @@
     { "path": "../../packages/model-gateway" },
     { "path": "../../packages/plans" },
     { "path": "../../packages/releases" },
-    { "path": "../../packages/remote-protocol" }
+    { "path": "../../packages/remote-protocol" },
+    { "path": "../../packages/web-research" }
   ],
   "include": ["src/**/*.ts"]
 }

@@ -14,6 +14,8 @@ export const ROOM_PERMISSIONS = [
   'git.push',
   'mcp.use',
   'plugins.use',
+  'web.search',
+  'web.fetch',
   'destructive.approve',
   'members.invite',
   'members.manage',
@@ -26,7 +28,16 @@ export type MemberStatus = 'ACTIVE' | 'SUSPENDED' | 'REMOVED';
 
 const ROLE_PERMISSIONS: Record<RoomRole, readonly RoomPermission[]> = {
   VIEWER: ['room.view', 'files.read', 'git.read'],
-  AGENT_USER: ['room.view', 'agent.prompt', 'files.read', 'files.write', 'tests.run', 'git.read'],
+  AGENT_USER: [
+    'room.view',
+    'agent.prompt',
+    'files.read',
+    'files.write',
+    'tests.run',
+    'git.read',
+    'web.search',
+    'web.fetch',
+  ],
   EDITOR: [
     'room.view',
     'agent.prompt',
@@ -36,6 +47,8 @@ const ROLE_PERMISSIONS: Record<RoomRole, readonly RoomPermission[]> = {
     'terminal.run',
     'git.read',
     'git.write',
+    'web.search',
+    'web.fetch',
   ],
   ADMIN: [...ROOM_PERMISSIONS],
 };

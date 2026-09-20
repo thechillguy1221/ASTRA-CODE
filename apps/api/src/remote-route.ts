@@ -472,6 +472,8 @@ const ROOM_PERMISSION_SET = new Set<string>([
   'git.push',
   'mcp.use',
   'plugins.use',
+  'web.search',
+  'web.fetch',
   'destructive.approve',
   'members.invite',
   'members.manage',

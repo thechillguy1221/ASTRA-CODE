@@ -25,6 +25,7 @@
     { "path": "./packages/test-utils" },
     { "path": "./packages/workspace" },
     { "path": "./packages/remote-protocol" },
-    { "path": "./packages/codex-runtime" }
+    { "path": "./packages/codex-runtime" },
+    { "path": "./packages/web-research" }
   ]
 }
