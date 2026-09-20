@@ -1,5 +1,3 @@
-/* global process */
-
 const LIVE_REQUIRED_KEYS = [
   'LYNTAR_LIVE_TEST',
   'LYNTAR_MODEL_GATEWAY_URL',

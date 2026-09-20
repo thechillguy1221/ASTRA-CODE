@@ -116,7 +116,7 @@ export function App(): React.JSX.Element {
           email,
           password,
           device: {
-            label: 'Astra AI Admin',
+            label: 'Astra Code Admin',
             platform: 'web',
             architecture: 'browser',
             appVersion: '0.1.0',

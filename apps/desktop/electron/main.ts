@@ -41,10 +41,17 @@ async function createWindow(): Promise<void> {
     undefined,
     new SecureCredentialStore({ userDataPath: app.getPath('userData'), safeStorage }),
     new FileSessionStore(app.getPath('userData')),
+    {
+      runtimeMode: 'codex',
+      codexRuntimeRoot: app.isPackaged
+        ? join(process.resourcesPath, 'codex')
+        : join(app.getAppPath(), 'apps/desktop/resources/codex'),
+      userDataPath: app.getPath('userData'),
+    },
   );
   await registerIpcHandlers(runtime);
   const window = new BrowserWindow({
-    title: 'Astra AI',
+    title: 'Astra Code',
     autoHideMenuBar: true,
     show: false,
     width: 1440,

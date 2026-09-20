@@ -1,6 +1,6 @@
 ---
 name: Frontend Design
-publisher: Astra AI
+publisher: Astra Code
 version: 1.0.0
 license: UNLICENSED
 ---

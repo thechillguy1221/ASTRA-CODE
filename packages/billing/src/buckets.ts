@@ -5,14 +5,31 @@ import {
   parseCredits,
   subtractCredits,
 } from './math.js';
+import { CREDIT_PACKS, getCreditPack, type CreditPack, type PricingRegion } from '@lyntar/plans';
 
+/**
+ * Deprecated inbound Razorpay compatibility offer. New checkout must use the
+ * centralized CREDIT_PACKS catalog; this remains accepted only for historical
+ * payment events that were created before the regional catalog migration.
+ */
 export const TOP_UP_250 = {
   id: 'TOPUP_250',
   displayName: '250 credits',
   credits: '250',
   priceInr: '499',
   validityDays: 365,
+  deprecated: true,
 } as const;
+
+export { CREDIT_PACKS };
+
+export function getConfiguredCreditPack(packId: string): CreditPack {
+  return getCreditPack(packId);
+}
+
+export function getCreditPackPrice(packId: string, region: PricingRegion) {
+  return getCreditPack(packId).prices[region];
+}
 
 /** One additional monthly allocation is the maximum subscription rollover. */
 export function calculateSubscriptionRollover(
@@ -25,7 +42,10 @@ export function calculateSubscriptionRollover(
   return formatCredits(remaining < maximum ? remaining : maximum);
 }
 
-export function topUpExpiresAt(createdAt: string, validityDays = TOP_UP_250.validityDays): string {
+export function topUpExpiresAt(
+  createdAt: string,
+  validityDays: number = TOP_UP_250.validityDays,
+): string {
   return new Date(new Date(createdAt).getTime() + validityDays * 24 * 60 * 60 * 1000).toISOString();
 }
 

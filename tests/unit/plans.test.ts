@@ -15,6 +15,7 @@ describe('server-controlled plans', () => {
     expect(catalog.get('FREE').monthlyCredits).toBe('25');
     expect(catalog.get('BASIC').monthlyCredits).toBe('300');
     expect(catalog.get('PRO').monthlyPriceInr).toBe('999');
+    expect(catalog.get('PRO').monthlyPriceUsd).toBe('11');
     expect(catalog.get('TEAM').seats).toBe(5);
     expect(catalog.get('BUSINESS').crossPersonRooms).toBe(true);
   });
@@ -67,7 +68,8 @@ describe('server-controlled plans', () => {
           {
             id: 'BASIC',
             display_name: 'Basic',
-            monthly_price_inr: '499',
+            monthly_price_inr: '549',
+            monthly_price_usd: '6',
             monthly_credits: '300',
             enabled: true,
             entitlements: {
@@ -87,6 +89,7 @@ describe('server-controlled plans', () => {
     } as never;
     const catalog = await loadPlanCatalog(pool, createDefaultPlanCatalog());
     expect(catalog.get('BASIC').monthlyCredits).toBe('300');
-    expect(catalog.get('BASIC').monthlyPriceInr).toBe('499');
+    expect(catalog.get('BASIC').monthlyPriceInr).toBe('549');
+    expect(catalog.get('BASIC').monthlyPriceUsd).toBe('6');
   });
 });

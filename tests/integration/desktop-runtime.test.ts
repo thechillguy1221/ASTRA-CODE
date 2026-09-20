@@ -10,7 +10,10 @@ import {
   createMemoryEventStore,
   createMemoryReceiptStore,
 } from '@lyntar/api';
-import { DesktopRuntime } from '../../apps/desktop/electron/desktop-runtime.js';
+import {
+  DesktopRuntime,
+  type DesktopRuntimeOptions,
+} from '../../apps/desktop/electron/desktop-runtime.js';
 import type { ModelDecision } from '@lyntar/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -103,7 +106,8 @@ describe('desktop runtime adapter', () => {
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
 
     try {
-      const runtime = new DesktopRuntime(address);
+      const legacyTestRuntime: DesktopRuntimeOptions = { runtimeMode: 'legacy-test' };
+      const runtime = new DesktopRuntime(address, undefined, undefined, legacyTestRuntime);
       const events: string[] = [];
       runtime.subscribe((event) => events.push(event.type));
       const workspace = await runtime.openWorkspace(repository);

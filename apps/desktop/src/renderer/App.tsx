@@ -16,6 +16,7 @@ import type {
   Wallet,
 } from '@lyntar/contracts';
 import { addCredits } from '@lyntar/billing/math';
+import { AstraClineApprovalCard, AstraClineSessionStatus } from './cline-workspace.js';
 import { deriveProgressRows } from './view-model.js';
 
 type PendingPermission = {
@@ -152,7 +153,7 @@ export function App(): ReactElement {
         email: authEmail.trim(),
         password: authPassword,
         device: {
-          label: 'Astra AI desktop',
+          label: 'Astra Code desktop',
           platform: 'win32',
           architecture: 'x64',
           appVersion: '0.1.0',
@@ -498,7 +499,7 @@ function BuildView(props: {
         <p className="section-kicker">A local development partner</p>
         <h1>What do you want to build?</h1>
         <p>
-          Give Astra AI a focused task. It will inspect the repository, make bounded changes, run
+          Give Astra Code a focused task. It will inspect the repository, make bounded changes, run
           the right checks, and show exactly what changed.
         </p>
       </section>
@@ -550,9 +551,19 @@ function BuildView(props: {
             </button>
           </div>
           {props.pendingPermission && (
-            <PermissionCard
-              permission={props.pendingPermission}
-              resolve={props.resolvePermission}
+            <AstraClineApprovalCard
+              title={
+                props.pendingPermission.action === 'budget.overrun'
+                  ? 'Budget checkpoint'
+                  : props.pendingPermission.risk === 'destructive'
+                    ? 'High-risk approval needed'
+                    : 'Approval needed'
+              }
+              description={props.pendingPermission.summary ?? props.pendingPermission.action}
+              detail={props.pendingPermission.command}
+              meta={props.pendingPermission.reason}
+              onApprove={() => props.resolvePermission(true)}
+              onReject={() => props.resolvePermission(false)}
             />
           )}
         </div>
@@ -562,7 +573,15 @@ function BuildView(props: {
               <span className="panel-index">02</span>
               <h2>Follow the work</h2>
             </div>
-            <span className="live-label">APPEND-ONLY EVENTS</span>
+            <div className="execution-status">
+              <AstraClineSessionStatus
+                label={
+                  props.taskId ? 'Astra agent running' : props.result ? 'Task completed' : 'Ready'
+                }
+                state={props.result ? 'idle' : props.taskId ? 'running' : 'idle'}
+              />
+              <span className="live-label">APPEND-ONLY EVENTS</span>
+            </div>
           </div>
           <div className="progress-list">
             {props.progressRows.length === 0 ? (
@@ -594,39 +613,6 @@ function BuildView(props: {
       </section>
       {props.result && <ResultPanel result={props.result} />}
     </>
-  );
-}
-
-function PermissionCard({
-  permission,
-  resolve,
-}: {
-  permission: PendingPermission;
-  resolve: (approved: boolean) => void;
-}): ReactElement {
-  return (
-    <div className="permission">
-      <div>
-        <strong>
-          {permission.action === 'budget.overrun'
-            ? 'Budget checkpoint'
-            : permission.risk === 'destructive'
-              ? 'High-risk approval needed'
-              : 'Approval needed'}
-        </strong>
-        <span>{permission.summary ?? permission.action}</span>
-      </div>
-      {permission.command && <code>{permission.command}</code>}
-      {permission.reason && <span className="muted">{permission.reason}</span>}
-      <div className="actions">
-        <button className="primary" onClick={() => resolve(true)}>
-          {permission.action === 'budget.overrun' ? 'Continue' : 'Allow'}
-        </button>
-        <button className="secondary" onClick={() => resolve(false)}>
-          {permission.action === 'budget.overrun' ? 'Stop task' : 'Reject'}
-        </button>
-      </div>
-    </div>
   );
 }
 

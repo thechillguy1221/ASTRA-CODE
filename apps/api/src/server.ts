@@ -6,7 +6,7 @@ import {
   loadPlanCatalog,
   PostgresPaymentStore,
 } from '@lyntar/db';
-import { VercelGatewayClient } from '@lyntar/model-gateway';
+import { VercelGatewayClient, VercelResponsesGatewayClient } from '@lyntar/model-gateway';
 import {
   AuthService,
   GoogleDesktopOAuthService,
@@ -180,11 +180,22 @@ const gateway =
         apiKey: config.modelGatewayApiKey,
       })
     : undefined;
+const responsesGateway =
+  config.modelGatewayBaseUrl && config.modelGatewayApiKey
+    ? new VercelResponsesGatewayClient({
+        baseUrl: config.modelGatewayBaseUrl,
+        apiKey: config.modelGatewayApiKey,
+      })
+    : undefined;
 const app = buildApi({
   ...(postgres
     ? { catalog: postgres.catalog, receipts: postgres.receipts, events: postgres.events }
     : {}),
   ...(gateway ? { gateway } : {}),
+  ...(responsesGateway ? { responsesGateway } : {}),
+  ...(process.env.ASTRA_RUNTIME_TOKEN_SECRET
+    ? { runtimeTokenSecret: process.env.ASTRA_RUNTIME_TOKEN_SECRET }
+    : {}),
   auth,
   billing,
   organizationBilling,

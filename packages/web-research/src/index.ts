@@ -272,7 +272,7 @@ export interface WebResearchServiceOptions {
 export class UnavailableWebSearchProvider implements WebSearchProvider {
   readonly id = 'unavailable';
 
-  async search(_request: WebSearchRequest, _signal: AbortSignal): Promise<ProviderSearchResponse> {
+  async search(): Promise<ProviderSearchResponse> {
     throw new WebResearchError(
       'WEB_SEARCH_UNAVAILABLE',
       'No live Astra web search provider is configured',
@@ -861,6 +861,8 @@ function sanitizeWebContent(value: string, contentType: string): string {
         .trim(),
     );
   }
+  // Control characters are intentionally removed from untrusted web content.
+  // eslint-disable-next-line no-control-regex
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, ' ').trim();
 }
 
@@ -871,11 +873,14 @@ function extractTitle(value: string): string | undefined {
 }
 
 function sanitizeInlineText(value: string): string {
-  return decodeHtmlEntities(value)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    decodeHtmlEntities(value)
+      .replace(/<[^>]+>/g, ' ')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 function decodeHtmlEntities(value: string): string {

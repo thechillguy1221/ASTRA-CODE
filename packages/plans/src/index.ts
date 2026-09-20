@@ -1,5 +1,7 @@
 import { PlanSchema, type BillingMode, type Plan } from '@lyntar/contracts';
 
+export * from './pricing.js';
+
 function compareCredits(left: string, right: string): -1 | 0 | 1 {
   const scale = 10_000_000n;
   const parse = (value: string): bigint => {
@@ -90,6 +92,7 @@ export function createDefaultPlanCatalog(): PlanCatalog {
       id: 'FREE',
       displayName: 'Free',
       monthlyPriceInr: '0',
+      monthlyPriceUsd: '0',
       monthlyCredits: '25',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
@@ -111,7 +114,8 @@ export function createDefaultPlanCatalog(): PlanCatalog {
     PlanSchema.parse({
       id: 'BASIC',
       displayName: 'Basic',
-      monthlyPriceInr: '499',
+      monthlyPriceInr: '549',
+      monthlyPriceUsd: '6',
       monthlyCredits: '300',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
@@ -134,6 +138,7 @@ export function createDefaultPlanCatalog(): PlanCatalog {
       id: 'PRO',
       displayName: 'Pro',
       monthlyPriceInr: '999',
+      monthlyPriceUsd: '11',
       monthlyCredits: '600',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
@@ -155,7 +160,8 @@ export function createDefaultPlanCatalog(): PlanCatalog {
     PlanSchema.parse({
       id: 'MAX',
       displayName: 'Max',
-      monthlyPriceInr: '1999',
+      monthlyPriceInr: '1899',
+      monthlyPriceUsd: '21',
       monthlyCredits: '1200',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
@@ -177,7 +183,8 @@ export function createDefaultPlanCatalog(): PlanCatalog {
     PlanSchema.parse({
       id: 'TEAM',
       displayName: 'Team',
-      monthlyPriceInr: '9999',
+      monthlyPriceInr: '9499',
+      monthlyPriceUsd: '105',
       monthlyCredits: '6000',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
@@ -199,7 +206,8 @@ export function createDefaultPlanCatalog(): PlanCatalog {
     PlanSchema.parse({
       id: 'BUSINESS',
       displayName: 'Business',
-      monthlyPriceInr: '19999',
+      monthlyPriceInr: '18999',
+      monthlyPriceUsd: '209',
       monthlyCredits: '12000',
       allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],

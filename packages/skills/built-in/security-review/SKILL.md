@@ -1,6 +1,6 @@
 ---
 name: Security Review
-publisher: Astra AI
+publisher: Astra Code
 version: 1.0.0
 license: UNLICENSED
 ---

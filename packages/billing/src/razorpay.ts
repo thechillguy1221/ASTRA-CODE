@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PlanCatalog } from '@lyntar/plans';
 import type { BillingService } from './service.js';
 import type { OrganizationBillingService } from './organization-service.js';
-import { TOP_UP_250, topUpExpiresAt } from './buckets.js';
+import { TOP_UP_250, getConfiguredCreditPack, topUpExpiresAt } from './buckets.js';
 
 export interface PaymentRecord {
   paymentId: string;
@@ -333,31 +333,55 @@ export class RazorpayWebhookService {
             ? data.organizationId
             : null;
         if (topUpSkuId) {
-          if (topUpSkuId !== TOP_UP_250.id || String(data.amountInr ?? '') !== TOP_UP_250.priceInr)
+          const amountInr = String(data.amountInr ?? '');
+          const isLegacyTopUp = topUpSkuId === TOP_UP_250.id && amountInr === TOP_UP_250.priceInr;
+          const configuredPack = (() => {
+            try {
+              return getConfiguredCreditPack(topUpSkuId);
+            } catch {
+              return null;
+            }
+          })();
+          const isCurrentIndiaTopUp =
+            configuredPack?.prices.INDIA.currency === 'INR' &&
+            configuredPack.prices.INDIA.amount === amountInr;
+          if (!isLegacyTopUp && !isCurrentIndiaTopUp)
             throw new Error('Top-up payment does not match the server catalog');
+          const pack: { credits: string; displayName: string; validityDays: number } =
+            configuredPack
+              ? {
+                  credits: configuredPack.credits,
+                  displayName: `${configuredPack.credits} credits`,
+                  validityDays: configuredPack.validityDays,
+                }
+              : {
+                  credits: TOP_UP_250.credits,
+                  displayName: TOP_UP_250.displayName,
+                  validityDays: TOP_UP_250.validityDays,
+                };
           const purchasedAt = new Date().toISOString();
           if (organizationId && this.options.organizationBilling) {
             await this.options.organizationBilling.grantCredits({
               organizationId,
               actorUserId: userId,
-              amountCredits: TOP_UP_250.credits,
+              amountCredits: pack.credits,
               transactionType: 'CREDIT_PURCHASE',
               idempotencyKey: `topup:${providerPaymentId}`,
-              reason: `${TOP_UP_250.displayName} organization top-up purchase`,
+              reason: `${pack.displayName} organization top-up purchase`,
               sourceType: 'purchased_topup',
-              expiresAt: topUpExpiresAt(purchasedAt),
+              expiresAt: topUpExpiresAt(purchasedAt, pack.validityDays),
               referenceId: providerPaymentId,
               metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
             });
           } else {
             await this.options.billing.grantCredits({
               userId,
-              amountCredits: TOP_UP_250.credits,
+              amountCredits: pack.credits,
               transactionType: 'CREDIT_PURCHASE',
               idempotencyKey: `topup:${providerPaymentId}`,
-              reason: `${TOP_UP_250.displayName} top-up purchase`,
+              reason: `${pack.displayName} top-up purchase`,
               sourceType: 'purchased_topup',
-              expiresAt: topUpExpiresAt(purchasedAt),
+              expiresAt: topUpExpiresAt(purchasedAt, pack.validityDays),
               referenceId: providerPaymentId,
               metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
             });

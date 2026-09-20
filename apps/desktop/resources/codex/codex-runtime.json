@@ -1,0 +1,20 @@
+{
+  "sourceSha": "5c5308fc9a9ee789049d646ef11e5400384b9c6f",
+  "runtimeSourceSha": "106bdc71ea78c8cf4e22d7c643c1564de630b3c9",
+  "releaseTag": "rust-v0.156.0-alpha.10",
+  "releaseAssetUrl": "https://github.com/openai/codex/releases/download/rust-v0.156.0-alpha.10/codex-app-server-x86_64-pc-windows-msvc.exe",
+  "protocolFingerprint": "1b94b320c014fa02eb89bc613d7beef36b1a400d164eeeaad8dd716d6da81435",
+  "adapterVersion": "astra-codex-adapter-v1",
+  "version": "rust-v0.156.0-alpha.10",
+  "platform": "win32",
+  "architecture": "x64",
+  "artifactPath": "codex-app-server.exe",
+  "artifactSha256": "616c4961d85c8faccf0c1ae5db3ce4dfd2de18422f6a9a5c5ebada9c96ad4395",
+  "artifact": {
+    "path": "codex-app-server.exe",
+    "sha256": "616c4961d85c8faccf0c1ae5db3ce4dfd2de18422f6a9a5c5ebada9c96ad4395"
+  },
+  "args": ["--listen", "stdio://", "--session-source", "vscode"],
+  "acquisition": "official-github-release",
+  "buildTimestamp": "2026-09-20T22:37:59.029Z"
+}

@@ -1,5 +1,5 @@
 /**
- * Secret redactor for the Astra AI agent.
+ * Secret redactor for the Astra Code agent.
  *
  * Detects and redacts common secret patterns before they are stored in
  * agent session memory. Repository files are untrusted input.

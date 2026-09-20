@@ -9,7 +9,14 @@ import {
 import { AUTO_MODEL_ID, type BillingMode } from '@lyntar/contracts';
 import type { ModelCatalogStore } from '@lyntar/db';
 import type { UsageReceiptStore } from '@lyntar/db';
-import type { PlanCatalog } from '@lyntar/plans';
+import {
+  getPlanRegionalPrice,
+  listCreditPacks,
+  pricingRegionForCountryCode,
+  normalizeCountryCode,
+  STANDARD_CREDIT_RATES,
+  type PlanCatalog,
+} from '@lyntar/plans';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveRequestedModel } from './model-selection.js';
@@ -41,6 +48,21 @@ function tokenFrom(request: FastifyRequest): string | null {
     .find((part) => part.startsWith('astra_access='))
     ?.slice('astra_access='.length);
   return access ? decodeURIComponent(access) : null;
+}
+
+function countryHintFrom(request: FastifyRequest): string | null {
+  const query = request.query as { country?: unknown } | undefined;
+  const candidates = [
+    typeof query?.country === 'string' ? query.country : null,
+    typeof request.headers['x-country-code'] === 'string'
+      ? request.headers['x-country-code']
+      : null,
+    typeof request.headers['cf-ipcountry'] === 'string' ? request.headers['cf-ipcountry'] : null,
+    typeof request.headers['x-vercel-ip-country'] === 'string'
+      ? request.headers['x-vercel-ip-country']
+      : null,
+  ];
+  return candidates.map(normalizeCountryCode).find((country) => country !== null) ?? null;
 }
 
 function sendBillingError(reply: FastifyReply, error: unknown) {
@@ -96,6 +118,29 @@ export async function registerBillingRoutes(
   dependencies: BillingRouteDependencies,
 ): Promise<void> {
   app.get('/v1/plans', async (_request, reply) => reply.send({ plans: dependencies.plans.list() }));
+
+  app.get('/v1/pricing', async (request, reply) => {
+    const countryCode = countryHintFrom(request);
+    const region = pricingRegionForCountryCode(countryCode);
+    return reply.send({
+      productName: 'Astra Code',
+      region,
+      countryCode,
+      plans: dependencies.plans.list().map((plan) => ({
+        ...plan,
+        regionalPrice: getPlanRegionalPrice(plan.id, region),
+      })),
+      creditPacks: listCreditPacks(region),
+      standardCreditRate: STANDARD_CREDIT_RATES[region],
+      policy: {
+        additionalCreditsAvailable: true,
+        purchasedCreditValidityDays: 365,
+        subscriptionRolloverCycles: 1,
+        countryIsPricingSignal: true,
+        checkoutRequiresVerifiedBillingCountry: true,
+      },
+    });
+  });
 
   app.get('/v1/wallet', async (request, reply) => {
     const identity = await requireUser(dependencies, request, reply);
@@ -206,6 +251,32 @@ export async function registerBillingRoutes(
       return sendBillingError(reply, error);
     }
   });
+
+  app.get<{ Params: { taskId: string } }>(
+    '/v1/billing/tasks/:taskId/receipts',
+    async (request, reply) => {
+      const identity = await requireUser(dependencies, request, reply);
+      if (!identity) return;
+      const reservationId = request.headers['x-lyntar-reservation-id'];
+      if (typeof reservationId !== 'string')
+        return reply.code(400).send({ error: 'RESERVATION_REQUIRED' });
+      const reservation =
+        (await dependencies.billing.getReservation(reservationId)) ??
+        (await dependencies.organizationBilling.getReservation(reservationId));
+      if (
+        !reservation ||
+        reservation.userId !== identity.user.id ||
+        (reservation.organizationId && reservation.actorUserId !== identity.user.id) ||
+        reservation.taskId !== request.params.taskId
+      )
+        return reply.code(404).send({ error: 'RESERVATION_NOT_FOUND' });
+      if (!dependencies.receipts)
+        return reply.code(503).send({ error: 'USAGE_RECEIPTS_NOT_CONFIGURED' });
+      return reply.send({
+        receipts: await dependencies.receipts.listForTask(request.params.taskId),
+      });
+    },
+  );
 
   app.post('/v1/billing/settlements', async (request, reply) => {
     const identity = await requireUser(dependencies, request, reply);

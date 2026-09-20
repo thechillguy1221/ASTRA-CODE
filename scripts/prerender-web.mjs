@@ -20,12 +20,12 @@ function escapeHtml(value) {
 function staticBody(route) {
   const heading = escapeHtml(route.title);
   const description = escapeHtml(route.description);
-  const kind = route.category === 'comparison' ? 'Comparison' : 'Astra AI';
-  return `<main class="page prerendered-page"><span class="eyebrow">${kind}</span><h1>${heading}</h1><p class="lede">${description}</p><p>Astra AI is a desktop AI coding agent for local Windows projects, bounded actions, model choice, and verified results.</p><nav aria-label="Page actions"><a href="/download/windows">Download Astra</a><a href="/pricing">See pricing</a></nav></main>`;
+  const kind = route.category === 'comparison' ? 'Comparison' : 'Astra Code';
+  return `<main class="page prerendered-page"><span class="eyebrow">${kind}</span><h1>${heading}</h1><p class="lede">${description}</p><p>Astra Code is a desktop AI coding agent for local Windows projects, bounded actions, model choice, and verified results.</p><nav aria-label="Page actions"><a href="/download/windows">Download Astra Code</a><a href="/pricing">See pricing</a></nav></main>`;
 }
 
 function render(route) {
-  const title = escapeHtml(`${route.title} — Astra AI`);
+  const title = escapeHtml(`${route.title} — Astra Code`);
   const description = escapeHtml(route.description);
   const canonical = `${siteUrl}${route.path}`;
   const schema = JSON.stringify({
@@ -34,7 +34,7 @@ function render(route) {
     name: route.title,
     description: route.description,
     url: canonical,
-    isPartOf: { '@type': 'WebSite', name: 'Astra AI', url: siteUrl },
+    isPartOf: { '@type': 'WebSite', name: 'Astra Code', url: siteUrl },
   }).replaceAll('<', '\\u003c');
   return source
     .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getCompetitor } from './competitors.js';
-import { noLivePlanData, resolvePublicRoute, type PublicPlanCard } from './routes.js';
+import {
+  noLivePlanData,
+  resolvePublicRoute,
+  type PublicCreditPack,
+  type PublicPlanCard,
+} from './routes.js';
 import { publicSiteUrl } from './site-config.js';
 import './app.css';
 
@@ -24,46 +29,78 @@ function LinkButton({
   );
 }
 
-function useServerPlans(): { plans: PublicPlanCard[]; loading: boolean } {
+function countryHint(): string | null {
+  const language = typeof navigator === 'undefined' ? '' : navigator.language;
+  return /[-_]IN$/i.test(language) ? 'IN' : null;
+}
+
+function useServerPlans(): {
+  plans: PublicPlanCard[];
+  creditPacks: PublicCreditPack[];
+  region: 'INDIA' | 'GLOBAL' | null;
+  standardCreditRate: { currency: 'INR' | 'USD'; amount: string } | null;
+  loading: boolean;
+} {
   const [plans, setPlans] = useState<PublicPlanCard[]>([]);
+  const [creditPacks, setCreditPacks] = useState<PublicCreditPack[]>([]);
+  const [region, setRegion] = useState<'INDIA' | 'GLOBAL' | null>(null);
+  const [standardCreditRate, setStandardCreditRate] = useState<{
+    currency: 'INR' | 'USD';
+    amount: string;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
-    void fetch(`${apiBase}/v1/plans`)
+    const query = countryHint() ? `?country=${countryHint()}` : '';
+    void fetch(`${apiBase}/v1/pricing${query}`)
       .then(async (response) => {
         if (!response.ok) throw new Error('plans unavailable');
         const body = (await response.json()) as {
+          region?: 'INDIA' | 'GLOBAL';
+          standardCreditRate?: { currency: 'INR' | 'USD'; amount: string };
           plans?: Array<{
             id: string;
             displayName: string;
-            monthlyPriceInr: string;
             monthlyCredits: string;
             seats?: number;
             activeJobsPerSeat?: number;
             maxConcurrentJobs?: number;
             pooledCredits?: boolean;
             topUpEnabled?: boolean;
-            taxExclusive?: boolean;
+            regionalPrice?: {
+              currency: 'INR' | 'USD';
+              amount: string;
+              taxIncluded: boolean;
+            };
           }>;
+          creditPacks?: PublicCreditPack[];
         };
         if (!active) return;
+        setRegion(body.region ?? null);
+        setStandardCreditRate(body.standardCreditRate ?? null);
+        setCreditPacks(body.creditPacks ?? []);
         setPlans(
           (body.plans ?? []).map((plan) => ({
             id: plan.id,
             displayName: plan.displayName,
-            priceInr: `₹${plan.monthlyPriceInr}`,
+            currency: plan.regionalPrice?.currency ?? 'USD',
+            price: plan.regionalPrice?.amount ?? '—',
             monthlyCredits: plan.monthlyCredits,
             seats: plan.seats ?? 1,
             activeJobsPerSeat: plan.activeJobsPerSeat ?? plan.maxConcurrentJobs ?? 1,
             pooledCredits: plan.pooledCredits === true,
             topUpEnabled: plan.topUpEnabled === true,
-            taxExclusive: plan.taxExclusive !== false,
             source: 'server',
           })),
         );
       })
       .catch(() => {
-        if (active) setPlans([]);
+        if (active) {
+          setPlans([]);
+          setCreditPacks([]);
+          setRegion(null);
+          setStandardCreditRate(null);
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -72,19 +109,19 @@ function useServerPlans(): { plans: PublicPlanCard[]; loading: boolean } {
       active = false;
     };
   }, []);
-  return { plans, loading };
+  return { plans, creditPacks, region, standardCreditRate, loading };
 }
 
 function useMetadata(route: ReturnType<typeof resolvePublicRoute>): void {
   useEffect(() => {
     const siteUrl = publicSiteUrl;
-    document.title = `${route.title} — Astra AI`;
+    document.title = `${route.title} — Astra Code`;
     const setMeta = (selector: string, attribute: 'content', value: string): void => {
       const element = document.querySelector<HTMLMetaElement>(selector);
       if (element) element.setAttribute(attribute, value);
     };
     setMeta('meta[name="description"]', 'content', route.description);
-    setMeta('meta[property="og:site_name"]', 'content', 'Astra AI');
+    setMeta('meta[property="og:site_name"]', 'content', 'Astra Code');
     setMeta('meta[property="og:title"]', 'content', route.title);
     setMeta('meta[property="og:description"]', 'content', route.description);
     setMeta('meta[property="og:url"]', 'content', `${siteUrl}${route.path}`);
@@ -105,18 +142,24 @@ function useMetadata(route: ReturnType<typeof resolvePublicRoute>): void {
       name: route.title,
       description: route.description,
       url: `${siteUrl}${route.path}`,
-      isPartOf: { '@type': 'WebSite', name: 'Astra AI', url: siteUrl },
+      isPartOf: { '@type': 'WebSite', name: 'Astra Code', url: siteUrl },
     });
   }, [route]);
 }
 
 function PlansSection({
   plans,
+  creditPacks,
+  region,
+  standardCreditRate,
   loading,
   navigate,
   compact = false,
 }: {
   plans: PublicPlanCard[];
+  creditPacks: PublicCreditPack[];
+  region: 'INDIA' | 'GLOBAL' | null;
+  standardCreditRate: { currency: 'INR' | 'USD'; amount: string } | null;
   loading: boolean;
   navigate: (path: string) => void;
   compact?: boolean;
@@ -127,8 +170,8 @@ function PlansSection({
         <span className="eyebrow">Server-controlled plans</span>
         <h2>Predictable credits, without provider juggling.</h2>
         <p>
-          Prices and allowances are read from Astra AI’s backend. The desktop and public site do not
-          own a second pricing table.
+          Prices and allowances are read from Astra Code’s backend. The desktop and public site do
+          not own a second pricing table.
         </p>
       </div>
       {loading ? (
@@ -143,8 +186,8 @@ function PlansSection({
             <article className="plan-card" key={plan.id}>
               <span className="card-kicker">{plan.displayName}</span>
               <strong>
-                {plan.priceInr}
-                {plan.taxExclusive ? ' + applicable taxes' : ''}
+                {plan.currency === 'INR' ? '₹' : '$'}
+                {plan.price}
               </strong>
               <p>{plan.monthlyCredits} credits / month</p>
               <p className="plan-detail">
@@ -152,7 +195,9 @@ function PlansSection({
                 {plan.activeJobsPerSeat === 1 ? '' : 's'} per active seat
                 {plan.pooledCredits ? ' · pooled' : ''}
               </p>
-              {plan.topUpEnabled && <p className="plan-detail">250-credit top-up available</p>}
+              {plan.topUpEnabled && (
+                <p className="plan-detail">Additional credits available anytime</p>
+              )}
               <LinkButton path="/signup" navigate={navigate}>
                 Choose {plan.displayName}
               </LinkButton>
@@ -161,20 +206,44 @@ function PlansSection({
         </div>
       )}
       <p className="data-note">
-        1 credit = $0.01 of billable AI model usage. Actual consumption depends on the selected
-        model; subscription credits can roll over for one additional cycle when the server policy
-        allows it.
+        {region === 'INDIA'
+          ? 'India pricing'
+          : region === 'GLOBAL'
+            ? 'Global pricing'
+            : 'Regional pricing'}{' '}
+        · Standard credit rate: {standardCreditRate?.currency === 'INR' ? '₹' : '$'}
+        {standardCreditRate?.amount ?? '—'}. Model usage remains metered; subscription credits can
+        roll over for one additional cycle under server policy.
       </p>
+      {creditPacks.length > 0 && (
+        <div className="credit-pack-strip">
+          <strong>Need more credits? Add credits and continue.</strong>
+          <span>
+            {creditPacks.slice(0, 5).map((pack) => (
+              <span key={pack.id} className="credit-pack-pill">
+                {pack.credits} · {pack.price.currency === 'INR' ? '₹' : '$'}
+                {pack.price.amount}
+              </span>
+            ))}
+          </span>
+        </div>
+      )}
     </section>
   );
 }
 
 function Home({
   plans,
+  creditPacks,
+  region,
+  standardCreditRate,
   loading,
   navigate,
 }: {
   plans: PublicPlanCard[];
+  creditPacks: PublicCreditPack[];
+  region: 'INDIA' | 'GLOBAL' | null;
+  standardCreditRate: { currency: 'INR' | 'USD'; amount: string } | null;
   loading: boolean;
   navigate: (path: string) => void;
 }): React.JSX.Element {
@@ -185,7 +254,7 @@ function Home({
           <span className="eyebrow">Desktop AI coding agent · Windows</span>
           <h1>Your AI coding agent, without the API-key headache.</h1>
           <p className="lede">
-            Astra AI connects a local workspace, multiple approved models, bounded tools, task
+            Astra Code connects a local workspace, multiple approved models, bounded tools, task
             estimates, and verified results inside one coding environment.
           </p>
           <div className="hero-actions">
@@ -316,7 +385,37 @@ function Home({
           </li>
         </ol>
       </section>
-      <PlansSection plans={plans} loading={loading} navigate={navigate} compact />
+      <section className="section feature-band">
+        <span className="eyebrow">Continuous account</span>
+        <h2>Run out of credits? Just add more.</h2>
+        <p>
+          Your subscription stays the same. Add Astra Credits to the same wallet and continue using
+          the same projects, Rooms, integrations, and agent workflows.
+        </p>
+        <div className="credit-flow" aria-label="Astra credit flow">
+          <span>Monthly plan</span>
+          <b>→</b>
+          <span>Included credits</span>
+          <b>→</b>
+          <span>Use Astra Code</span>
+          <b>→</b>
+          <span>Add credits</span>
+          <b>→</b>
+          <span>Keep building</span>
+        </div>
+        <LinkButton path="/credits" navigate={navigate}>
+          Learn how credits work →
+        </LinkButton>
+      </section>
+      <PlansSection
+        plans={plans}
+        creditPacks={creditPacks}
+        region={region}
+        standardCreditRate={standardCreditRate}
+        loading={loading}
+        navigate={navigate}
+        compact
+      />
       <section className="section comparison-strip">
         <span className="eyebrow">Make an informed choice</span>
         <h2>See how the workflow differs.</h2>
@@ -340,7 +439,7 @@ function Home({
         </div>
       </section>
       <section className="final-cta page">
-        <span className="eyebrow">Astra AI</span>
+        <span className="eyebrow">Astra Code</span>
         <h2>Stop configuring providers. Start building.</h2>
         <LinkButton path="/download/windows" className="cta" navigate={navigate}>
           Download Astra
@@ -576,7 +675,7 @@ function AccountPanel({
         fetch(`${apiBase}${endpoint}`, { credentials: 'include' });
       const meResponse = await request('/v1/auth/me');
       if (meResponse.status === 401 || meResponse.status === 403) {
-        if (active) setMessage('Sign in to manage your Astra AI account.');
+        if (active) setMessage('Sign in to manage your Astra Code account.');
         return;
       }
       if (!meResponse.ok) throw new Error('Account data is unavailable.');
@@ -818,7 +917,7 @@ function ComparisonPage({
     return (
       <section className="page article-page">
         <span className="eyebrow">Comparison</span>
-        <h1>Astra AI vs BYOK agents</h1>
+        <h1>Astra Code vs BYOK agents</h1>
         <p className="lede">
           BYOK gives advanced users direct provider control. Astra packages approved model access,
           estimates, model switching, and account-level credits into one workflow.
@@ -832,7 +931,7 @@ function ComparisonPage({
             </p>
           </div>
           <div>
-            <h2>Astra AI</h2>
+            <h2>Astra Code</h2>
             <p>
               Create an Astra account → choose a plan → see the estimate → run the task → inspect
               the usage receipt.
@@ -861,7 +960,7 @@ function ComparisonPage({
   return (
     <section className="page article-page">
       <span className="eyebrow">Verified {competitor.verifiedAt}</span>
-      <h1>Astra AI vs {competitor.name}</h1>
+      <h1>Astra Code vs {competitor.name}</h1>
       {competitor.published ? (
         <>
           <p className="lede">
@@ -870,7 +969,7 @@ function ComparisonPage({
           </p>
           <div className="fact-grid">
             <div>
-              <span>Astra AI</span>
+              <span>Astra Code</span>
               <strong>Managed desktop workflow</strong>
               <p>
                 Server-controlled models, local workspace access, task budgets, estimates, and
@@ -918,7 +1017,7 @@ function ComparisonPage({
 export function App(): React.JSX.Element {
   const [path, setPath] = useState(window.location.pathname || '/');
   const route = useMemo(() => resolvePublicRoute(path), [path]);
-  const { plans, loading } = useServerPlans();
+  const { plans, creditPacks, region, standardCreditRate, loading } = useServerPlans();
   useMetadata(route);
   const navigate = (nextPath: string): void => {
     setPath(nextPath);
@@ -937,7 +1036,7 @@ export function App(): React.JSX.Element {
     <div className="site-shell">
       <header className="site-nav">
         <LinkButton path="/" className="site-brand" navigate={navigate}>
-          ASTRA <span>AI</span>
+          ASTRA <span>CODE</span>
         </LinkButton>
         <details className="mobile-nav">
           <summary>Menu</summary>
@@ -993,7 +1092,14 @@ export function App(): React.JSX.Element {
             </LinkButton>
           </section>
         ) : path === '/' ? (
-          <Home plans={plans} loading={loading} navigate={navigate} />
+          <Home
+            plans={plans}
+            creditPacks={creditPacks}
+            region={region}
+            standardCreditRate={standardCreditRate}
+            loading={loading}
+            navigate={navigate}
+          />
         ) : route.category === 'comparison' ? (
           <ComparisonPage slug={route.competitor ?? ''} navigate={navigate} />
         ) : isAuth ? (
@@ -1008,12 +1114,82 @@ export function App(): React.JSX.Element {
               <span className="eyebrow">Pricing</span>
               <h1>One account for models, tasks, and credits.</h1>
               <p className="lede">
-                Astra’s canonical plans come from the backend. Credits are settled from actual usage
-                receipts; they are not a synonym for provider tokens.
+                Astra Code’s canonical plans come from the backend. Credits are settled from actual
+                usage receipts; they are not a synonym for provider tokens.
               </p>
             </section>
-            <PlansSection plans={plans} loading={loading} navigate={navigate} />
+            <PlansSection
+              plans={plans}
+              creditPacks={creditPacks}
+              region={region}
+              standardCreditRate={standardCreditRate}
+              loading={loading}
+              navigate={navigate}
+            />
           </>
+        ) : path === '/credits' ? (
+          <section className="page article-page">
+            <span className="eyebrow">Astra Credits</span>
+            <h1>One account. Included usage. Top up when you need more.</h1>
+            <p className="lede">
+              Astra Credits are the standardized unit of metered AI usage. When included monthly
+              credits run out, purchase credits into the same wallet instead of creating another
+              account or losing project context.
+            </p>
+            <div className="article-columns">
+              <div>
+                <h2>How balances work</h2>
+                <p>
+                  Monthly included credits refresh each cycle and follow the configured rollover
+                  policy. Purchased credits are tracked separately and remain valid for 12 months.
+                </p>
+                <h2>Personal and organization wallets</h2>
+                <p>
+                  Personal work uses a personal wallet. Team and Business Room work uses the pooled
+                  organization wallet, with member and Room attribution retained in the ledger.
+                </p>
+                <h2>Usage is model-dependent</h2>
+                <p>
+                  Different models and tool workflows consume credits at different rates. Astra
+                  shows estimates and reconciles actual usage from server receipts.
+                </p>
+              </div>
+              <aside className="article-aside">
+                <strong>Need more credits?</strong>
+                <span>Add credits and continue.</span>
+                <span>Same account</span>
+                <span>Same projects</span>
+                <span>Same Room context</span>
+                <LinkButton path="/pricing" className="cta" navigate={navigate}>
+                  View regional pricing
+                </LinkButton>
+              </aside>
+            </div>
+            <div className="faq-list">
+              <h2>Credit FAQ</h2>
+              <details>
+                <summary>What happens when I run out?</summary>
+                <p>
+                  Purchase additional Astra Credits and continue from the same account. No second
+                  subscription is required.
+                </p>
+              </details>
+              <details>
+                <summary>Are Team credits shared?</summary>
+                <p>
+                  Yes. Team and Business monthly credits are pooled through the organization wallet
+                  and used by authorized members.
+                </p>
+              </details>
+              <details>
+                <summary>Can I change regional pricing with a VPN?</summary>
+                <p>
+                  Regional pricing is based on verified account and billing-region information, not
+                  only the current IP address.
+                </p>
+              </details>
+            </div>
+          </section>
         ) : (
           <section className="page article-page">
             <span className="eyebrow">
@@ -1021,7 +1197,7 @@ export function App(): React.JSX.Element {
                 ? 'Feature'
                 : route.category === 'use-case'
                   ? 'Use case'
-                  : 'Astra AI'}
+                  : 'Astra Code'}
             </span>
             <h1>{route.title}</h1>
             <p className="lede">{route.description}</p>

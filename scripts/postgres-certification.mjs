@@ -1,5 +1,3 @@
-/* global process, console */
-
 import { execFile } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

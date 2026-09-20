@@ -159,11 +159,17 @@ textarea:focus-visible {
 .panel-heading,
 .actions,
 .topbar-actions,
-.mode-toolbar {
+.mode-toolbar,
+.execution-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.execution-status {
+  justify-content: flex-end;
+  gap: 10px;
 }
 .topbar {
   min-height: 47px;

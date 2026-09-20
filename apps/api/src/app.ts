@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import {
   createMemoryCatalog,
@@ -7,7 +8,7 @@ import {
   type ModelCatalogStore,
   type UsageReceiptStore,
 } from '@lyntar/db';
-import type { GatewayModelClient } from '@lyntar/model-gateway';
+import type { GatewayModelClient, ResponsesGatewayClient } from '@lyntar/model-gateway';
 import type { AuthService } from '@lyntar/auth';
 import type { RateLimitStore } from '@lyntar/auth';
 import { hashRateLimitIdentity } from '@lyntar/auth';
@@ -47,12 +48,16 @@ import {
   type WebResearchService as WebResearchServiceType,
 } from '@lyntar/web-research';
 import { registerWebResearchRoutes } from './web-research-route.js';
+import { CodexRuntimeTokenService } from './codex-runtime-auth.js';
+import { registerCodexRuntimeRoutes } from './codex-runtime-route.js';
 
 export interface ApiDependencies {
   catalog?: ModelCatalogStore;
   receipts?: UsageReceiptStore;
   events?: AgentEventStore;
   gateway?: GatewayModelClient;
+  responsesGateway?: ResponsesGatewayClient;
+  runtimeTokenSecret?: string;
   auth?: AuthService;
   exposeDevelopmentTokens?: boolean;
   billing?: BillingService;
@@ -110,6 +115,8 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       'POST /v1/rooms/invitations/redeem': { limit: 10, windowMs: 10 * 60 * 1000 },
       'POST /v1/web/search': { limit: 30, windowMs: 10 * 60 * 1000 },
       'POST /v1/web/fetch': { limit: 30, windowMs: 10 * 60 * 1000 },
+      'POST /v1/runtime/codex/token': { limit: 30, windowMs: 10 * 60 * 1000 },
+      'POST /runtime/codex/v1/responses': { limit: 120, windowMs: 10 * 60 * 1000 },
     };
     const prefixedLimits: Array<{
       method: string;
@@ -150,6 +157,11 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   const webResearch =
     dependencies.webResearch ??
     new WebResearchService({ provider: new UnavailableWebSearchProvider() });
+  const runtimeTokens = new CodexRuntimeTokenService(
+    dependencies.runtimeTokenSecret ??
+      process.env.ASTRA_RUNTIME_TOKEN_SECRET ??
+      randomBytes(32).toString('hex'),
+  );
   app.get('/health', async () => ({ status: 'ok' }));
   void registerModelRoutes(app, {
     catalog,
@@ -219,6 +231,16 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       auth: dependencies.auth,
       remote,
       webResearch,
+    });
+    void registerCodexRuntimeRoutes(app, {
+      auth: dependencies.auth,
+      catalog,
+      receipts,
+      billing,
+      organizationBilling,
+      remote,
+      runtimeTokens,
+      ...(dependencies.responsesGateway ? { responsesGateway: dependencies.responsesGateway } : {}),
     });
   }
   return app;

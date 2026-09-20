@@ -1,0 +1,29 @@
+.cline-ui-session-status {
+  --cline-ui-session-status-color: var(--neutral-a4, #566579);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--muted-foreground, #8b9aae);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.cline-ui-session-status__dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--cline-ui-session-status-color);
+}
+
+.cline-ui-session-status--neutral .cline-ui-session-status__dot {
+  visibility: hidden;
+}
+
+.cline-ui-session-status--running {
+  --cline-ui-session-status-color: var(--primary, #71b1ff);
+}
+
+.cline-ui-session-status--error {
+  --cline-ui-session-status-color: var(--error-text, #ff9fa8);
+}

@@ -32,7 +32,7 @@ def exercise(browser_name: str, browser_type) -> None:
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         for route in PUBLIC_ROUTES:
             page.goto(f"{BASE_URL}{route}", wait_until="networkidle")
-            assert "Astra AI" in page.title(), f"missing Astra title on {route}"
+            assert "Astra Code" in page.title(), f"missing Astra Code title on {route}"
             assert page.locator("h1").count() == 1, f"expected one h1 on {route}"
 
         page.goto(f"{BASE_URL}/", wait_until="networkidle")

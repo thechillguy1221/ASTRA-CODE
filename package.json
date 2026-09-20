@@ -1,7 +1,7 @@
 {
   "name": "lyntar",
-  "productName": "Astra AI",
-  "description": "Astra AI desktop coding agent platform with bounded local execution, model routing, and verified results.",
+  "productName": "Astra Code",
+  "description": "Astra Code desktop coding agent platform with bounded local execution, model routing, and verified results.",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -20,6 +20,7 @@
     "package:win": "npm run package:win --workspace @lyntar/desktop",
     "package:win:unsigned": "npm run package:win:unsigned --workspace @lyntar/desktop",
     "build:codex-runtime": "node scripts/build-codex-runtime.mjs",
+    "certify:codex-runtime": "npm run build --workspace @lyntar/codex-runtime && node scripts/verify-codex-runtime-artifact.mjs && node scripts/certify-codex-runtime.mjs",
     "verify:source-provenance": "node scripts/verify-source-provenance.mjs",
     "lint": "eslint .",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"packages/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"scripts/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"tests/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"docs/**/*.{md,json,yml,yaml}\" \"*.{json,js,ts,mjs,cjs,md,yml,yaml}\"",

@@ -57,12 +57,18 @@ export function parseUsageReceipt(raw: unknown, context: ReceiptContext): UsageR
     'usage.prompt_tokens',
     'usage.input_tokens',
     'usage.inputTokens',
+    'response.usage.prompt_tokens',
+    'response.usage.input_tokens',
+    'response.usage.inputTokens',
   );
   const outputTokens = numberAt(
     raw,
     'usage.completion_tokens',
     'usage.output_tokens',
     'usage.outputTokens',
+    'response.usage.completion_tokens',
+    'response.usage.output_tokens',
+    'response.usage.outputTokens',
   );
   const cacheTokens = numberAt(
     raw,
@@ -70,19 +76,31 @@ export function parseUsageReceipt(raw: unknown, context: ReceiptContext): UsageR
     'usage.cache_read_input_tokens',
     'usage.prompt_tokens_details.cached_tokens',
     'usage.input_cached_tokens',
+    'response.usage.cached_tokens',
+    'response.usage.cache_read_input_tokens',
+    'response.usage.prompt_tokens_details.cached_tokens',
   );
   const cacheWriteTokens = numberAt(
     raw,
     'usage.cache_write_input_tokens',
     'usage.cache_write_tokens',
+    'response.usage.cache_write_input_tokens',
+    'response.usage.cache_write_tokens',
   );
   const reasoningUnits = numberAt(
     raw,
     'usage.reasoning_tokens',
     'usage.reasoning_units',
     'usage.reasoningTokens',
+    'response.usage.reasoning_tokens',
+    'response.usage.reasoning_units',
+    'response.usage.reasoningTokens',
   );
-  const otherBillableUnits = numberAt(raw, 'usage.other_billable_units');
+  const otherBillableUnits = numberAt(
+    raw,
+    'usage.other_billable_units',
+    'response.usage.other_billable_units',
+  );
   const actualCostUsd = numberAt(
     raw,
     'cost.total',
@@ -90,6 +108,10 @@ export function parseUsageReceipt(raw: unknown, context: ReceiptContext): UsageR
     'providerMetadata.gateway.cost',
     'provider_metadata.gateway.cost',
     'usage.cost',
+    'response.cost.total',
+    'response.cost.totalCost',
+    'response.usage.cost',
+    'response.usage_metadata.cost',
   );
   if (
     inputTokens === undefined &&

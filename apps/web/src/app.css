@@ -718,3 +718,67 @@ p {
     transition: none !important;
   }
 }
+
+.credit-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  color: #d9e7f2;
+}
+
+.credit-flow span,
+.credit-pack-pill {
+  border: 1px solid #345067;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #102536;
+}
+
+.credit-flow b {
+  color: #8ed5bb;
+}
+
+.credit-pack-strip {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: 1px solid #345067;
+  border-radius: 14px;
+  background: #0d1d2b;
+}
+
+.credit-pack-strip > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.credit-pack-pill {
+  display: inline-flex;
+  font-size: 13px;
+}
+
+.faq-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 48px;
+}
+
+.faq-list h2 {
+  margin-bottom: 4px;
+}
+
+.faq-list details {
+  padding: 16px 18px;
+  border: 1px solid #345067;
+  border-radius: 12px;
+  background: #0d1d2b;
+}
+
+.faq-list summary {
+  cursor: pointer;
+  font-weight: 700;
+}

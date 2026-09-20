@@ -39,6 +39,10 @@ export const PlanSchema = z.object({
   id: z.string().min(1),
   displayName: z.string().min(1),
   monthlyPriceInr: z.string().regex(/^\d+$/),
+  monthlyPriceUsd: z
+    .string()
+    .regex(/^\d+(?:\.\d+)?$/)
+    .optional(),
   monthlyCredits: CreditAmountSchema,
   allowedModelIds: z.array(z.string().min(1)),
   allowedModes: z.array(BillingModeSchema),

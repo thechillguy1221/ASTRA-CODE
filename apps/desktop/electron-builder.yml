@@ -1,5 +1,5 @@
 appId: dev.astra.ai.desktop
-productName: Astra AI
+productName: Astra Code
 directories:
   output: release
   buildResources: build
@@ -7,13 +7,18 @@ icon: build/icon.ico
 files:
   - dist/**/*
   - package.json
+extraResources:
+  - from: resources/codex
+    to: codex
+  - from: resources/licenses
+    to: licenses
 asar: true
 win:
   target:
     - target: nsis
       arch:
         - x64
-  artifactName: Astra-AI-${version}-win-x64.${ext}
+  artifactName: Astra-Code-${version}-win-x64.${ext}
 nsis:
   oneClick: false
   perMachine: false
@@ -21,6 +26,6 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
 protocols:
-  - name: Astra AI authentication
+  - name: Astra Code authentication
     schemes:
       - astra

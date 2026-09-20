@@ -1,4 +1,5 @@
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
+import { join } from 'node:path';
 import {
   AgentTaskRunner,
   InMemorySessionStore,
@@ -10,6 +11,7 @@ import {
 } from '@lyntar/agent-core';
 import { HackathonService, LearnService, VivaService } from '@lyntar/modes';
 import { MemoryCredentialStore, type CredentialStore, type DeviceIdentity } from './credentials.js';
+import { CodexTaskRunner } from './codex-task-runner.js';
 import {
   AuthSessionResultSchema,
   DesktopDeviceSchema,
@@ -37,6 +39,7 @@ import {
   type VivaDifficulty,
   type VivaQuestion,
   type VivaEvaluation,
+  type TaskBudget,
 } from '@lyntar/contracts';
 import {
   classifyCommand,
@@ -46,6 +49,27 @@ import {
   verifyProject,
 } from '@lyntar/workspace';
 import { creditsFromUsd, formatUsd, parseUsd } from '@lyntar/billing';
+
+export interface DesktopRuntimeOptions {
+  /** Production defaults to the pinned Codex runtime. Legacy mode is test-only. */
+  runtimeMode?: 'codex' | 'legacy-test';
+  codexRuntimeRoot?: string;
+  userDataPath?: string;
+}
+
+interface DesktopTaskRunner {
+  start(input: {
+    taskId: string;
+    workspaceId: string;
+    agentSessionId: string;
+    prompt: string;
+    modelId: string;
+    budget: TaskBudget;
+    reservationId?: string;
+  }): Promise<unknown>;
+  cancel(taskId: string, reason: string): void;
+  resolvePermission(taskId: string, requestId: string, approved: boolean): void;
+}
 
 class ApiModelPort implements ModelPort {
   constructor(
@@ -69,16 +93,17 @@ class ApiModelPort implements ModelPort {
       body: JSON.stringify(request),
       signal,
     });
-    if (!response.ok) throw new Error(`Astra AI API model request failed with ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Astra Code API model request failed with ${response.status}`);
     if (response.headers.get('content-type')?.includes('application/x-ndjson')) {
-      if (!response.body) throw new Error('Astra AI API returned no model stream');
+      if (!response.body) throw new Error('Astra Code API returned no model stream');
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       const consume = (line: string): ModelStreamEvent | null => {
         if (!line.trim()) return null;
         const value = JSON.parse(line) as Record<string, unknown>;
-        if (value.type === 'error') throw new Error('Astra AI model stream failed');
+        if (value.type === 'error') throw new Error('Astra Code model stream failed');
         if (value.type === 'model') {
           const selectedModelId =
             typeof value.selectedModelId === 'string' ? value.selectedModelId : undefined;
@@ -164,7 +189,10 @@ export class DesktopRuntime {
   private workspace: LocalWorkspace | undefined;
   private git: GitWorkspace | undefined;
   private descriptor: WorkspaceDescriptor | undefined;
-  private runner: AgentTaskRunner | undefined;
+  private runner: DesktopTaskRunner | undefined;
+  private readonly runtimeMode: DesktopRuntimeOptions['runtimeMode'];
+  private readonly codexRuntimeRoot: string;
+  private readonly runtimeUserDataPath: string;
   private agentSessionId: string = randomUUID();
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly learn = new LearnService();
@@ -186,7 +214,16 @@ export class DesktopRuntime {
     private readonly apiBaseUrl = process.env.LYNTAR_API_URL ?? 'http://127.0.0.1:4317',
     private readonly credentials: CredentialStore = new MemoryCredentialStore(),
     private readonly sessionStore: SessionStore = new InMemorySessionStore(),
-  ) {}
+    options: DesktopRuntimeOptions = {},
+  ) {
+    this.runtimeMode = options.runtimeMode ?? 'codex';
+    this.codexRuntimeRoot =
+      options.codexRuntimeRoot ??
+      process.env.ASTRA_CODEX_RUNTIME_ROOT ??
+      join(process.cwd(), 'apps/desktop/resources/codex');
+    this.runtimeUserDataPath =
+      options.userDataPath ?? process.env.ASTRA_RUNTIME_USER_DATA ?? join(process.cwd(), '.astra');
+  }
 
   async openWorkspace(root: string): Promise<WorkspaceDescriptor> {
     const workspace = await LocalWorkspace.open(root);
@@ -212,49 +249,79 @@ export class DesktopRuntime {
       canonicalRoot: workspace.canonical.root,
       selectedAt: new Date().toISOString(),
     };
-    this.runner = new AgentTaskRunner({
-      model: new ApiModelPort(
-        this.apiBaseUrl,
-        () => this.authSession?.accessToken ?? null,
-        (taskId) => this.activeReservationIds.get(taskId) ?? null,
-      ),
-      workspace,
-      patch: { apply: (batch, signal) => workspace.writeBatch(batch, signal) },
-      command: {
-        run: (request, signal) => new LocalCommandRunner(workspace.canonical).run(request, signal),
-      },
-      git,
-      verification: {
-        verify: async (signal) => {
-          const result = await verifyProject(workspace.canonical, signal);
-          return {
-            status: result.status,
-            ...(result.command ? { command: result.command } : {}),
-            summary: result.summary,
-            stdout: result.result?.stdout ?? '',
-            stderr: result.result?.stderr ?? '',
-          };
-        },
-      },
-      event: {
-        append: async (event) => {
-          this.listeners.forEach((listener) => listener(event));
-          const response = await fetch(`${this.apiBaseUrl}/v1/agent-events`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(event),
-          });
-          if (!response.ok)
-            throw new Error(`Astra AI event persistence failed with ${response.status}`);
-        },
-      },
-      permission: new DesktopPermissionPort(),
-      receipts: this.receipts,
-      session: {
-        store: this.sessionStore,
-        userId: () => this.authSession?.user.id ?? 'local-desktop',
-      },
-    });
+    const legacyRunner =
+      this.runtimeMode === 'legacy-test'
+        ? new AgentTaskRunner({
+            model: new ApiModelPort(
+              this.apiBaseUrl,
+              () => this.authSession?.accessToken ?? null,
+              (taskId) => this.activeReservationIds.get(taskId) ?? null,
+            ),
+            workspace,
+            patch: { apply: (batch, signal) => workspace.writeBatch(batch, signal) },
+            command: {
+              run: (request, signal) =>
+                new LocalCommandRunner(workspace.canonical).run(request, signal),
+            },
+            git,
+            verification: {
+              verify: async (signal) => {
+                const result = await verifyProject(workspace.canonical, signal);
+                return {
+                  status: result.status,
+                  ...(result.command ? { command: result.command } : {}),
+                  summary: result.summary,
+                  stdout: result.result?.stdout ?? '',
+                  stderr: result.result?.stderr ?? '',
+                };
+              },
+            },
+            event: {
+              append: async (event) => {
+                this.listeners.forEach((listener) => listener(event));
+                const response = await fetch(`${this.apiBaseUrl}/v1/agent-events`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(event),
+                });
+                if (!response.ok)
+                  throw new Error(`Astra Code event persistence failed with ${response.status}`);
+              },
+            },
+            permission: new DesktopPermissionPort(),
+            receipts: this.receipts,
+            session: {
+              store: this.sessionStore,
+              userId: () => this.authSession?.user.id ?? 'local-desktop',
+            },
+          })
+        : undefined;
+    this.runner =
+      this.runtimeMode === 'codex'
+        ? new CodexTaskRunner({
+            workspace,
+            git,
+            runtimeRoot: this.codexRuntimeRoot,
+            userDataPath: this.runtimeUserDataPath,
+            apiBaseUrl: this.apiBaseUrl,
+            accessToken: () => this.authSession?.accessToken ?? null,
+            emit: async (event) => {
+              this.listeners.forEach((listener) => listener(event));
+              const response = await fetch(`${this.apiBaseUrl}/v1/agent-events`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(this.authSession?.accessToken
+                    ? { Authorization: `Bearer ${this.authSession.accessToken}` }
+                    : {}),
+                },
+                body: JSON.stringify(event),
+              });
+              if (!response.ok)
+                throw new Error(`Astra Code event persistence failed with ${response.status}`);
+            },
+          })
+        : legacyRunner;
     return this.descriptor;
   }
 
@@ -325,7 +392,7 @@ export class DesktopRuntime {
 
   async listModels(): Promise<ModelCatalogEntry[]> {
     const response = await fetch(`${this.apiBaseUrl}/v1/models`);
-    if (!response.ok) throw new Error(`Astra AI model catalog failed with ${response.status}`);
+    if (!response.ok) throw new Error(`Astra Code model catalog failed with ${response.status}`);
     const body = ModelCatalogResponseSchema.parse(await response.json());
     return body.models.map((model) => ModelCatalogEntrySchema.parse(model));
   }
@@ -399,7 +466,7 @@ export class DesktopRuntime {
       body: JSON.stringify({
         codeChallenge: challenge,
         device: {
-          label: 'Astra AI desktop',
+          label: 'Astra Code desktop',
           platform: process.platform,
           architecture: process.arch,
           appVersion: '0.1.0',
@@ -468,7 +535,7 @@ export class DesktopRuntime {
         Authorization: `Bearer ${session.accessToken}`,
       },
       body: JSON.stringify({
-        label: 'Astra AI desktop',
+        label: 'Astra Code desktop',
         platform: process.platform,
         architecture: process.arch,
         publicKeyPem: identity.publicKeyPem,
@@ -525,6 +592,7 @@ export class DesktopRuntime {
       const taskResult = IpcTaskResultSchema.parse(
         await this.runner.start({
           ...input,
+          ...(reservationId ? { reservationId } : {}),
           workspaceId: this.descriptor.workspaceId,
           agentSessionId: this.agentSessionId,
         }),

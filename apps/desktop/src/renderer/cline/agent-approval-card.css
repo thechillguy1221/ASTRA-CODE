@@ -1,0 +1,98 @@
+.cline-ui-agent-approval-card {
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--border, #2a435c) 80%, transparent);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--background, #101a26) 86%, transparent);
+  padding: 0.75rem;
+}
+
+.cline-ui-agent-approval-card__header,
+.cline-ui-agent-approval-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cline-ui-agent-approval-card__header {
+  justify-content: space-between;
+}
+
+.cline-ui-agent-approval-card__title {
+  color: var(--foreground, #e7edf5);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.cline-ui-agent-approval-card__meta,
+.cline-ui-agent-approval-card__description {
+  color: var(--muted-foreground, #8b9aae);
+  font-size: 0.75rem;
+}
+
+.cline-ui-agent-approval-card__detail {
+  max-height: 11rem;
+  max-width: 100%;
+  margin: 0.5rem 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  border: 1px solid color-mix(in srgb, var(--border, #2a435c) 70%, transparent);
+  border-radius: 0.5rem;
+  background: var(--background, #101a26);
+  padding: 0.5rem;
+  color: var(--muted-foreground, #8b9aae);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.cline-ui-agent-approval-card__error {
+  margin-top: 0.5rem;
+  color: var(--error-text, #ff9fa8);
+  font-size: 0.75rem;
+}
+
+.cline-ui-agent-approval-card__actions {
+  margin-top: 0.5rem;
+}
+
+.cline-ui-agent-approval-card__button {
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.cline-ui-agent-approval-card__button--approve {
+  border: 0;
+  background: var(--primary, #71b1ff);
+  color: #07111f;
+}
+
+.cline-ui-agent-approval-card__button--secondary {
+  border: 1px solid var(--border, #2a435c);
+  background: transparent;
+  color: var(--foreground, #e7edf5);
+}
+
+.cline-ui-agent-approval-card__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cline-ui-agent-approval-card__spinner {
+  animation: cline-ui-agent-approval-card-spin 1s linear infinite;
+}
+
+@keyframes cline-ui-agent-approval-card-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cline-ui-agent-approval-card__spinner {
+    animation: none;
+  }
+}

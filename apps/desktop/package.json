@@ -1,8 +1,8 @@
 {
   "name": "@lyntar/desktop",
-  "productName": "Astra AI",
-  "description": "Astra AI Windows desktop coding workspace.",
-  "author": "Astra AI",
+  "productName": "Astra Code",
+  "description": "Astra Code Windows desktop coding workspace.",
+  "author": "Astra Code",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -12,8 +12,8 @@
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "package:win": "npm run build && electron-builder --config electron-builder.yml --win nsis --x64",
-    "package:win:unsigned": "npm run build && electron-builder --config electron-builder.unsigned.yml --win nsis --x64",
+    "package:win": "npm run build && node ../../scripts/verify-codex-runtime-artifact.mjs && electron-builder --config electron-builder.yml --win nsis --x64",
+    "package:win:unsigned": "npm run build && node ../../scripts/verify-codex-runtime-artifact.mjs && electron-builder --config electron-builder.unsigned.yml --win nsis --x64",
     "start": "electron dist/electron/main.js",
     "dev": "vite --host 127.0.0.1"
   },

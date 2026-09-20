@@ -60,6 +60,16 @@ describe('billing API', () => {
     expect(
       plans.json().plans.find((plan: { id: string }) => plan.id === 'BASIC').monthlyCredits,
     ).toBe('300');
+    const indiaPricing = await app.inject({ method: 'GET', url: '/v1/pricing?country=IN' });
+    expect(indiaPricing.statusCode).toBe(200);
+    expect(indiaPricing.json().productName).toBe('Astra Code');
+    expect(indiaPricing.json().region).toBe('INDIA');
+    expect(
+      indiaPricing.json().plans.find((plan: { id: string }) => plan.id === 'BASIC').regionalPrice,
+    ).toMatchObject({ currency: 'INR', amount: '549', taxIncluded: true });
+    expect(indiaPricing.json().creditPacks).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'TOPUP_1000', credits: '1000' })]),
+    );
     const reservation = await app.inject({
       method: 'POST',
       url: '/v1/billing/reservations',

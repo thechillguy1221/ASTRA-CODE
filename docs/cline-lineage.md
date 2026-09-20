@@ -2,25 +2,45 @@
 
 Audit date: 2026-09-20
 
-The current repository does not contain the Cline SDK/Core or copied Cline source. The repository-wide audit found no `@cline/sdk`, `@cline/core`, Cline agent-loop import, or Cline source directory in the workspace packages or lockfile. The `/compare/cline` public page is competitor content and is not evidence of code reuse.
+Astra uses a pinned, selected subset of the Cline SDK UI as a presentation
+foundation. The integration is deliberately limited to agent interaction
+components; Astra does not instantiate the Cline agent loop, provider handlers,
+account state, or billing flows.
 
-| Astra component            | Verified upstream Cline component | Astra boundary                                                   | Modified upstream source | License obligation             |
-| -------------------------- | --------------------------------- | ---------------------------------------------------------------- | ------------------------ | ------------------------------ |
-| `packages/agent-core`      | None found                        | `AgentTaskRunner`, ports, budgets, state machine, events         | No                       | No Cline obligation identified |
-| `packages/workspace`       | None found                        | canonical Windows paths, patching, Git isolation, command policy | No                       | No Cline obligation identified |
-| `packages/model-gateway`   | None found                        | gateway request/stream/receipt normalization                     | No                       | No Cline obligation identified |
-| `packages/mcp`             | None found                        | Astra MCP registry and permissions                               | No                       | No Cline obligation identified |
-| `packages/remote-protocol` | None found                        | device/Room protocol and authorization                           | No                       | No Cline obligation identified |
-| `apps/desktop`             | None found                        | Electron adapter and typed capability IPC                        | No                       | No Cline obligation identified |
+| Astra component                                           | Verified upstream Cline component                                     | Astra boundary                                                                 | Source classification         | License obligation                                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- | ---------------------------------------------------- |
+| `apps/desktop/src/renderer/cline/session-status.tsx`      | `sdk/packages/ui/components/session-status.tsx`                       | `AstraClineSessionStatus` maps Astra event state to the Cline status component | MODIFIED-UPSTREAM/VENDORED UI | Apache-2.0 attribution and source notice retained    |
+| `apps/desktop/src/renderer/cline/agent-approval-card.tsx` | `sdk/packages/ui/components/agent-approval-card.tsx`                  | `AstraClineApprovalCard` supplies Astra permission callbacks and labels        | MODIFIED-UPSTREAM/VENDORED UI | Apache-2.0 attribution and source notice retained    |
+| `apps/desktop/src/renderer/cline/*.css`                   | `sdk/packages/ui/components/{session-status,agent-approval-card}.css` | Astra-compatible styling and token fallbacks                                   | MODIFIED-UPSTREAM/VENDORED UI | Apache-2.0 attribution and source notice retained    |
+| `apps/desktop/src/renderer/cline-workspace.tsx`           | Cline SDK UI component contracts                                      | Typed renderer-only adapter                                                    | ASTRA-ADAPTER                 | No additional upstream code beyond selected UI files |
+| `packages/agent-core`                                     | No Cline runtime component                                            | Existing Astra compatibility/runtime code; not selected as Cline authority     | ASTRA-NATIVE                  | No Cline runtime dependency                          |
+| `packages/workspace`                                      | No independently owned Cline IDE primitive                            | Windows paths, patching, Git isolation, command policy                         | ASTRA-NATIVE                  | No Cline runtime dependency                          |
+| `packages/model-gateway`                                  | Cline provider flows excluded                                         | Astra Gateway request/stream/receipt normalization                             | ASTRA-NATIVE                  | No Cline provider/billing dependency                 |
+| `packages/remote-protocol`                                | Cline remote flows excluded                                           | Astra device/Room protocol and authorization                                   | ASTRA-NATIVE                  | No Cline remote dependency                           |
 
-The product therefore owns the agent abstractions rather than wrapping a Cline runtime. This is a lineage finding, not a recommendation to rewrite the working agent. If a future change adopts Cline code, pin the exact upstream commit, preserve the applicable notices, record modifications, and review the current license before merging it.
+Pinned upstream: `https://github.com/cline/cline`, commit
+`9a2512bb9835869d74774da99708a7f9d80b0fe8`, tree
+`79cd0f11e55ebbf11da424afa482f003b1e0bed2`.
 
-Reproducible checks:
+The Cline SDK UI source is incorporated into the production renderer through
+the copied component modules and the `AstraCline*` adapter. The current build
+does not import `sdk/packages/ui/components/agent-chat/index.tsx` because that
+surface has broader Tailwind/Radix/runtime coupling; the provenance matrix
+records it as a future adapter boundary rather than claiming it is integrated.
+
+The following paths are intentionally excluded from Astra's production path:
+
+- `sdk/packages/core/`
+- `sdk/packages/agents/`
+- `sdk/packages/llms/`
+- Cline provider/account/billing settings
+- Cline autonomous agent execution
+
+Reproducible evidence:
 
 ```text
-rg -ni "cline|@cline" apps packages tests package.json package-lock.json
-node scripts/supply-chain-report.mjs
-npm audit --json
+npm.cmd run build:renderer --workspace @lyntar/desktop
+node scripts/verify-source-provenance.mjs
 ```
 
-No public claim says Astra is affiliated with or endorsed by Cline.
+Astra AI is independent and does not imply endorsement by Cline.

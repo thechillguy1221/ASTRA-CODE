@@ -21,22 +21,30 @@ const routeDefinitions: Array<
   [
     '/',
     'Build with the model you want.',
-    'Astra AI is a desktop coding agent for local projects, bounded actions, and verified results.',
+    'Astra Code is a desktop coding agent for local projects, bounded actions, and verified results.',
     'public',
     true,
     undefined,
   ],
   [
     '/pricing',
-    'Astra AI pricing',
-    'Server-controlled plans with predictable credit-based usage.',
+    'Astra Code pricing',
+    'Regional plans, included Astra Credits, and optional top-ups from one account.',
+    'public',
+    true,
+    undefined,
+  ],
+  [
+    '/credits',
+    'Astra Credits',
+    'Understand included credits, purchased top-ups, pooled organization wallets, and usage.',
     'public',
     true,
     undefined,
   ],
   [
     '/download',
-    'Download Astra AI',
+    'Download Astra Code',
     'Install the supported Windows desktop application and review release requirements.',
     'public',
     true,
@@ -44,7 +52,7 @@ const routeDefinitions: Array<
   ],
   [
     '/download/windows',
-    'Astra AI for Windows',
+    'Astra Code for Windows',
     'Windows 10/11 x64 download details, release notes, and integrity information.',
     'public',
     true,
@@ -53,7 +61,7 @@ const routeDefinitions: Array<
   [
     '/models',
     'Choose the model for the job',
-    'See the models Astra AI has approved and how Auto selects among them.',
+    'See the models Astra Code has approved and how Auto selects among them.',
     'public',
     true,
     undefined,
@@ -68,7 +76,7 @@ const routeDefinitions: Array<
   ],
   [
     '/docs',
-    'Astra AI documentation',
+    'Astra Code documentation',
     'Learn how local workspaces, permissions, verification, and model usage work.',
     'public',
     true,
@@ -76,7 +84,7 @@ const routeDefinitions: Array<
   ],
   [
     '/blog',
-    'Astra AI notes',
+    'Astra Code notes',
     'Practical writing about agentic development, verification, and product updates.',
     'public',
     true,
@@ -188,7 +196,7 @@ const routeDefinitions: Array<
   ],
   [
     '/use-cases/students',
-    'Astra AI for students',
+    'Astra Code for students',
     'Build projects, understand the code, and prepare for interviews from one desktop workflow.',
     'use-case',
     true,
@@ -196,7 +204,7 @@ const routeDefinitions: Array<
   ],
   [
     '/use-cases/freelancers',
-    'Astra AI for freelancers',
+    'Astra Code for freelancers',
     'Move from brief to verified change while keeping model and tool costs visible.',
     'use-case',
     true,
@@ -204,7 +212,7 @@ const routeDefinitions: Array<
   ],
   [
     '/use-cases/startups',
-    'Astra AI for startups',
+    'Astra Code for startups',
     'Keep a small team moving across unfamiliar code without hiding the resulting diff.',
     'use-case',
     true,
@@ -212,7 +220,7 @@ const routeDefinitions: Array<
   ],
   [
     '/use-cases/developers',
-    'Astra AI for developers',
+    'Astra Code for developers',
     'A local-first agent for real repositories, real commands, and real verification.',
     'use-case',
     true,
@@ -220,7 +228,7 @@ const routeDefinitions: Array<
   ],
   [
     '/use-cases/teams',
-    'Astra AI for teams',
+    'Astra Code for teams',
     'Server-controlled models, plans, costs, and an auditable execution boundary.',
     'use-case',
     true,
@@ -236,7 +244,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/cursor',
-    'Astra AI vs Cursor',
+    'Astra Code vs Cursor',
     'Compare model access, usage economics, workspace workflow, and agent boundaries with current official sources.',
     'comparison',
     true,
@@ -244,7 +252,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/kiro',
-    'Astra AI vs Kiro',
+    'Astra Code vs Kiro',
     'Compare local desktop work, model credits, web workflows, and plan structure with current official sources.',
     'comparison',
     true,
@@ -252,7 +260,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/kilo-code',
-    'Astra AI vs Kilo Code',
+    'Astra Code vs Kilo Code',
     'Compare managed credits, BYOK flexibility, extensions, and cloud compute with current official sources.',
     'comparison',
     true,
@@ -260,7 +268,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/cline',
-    'Astra AI vs Cline',
+    'Astra Code vs Cline',
     'Compare a managed desktop product with an open-source, provider-flexible coding agent.',
     'comparison',
     true,
@@ -268,7 +276,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/windsurf',
-    'Astra AI vs Windsurf',
+    'Astra Code vs Windsurf',
     'Comparison pending a current official Windsurf product source.',
     'comparison',
     false,
@@ -276,7 +284,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/roo-code',
-    'Astra AI vs Roo Code',
+    'Astra Code vs Roo Code',
     'Comparison pending a current official Roo Code product source.',
     'comparison',
     false,
@@ -284,7 +292,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/github-copilot',
-    'Astra AI vs GitHub Copilot',
+    'Astra Code vs GitHub Copilot',
     'Compare a desktop-first local agent with GitHub’s editor, CLI, and cloud-agent ecosystem.',
     'comparison',
     true,
@@ -292,7 +300,7 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/byok',
-    'Astra AI vs BYOK agents',
+    'Astra Code vs BYOK agents',
     'Understand managed model access and BYOK control without treating either approach as universally better.',
     'comparison',
     true,
@@ -300,7 +308,7 @@ const routeDefinitions: Array<
   ],
   [
     '/alternatives/cursor',
-    'Astra AI alternative to Cursor',
+    'Astra Code alternative to Cursor',
     'A use-case-focused comparison for developers considering a managed multi-model desktop workflow.',
     'comparison',
     true,
@@ -308,7 +316,7 @@ const routeDefinitions: Array<
   ],
   [
     '/alternatives/kiro',
-    'Astra AI alternative to Kiro',
+    'Astra Code alternative to Kiro',
     'Compare a local Windows workflow with Kiro’s current documented surfaces.',
     'comparison',
     true,
@@ -316,7 +324,7 @@ const routeDefinitions: Array<
   ],
   [
     '/alternatives/cline',
-    'Astra AI alternative to Cline',
+    'Astra Code alternative to Cline',
     'Compare managed credits and onboarding with a provider-flexible open-source agent.',
     'comparison',
     true,
@@ -324,7 +332,7 @@ const routeDefinitions: Array<
   ],
   [
     '/alternatives/windsurf',
-    'Astra AI alternative to Windsurf',
+    'Astra Code alternative to Windsurf',
     'Comparison pending a current official Windsurf product source.',
     'comparison',
     false,
@@ -332,7 +340,7 @@ const routeDefinitions: Array<
   ],
   [
     '/marketplace',
-    'Astra AI marketplace',
+    'Astra Code marketplace',
     'Discover reviewed Skills, Plugins, and MCP packages when publishing is enabled.',
     'public',
     false,
@@ -340,7 +348,7 @@ const routeDefinitions: Array<
   ],
   [
     '/skills',
-    'Astra AI Skills',
+    'Astra Code Skills',
     'Browse workflow packages with publisher, version, license, and permission details.',
     'public',
     true,
@@ -348,7 +356,7 @@ const routeDefinitions: Array<
   ],
   [
     '/plugins',
-    'Astra AI Plugins',
+    'Astra Code Plugins',
     'Browse capability-scoped extensions without granting unrestricted access by default.',
     'public',
     true,
@@ -356,7 +364,7 @@ const routeDefinitions: Array<
   ],
   [
     '/mcp',
-    'Astra AI MCP directory',
+    'Astra Code MCP directory',
     'Browse scoped MCP connection definitions and their capabilities.',
     'public',
     true,
@@ -364,8 +372,8 @@ const routeDefinitions: Array<
   ],
   [
     '/changelog',
-    'Astra AI changelog',
-    'Read versioned Astra AI product and release notes.',
+    'Astra Code changelog',
+    'Read versioned Astra Code product and release notes.',
     'public',
     true,
     undefined,
@@ -373,7 +381,7 @@ const routeDefinitions: Array<
   // Legacy public paths remain resolvable while the canonical Astra routes take over.
   [
     '/students',
-    'Astra AI for students',
+    'Astra Code for students',
     'Build projects, understand the code, and prepare for interviews from one desktop workflow.',
     'use-case',
     false,
@@ -381,7 +389,7 @@ const routeDefinitions: Array<
   ],
   [
     '/vibe-coding',
-    'Vibe coding with Astra AI',
+    'Vibe coding with Astra Code',
     'Turn an idea into a working project while keeping changes bounded and verifiable.',
     'feature',
     false,
@@ -389,7 +397,7 @@ const routeDefinitions: Array<
   ],
   [
     '/ai-coding-agent',
-    'Astra AI coding agent',
+    'Astra Code coding agent',
     'A local repository agent that can inspect, edit, run, test, and show a verified diff.',
     'feature',
     false,
@@ -397,31 +405,31 @@ const routeDefinitions: Array<
   ],
   [
     '/compare/lyntar-vs-cursor',
-    'Astra AI vs Cursor',
-    'Legacy alias for the current Astra AI versus Cursor comparison.',
+    'Astra Code vs Cursor',
+    'Legacy alias for the current Astra Code versus Cursor comparison.',
     'comparison',
     false,
     'cursor',
   ],
   [
     '/compare/lyntar-vs-github-copilot',
-    'Astra AI vs GitHub Copilot',
-    'Legacy alias for the current Astra AI versus GitHub Copilot comparison.',
+    'Astra Code vs GitHub Copilot',
+    'Legacy alias for the current Astra Code versus GitHub Copilot comparison.',
     'comparison',
     false,
     'github-copilot',
   ],
   [
     '/compare/lyntar-vs-cline',
-    'Astra AI vs Cline',
-    'Legacy alias for the current Astra AI versus Cline comparison.',
+    'Astra Code vs Cline',
+    'Legacy alias for the current Astra Code versus Cline comparison.',
     'comparison',
     false,
     'cline',
   ],
   [
     '/compare/lyntar-vs-windsurf',
-    'Astra AI vs Windsurf',
+    'Astra Code vs Windsurf',
     'Legacy alias for a comparison pending a current official Windsurf product source.',
     'comparison',
     false,
@@ -429,7 +437,7 @@ const routeDefinitions: Array<
   ],
   [
     '/login',
-    'Sign in to Astra AI',
+    'Sign in to Astra Code',
     'Use one Astra identity across the website, desktop, billing, and devices.',
     'account',
     true,
@@ -437,7 +445,7 @@ const routeDefinitions: Array<
   ],
   [
     '/signup',
-    'Create your Astra AI account',
+    'Create your Astra Code account',
     'Create an account and verify your email before using the product.',
     'account',
     true,
@@ -445,7 +453,7 @@ const routeDefinitions: Array<
   ],
   [
     '/verify-email',
-    'Verify your Astra AI email',
+    'Verify your Astra Code email',
     'Enter the one-time verification code sent to your email.',
     'account',
     true,
@@ -453,7 +461,7 @@ const routeDefinitions: Array<
   ],
   [
     '/forgot-password',
-    'Reset your Astra AI password',
+    'Reset your Astra Code password',
     'Request a time-limited password reset link.',
     'account',
     true,
@@ -461,7 +469,7 @@ const routeDefinitions: Array<
   ],
   [
     '/reset-password',
-    'Choose a new Astra AI password',
+    'Choose a new Astra Code password',
     'Set a new password after verifying a reset request.',
     'account',
     true,
@@ -469,7 +477,7 @@ const routeDefinitions: Array<
   ],
   [
     '/account',
-    'Your Astra AI account',
+    'Your Astra Code account',
     'Manage your profile, security, plan, and product preferences.',
     'account',
     true,
@@ -477,7 +485,7 @@ const routeDefinitions: Array<
   ],
   [
     '/account/wallet',
-    'Your Astra AI credits',
+    'Your Astra Code credits',
     'View server-reported balance, reservations, settlements, and usage.',
     'account',
     true,
@@ -485,7 +493,7 @@ const routeDefinitions: Array<
   ],
   [
     '/account/billing',
-    'Astra AI billing',
+    'Astra Code billing',
     'Manage authoritative plan and payment state.',
     'account',
     true,
@@ -493,7 +501,7 @@ const routeDefinitions: Array<
   ],
   [
     '/account/devices',
-    'Your Astra AI devices',
+    'Your Astra Code devices',
     'Review and revoke active desktop sessions.',
     'account',
     true,
@@ -501,7 +509,7 @@ const routeDefinitions: Array<
   ],
   [
     '/privacy',
-    'Astra AI privacy',
+    'Astra Code privacy',
     'How account, usage, and local workspace metadata are handled.',
     'legal',
     true,
@@ -509,15 +517,15 @@ const routeDefinitions: Array<
   ],
   [
     '/terms',
-    'Astra AI terms',
-    'Terms for using Astra AI services and software.',
+    'Astra Code terms',
+    'Terms for using Astra Code services and software.',
     'legal',
     true,
     undefined,
   ],
   [
     '/refund-policy',
-    'Astra AI refund policy',
+    'Astra Code refund policy',
     'Refund and payment policy information.',
     'legal',
     true,
@@ -525,7 +533,7 @@ const routeDefinitions: Array<
   ],
   [
     '/open-source-notices',
-    'Astra AI open-source notices',
+    'Astra Code open-source notices',
     'Third-party dependency and license notices.',
     'legal',
     true,
@@ -550,7 +558,7 @@ export function resolvePublicRoute(pathname: string): PublicRoute {
     publicRoutes.find((route) => route.path === pathname) ?? {
       path: pathname,
       title: 'Page not found',
-      description: 'This route is not part of the Astra AI public surface.',
+      description: 'This route is not part of the Astra Code public surface.',
       status: 404,
     }
   );
@@ -559,14 +567,25 @@ export function resolvePublicRoute(pathname: string): PublicRoute {
 export interface PublicPlanCard {
   id: string;
   displayName: string;
-  priceInr: string;
+  currency: 'INR' | 'USD';
+  price: string;
   monthlyCredits: string;
   seats: number;
   activeJobsPerSeat: number;
   pooledCredits: boolean;
   topUpEnabled: boolean;
-  taxExclusive: boolean;
   source: 'server' | 'unavailable';
+}
+
+export interface PublicCreditPack {
+  id: string;
+  credits: string;
+  validityDays: number;
+  price: {
+    currency: 'INR' | 'USD';
+    amount: string;
+    taxIncluded: boolean;
+  };
 }
 
 export const noLivePlanData = 'NO_LIVE_DATA';

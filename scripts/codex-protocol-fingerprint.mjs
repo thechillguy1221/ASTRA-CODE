@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
-const root = resolve(import.meta.dirname, '..', 'vendor/upstream/codex');
+const root = resolve(
+  process.env.CODEX_SOURCE_ROOT ?? resolve(import.meta.dirname, '..', 'vendor/upstream/codex'),
+);
 const sourceRoots = [
   'codex-rs/app-server-protocol/src',
   'codex-rs/app-server-client/src',

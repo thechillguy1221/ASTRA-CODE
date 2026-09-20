@@ -9,4 +9,7 @@ coverage/
 apps/desktop/release/
 apps/desktop/release-unsigned/
 apps/desktop/.vite/
+# The 245 MB official Codex executable is acquired reproducibly by
+# scripts/build-codex-runtime.mjs and is not committed to Git.
+apps/desktop/resources/codex/codex-app-server.exe
 **/tsconfig.tsbuildinfo

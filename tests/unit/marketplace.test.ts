@@ -8,7 +8,7 @@ describe('marketplace trust boundary', () => {
       id: 'official.skill',
       type: 'skill',
       name: 'Official Skill',
-      publisher: 'Astra AI',
+      publisher: 'Astra Code',
       version: '1.0.0',
       description: 'A reviewed skill',
       permissions: ['read_workspace'],

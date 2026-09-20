@@ -232,7 +232,7 @@ export class AgentTaskRunner {
       {
         role: 'system',
         content:
-          'You are Astra AI agent. Use bounded structured actions and never expose hidden reasoning.',
+          'You are Astra Code agent. Use bounded structured actions and never expose hidden reasoning.',
       },
       { role: 'user', content: input.prompt },
     ];

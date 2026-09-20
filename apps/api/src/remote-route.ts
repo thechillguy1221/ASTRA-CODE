@@ -340,7 +340,7 @@ export async function registerRemoteRoutes(
         if (dependencies.email && dependencies.publicSiteUrl && result.token) {
           await dependencies.email.sendRoomInvitation({
             email: result.invitation.invitedEmail,
-            roomName: 'shared Astra AI Room',
+            roomName: 'shared Astra Code Room',
             inviteUrl: `${dependencies.publicSiteUrl}/room-invite?token=${encodeURIComponent(result.token)}`,
             eventKey: result.invitation.id,
           });

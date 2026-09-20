@@ -13,7 +13,8 @@ describe('V1 plan catalog', () => {
     const catalog = createDefaultPlanCatalog();
     const plan = catalog.get('BASIC');
     expect(plan.monthlyCredits).toBe('300');
-    expect(plan.monthlyPriceInr).toBe('499');
+    expect(plan.monthlyPriceInr).toBe('549');
+    expect(plan.monthlyPriceUsd).toBe('6');
   });
 
   it('Pro plan grants exactly 600 credits', () => {
@@ -21,13 +22,15 @@ describe('V1 plan catalog', () => {
     const plan = catalog.get('PRO');
     expect(plan.monthlyCredits).toBe('600');
     expect(plan.monthlyPriceInr).toBe('999');
+    expect(plan.monthlyPriceUsd).toBe('11');
   });
 
   it('Max plan grants exactly 1200 credits', () => {
     const catalog = createDefaultPlanCatalog();
     const plan = catalog.get('MAX');
     expect(plan.monthlyCredits).toBe('1200');
-    expect(plan.monthlyPriceInr).toBe('1999');
+    expect(plan.monthlyPriceInr).toBe('1899');
+    expect(plan.monthlyPriceUsd).toBe('21');
   });
 
   it('All paid plans allow all models (credits are the limiter, not model gating)', () => {
