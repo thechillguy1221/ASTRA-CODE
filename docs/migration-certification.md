@@ -19,7 +19,7 @@ certifications remain unavailable or incomplete.
 | ------------------------------------ | -------------------------------------------------------------------------------------------- |
 | Branch                               | `main`                                                                                       |
 | Starting SHA                         | `8fdaaa7c4e3eea761b9b8930ddf825caa77b3ea7`                                                   |
-| Final SHA                            | Not created; the working tree is intentionally uncommitted. `HEAD` remains the starting SHA. |
+| Final SHA                            | `b679597d3fe03efab9a6622de8f8c46468496131`                                                  |
 | Version                              | `0.1.0`                                                                                      |
 | Working tree                         | Dirty with the migration changes listed by `git status --short`.                             |
 | Certified desktop artifact           | `apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe`                        |
