@@ -28,4 +28,25 @@ describe('shared contracts', () => {
     expect(() => IpcCommandSchema.parse({ type: 'fs.readFile', path: 'x' })).toThrow();
     expect(() => IpcCommandSchema.parse({ type: 'shell.exec', command: 'dir' })).toThrow();
   });
+
+  it('accepts typed project-grounded mode commands', () => {
+    expect(
+      IpcCommandSchema.parse({ type: 'modes.learnFile', path: 'src/auth.ts', depth: 'BEGINNER' }),
+    ).toMatchObject({ type: 'modes.learnFile' });
+    expect(
+      IpcCommandSchema.parse({
+        type: 'modes.generateViva',
+        categories: ['AUTHENTICATION'],
+        difficulty: 'INTERMEDIATE',
+        count: 3,
+      }),
+    ).toMatchObject({ type: 'modes.generateViva' });
+    expect(
+      IpcCommandSchema.parse({
+        type: 'modes.hackathonPlan',
+        problem: 'Build a demo',
+        criteria: ['working demo'],
+      }),
+    ).toMatchObject({ type: 'modes.hackathonPlan' });
+  });
 });

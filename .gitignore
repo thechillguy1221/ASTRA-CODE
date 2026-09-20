@@ -8,3 +8,4 @@ coverage/
 *.log
 apps/desktop/release/
 apps/desktop/.vite/
+**/tsconfig.tsbuildinfo

@@ -11,12 +11,18 @@ import {
   type UsageReceipt,
 } from '@lyntar/contracts';
 import type { AgentEventStore, ModelCatalogStore, UsageReceiptStore } from './repositories.js';
+import { PostgresAuthStore } from './postgres-auth.js';
+import { PostgresBillingStore } from './postgres-billing.js';
+import type { AuthStore } from '@lyntar/auth';
+import type { BillingStore } from '@lyntar/billing';
 
 export interface PostgresStores {
   pool: Pool;
   catalog: ModelCatalogStore;
   receipts: UsageReceiptStore;
   events: AgentEventStore;
+  auth: AuthStore;
+  billing: BillingStore;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -38,6 +44,26 @@ function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
       row.pricing_verified_at === null || row.pricing_verified_at === undefined
         ? null
         : new Date(String(row.pricing_verified_at)).toISOString(),
+    ...(row.family ? { family: String(row.family) } : {}),
+    ...(row.recommended !== null && row.recommended !== undefined
+      ? { recommended: Boolean(row.recommended) }
+      : {}),
+    ...(Array.isArray(row.plan_access)
+      ? { planAccess: row.plan_access.map((value) => String(value)) }
+      : {}),
+    ...(row.max_reasoning === null || row.max_reasoning === undefined
+      ? {}
+      : { maxReasoning: Number(row.max_reasoning) }),
+    ...(row.routing_role ? { routingRole: String(row.routing_role) } : {}),
+    ...(row.fallback_model_id === null || row.fallback_model_id === undefined
+      ? {}
+      : { fallbackModelId: String(row.fallback_model_id) }),
+    ...(row.deprecated_at === null || row.deprecated_at === undefined
+      ? {}
+      : { deprecatedAt: new Date(String(row.deprecated_at)).toISOString() }),
+    ...(row.release_date === null || row.release_date === undefined
+      ? {}
+      : { releaseDate: String(row.release_date).slice(0, 10) }),
   });
 }
 
@@ -177,32 +203,37 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     catalog: new PostgresModelCatalogStore(pool),
     receipts: new PostgresUsageReceiptStore(pool),
     events: new PostgresAgentEventStore(pool),
+    auth: new PostgresAuthStore(pool),
+    billing: new PostgresBillingStore(pool),
   };
 }
 
 export async function applyFoundationMigration(client: PoolClient): Promise<void> {
-  const migrationPath = fileURLToPath(
-    new URL('../migrations/0001_agent_foundation.sql', import.meta.url),
-  );
-  const migrationSql = await readFile(migrationPath, 'utf8');
+  const migrations = [
+    { version: '0001_agent_foundation', file: '0001_agent_foundation.sql' },
+    { version: '0002_v1_commercial', file: '0002_v1_commercial.sql' },
+  ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS lyntar_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
   );
   await client.query('BEGIN');
   try {
     await client.query("SELECT pg_advisory_xact_lock(hashtext('lyntar:migrations'))");
-    const existing = await client.query(
-      'SELECT version FROM lyntar_schema_migrations WHERE version = $1',
-      ['0001_agent_foundation'],
-    );
-    if (existing.rowCount) {
-      await client.query('COMMIT');
-      return;
+    for (const migration of migrations) {
+      const existing = await client.query(
+        'SELECT version FROM lyntar_schema_migrations WHERE version = $1',
+        [migration.version],
+      );
+      if (existing.rowCount) continue;
+      const migrationPath = fileURLToPath(
+        new URL(`../migrations/${migration.file}`, import.meta.url),
+      );
+      const migrationSql = await readFile(migrationPath, 'utf8');
+      await client.query(migrationSql);
+      await client.query('INSERT INTO lyntar_schema_migrations(version) VALUES ($1)', [
+        migration.version,
+      ]);
     }
-    await client.query(migrationSql);
-    await client.query('INSERT INTO lyntar_schema_migrations(version) VALUES ($1)', [
-      '0001_agent_foundation',
-    ]);
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

@@ -41,6 +41,34 @@ export function buildCapabilityApiForTest(): LyntarIpcApi {
         return [];
       },
     },
+    auth: {
+      async login() {
+        throw new Error('No test API configured');
+      },
+      async status() {
+        return null;
+      },
+      async logout() {},
+    },
+    billing: {
+      async wallet() {
+        return null;
+      },
+    },
+    modes: {
+      async learnFile() {
+        throw new Error('No test workspace configured');
+      },
+      async generateViva() {
+        throw new Error('No test workspace configured');
+      },
+      async evaluateViva() {
+        throw new Error('No test workspace configured');
+      },
+      async hackathonPlan() {
+        throw new Error('No test workspace configured');
+      },
+    },
     events: {
       subscribe(listener) {
         listeners.add(listener);
@@ -89,6 +117,53 @@ export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void
   ipcMain.handle('models.list', () => {
     parseCommand('models.list');
     return runtime.listModels();
+  });
+  ipcMain.handle('auth.login', (_event, input: unknown) => {
+    const command = parseCommand(
+      'auth.login',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.authLogin(command);
+  });
+  ipcMain.handle('auth.status', () => {
+    parseCommand('auth.status');
+    return runtime.authStatus();
+  });
+  ipcMain.handle('auth.logout', () => {
+    parseCommand('auth.logout');
+    return runtime.authLogout();
+  });
+  ipcMain.handle('billing.wallet', () => {
+    parseCommand('billing.wallet');
+    return runtime.billingWallet();
+  });
+  ipcMain.handle('modes.learnFile', (_event, input: unknown) => {
+    const command = parseCommand(
+      'modes.learnFile',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.learnFile(command);
+  });
+  ipcMain.handle('modes.generateViva', (_event, input: unknown) => {
+    const command = parseCommand(
+      'modes.generateViva',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.generateViva(command);
+  });
+  ipcMain.handle('modes.hackathonPlan', (_event, input: unknown) => {
+    const command = parseCommand(
+      'modes.hackathonPlan',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.hackathonPlan(command);
+  });
+  ipcMain.handle('modes.evaluateViva', (_event, input: unknown) => {
+    const command = parseCommand(
+      'modes.evaluateViva',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.evaluateViva(command);
   });
   runtime.subscribe((event) => {
     for (const window of BrowserWindow.getAllWindows())

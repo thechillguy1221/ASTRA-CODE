@@ -6,6 +6,11 @@ describe('desktop IPC boundary', () => {
     const api = buildCapabilityApiForTest();
     expect(api.workspace.readFile).toBeTypeOf('function');
     expect(api.agent.startTask).toBeTypeOf('function');
+    expect(api.modes.learnFile).toBeTypeOf('function');
+    expect(api.modes.generateViva).toBeTypeOf('function');
+    expect(api.modes.hackathonPlan).toBeTypeOf('function');
+    expect(api.auth.login).toBeTypeOf('function');
+    expect(api.auth.status).toBeTypeOf('function');
     expect((api as Record<string, unknown>).fs).toBeUndefined();
     expect((api as Record<string, unknown>).shell).toBeUndefined();
   });

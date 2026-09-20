@@ -32,5 +32,13 @@ export const ModelCatalogEntrySchema = z.object({
   capabilities: ModelCapabilitiesSchema,
   costMetadata: ModelCostMetadataSchema.optional(),
   pricingVerifiedAt: z.string().datetime().nullable().optional(),
+  family: z.string().min(1).optional(),
+  recommended: z.boolean().optional(),
+  planAccess: z.array(z.string().min(1)).optional(),
+  maxReasoning: z.number().nonnegative().optional(),
+  routingRole: z.string().min(1).optional(),
+  fallbackModelId: z.string().min(1).nullable().optional(),
+  deprecatedAt: z.string().datetime().nullable().optional(),
+  releaseDate: z.string().date().nullable().optional(),
 });
 export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;

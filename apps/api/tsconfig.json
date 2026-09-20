@@ -7,10 +7,14 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "references": [
+    { "path": "../../packages/auth" },
+    { "path": "../../packages/billing" },
     { "path": "../../packages/config" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/db" },
-    { "path": "../../packages/model-gateway" }
+    { "path": "../../packages/model-gateway" },
+    { "path": "../../packages/plans" },
+    { "path": "../../packages/releases" }
   ],
   "include": ["src/**/*.ts"]
 }

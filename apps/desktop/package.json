@@ -16,6 +16,7 @@
     "@lyntar/config": "0.1.0",
     "@lyntar/contracts": "0.1.0",
     "@lyntar/model-gateway": "0.1.0",
+    "@lyntar/modes": "0.1.0",
     "@lyntar/workspace": "0.1.0",
     "electron": "^44.4.3",
     "react": "^19.1.0",

@@ -18,6 +18,9 @@
   },
   "dependencies": {
     "@lyntar/contracts": "0.1.0",
+    "@lyntar/auth": "0.1.0",
+    "@lyntar/billing": "0.1.0",
+    "@lyntar/plans": "0.1.0",
     "pg": "^8.13.3"
   }
 }

@@ -6,17 +6,32 @@ import {
   type PermissionAction,
   type PermissionOutcome,
 } from '@lyntar/agent-core';
+import { HackathonService, LearnService, VivaService } from '@lyntar/modes';
+import { MemoryCredentialStore, type CredentialStore } from './credentials.js';
 import {
+  AuthSessionResultSchema,
+  PublicUserSchema,
   IpcTaskResultSchema,
   ModelCatalogEntrySchema,
   ModelCatalogResponseSchema,
   ModelDecisionResponseSchema,
+  CreditReservationSchema,
+  WalletSchema,
   type AgentEvent,
+  type PublicUser,
+  type Wallet,
   type IpcTaskResult,
+  type HackathonPlan,
+  type LearnDepth,
+  type LearnResult,
   type ModelCatalogEntry,
   type ModelRequest,
   type ModelStreamEvent,
   type WorkspaceDescriptor,
+  type VivaCategory,
+  type VivaDifficulty,
+  type VivaQuestion,
+  type VivaEvaluation,
 } from '@lyntar/contracts';
 import {
   classifyCommand,
@@ -27,12 +42,21 @@ import {
 } from '@lyntar/workspace';
 
 class ApiModelPort implements ModelPort {
-  constructor(private readonly apiBaseUrl: string) {}
+  constructor(
+    private readonly apiBaseUrl: string,
+    private readonly accessToken: () => string | null,
+    private readonly reservationId: (taskId: string) => string | null,
+  ) {}
 
   async *complete(request: ModelRequest, signal: AbortSignal): AsyncIterable<ModelStreamEvent> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = this.accessToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const reservation = this.reservationId(request.taskId);
+    if (reservation) headers['x-lyntar-reservation-id'] = reservation;
     const response = await fetch(`${this.apiBaseUrl}/v1/model-requests`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(request),
       signal,
     });
@@ -71,6 +95,11 @@ export class DesktopRuntime {
   private runner: AgentTaskRunner | undefined;
   private agentSessionId = randomUUID();
   private readonly listeners = new Set<(event: AgentEvent) => void>();
+  private readonly learn = new LearnService();
+  private readonly viva = new VivaService();
+  private readonly hackathon = new HackathonService();
+  private authSession: ReturnType<typeof AuthSessionResultSchema.parse> | null = null;
+  private readonly activeReservationIds = new Map<string, string>();
   private readonly receiptValues: NonNullable<ReturnType<AgentPorts['receipts']['list']>> = [];
   private readonly receipts: AgentPorts['receipts'] = {
     add: (receipt) => this.receiptValues.push(receipt),
@@ -82,6 +111,7 @@ export class DesktopRuntime {
 
   constructor(
     private readonly apiBaseUrl = process.env.LYNTAR_API_URL ?? 'http://127.0.0.1:4317',
+    private readonly credentials: CredentialStore = new MemoryCredentialStore(),
   ) {}
 
   async openWorkspace(root: string): Promise<WorkspaceDescriptor> {
@@ -102,7 +132,11 @@ export class DesktopRuntime {
       selectedAt: new Date().toISOString(),
     };
     this.runner = new AgentTaskRunner({
-      model: new ApiModelPort(this.apiBaseUrl),
+      model: new ApiModelPort(
+        this.apiBaseUrl,
+        () => this.authSession?.accessToken ?? null,
+        (taskId) => this.activeReservationIds.get(taskId) ?? null,
+      ),
       workspace,
       patch: { apply: (batch, signal) => workspace.writeBatch(batch, signal) },
       command: {
@@ -153,11 +187,131 @@ export class DesktopRuntime {
     return this.workspace.search(query);
   }
 
+  async learnFile(input: {
+    path: string;
+    depth: LearnDepth;
+    question?: string | undefined;
+  }): Promise<LearnResult> {
+    if (!this.workspace) throw new Error('Open a workspace first');
+    const files = { [input.path]: await this.workspace.readFile(input.path) };
+    return this.learn.explain({
+      files,
+      path: input.path,
+      depth: input.depth,
+      ...(input.question ? { question: input.question } : {}),
+    });
+  }
+
+  async generateViva(input: {
+    categories: VivaCategory[];
+    difficulty: VivaDifficulty;
+    count: number;
+  }): Promise<VivaQuestion[]> {
+    if (!this.workspace) throw new Error('Open a workspace first');
+    const files = await this.readProjectSnapshot();
+    return this.viva.generate({ files, ...input });
+  }
+
+  async evaluateViva(input: { question: VivaQuestion; answer: string }): Promise<VivaEvaluation> {
+    const files = await this.readProjectSnapshot();
+    return this.viva.evaluate(input.question, input.answer, files);
+  }
+
+  async hackathonPlan(input: { problem: string; criteria: string[] }): Promise<HackathonPlan> {
+    return this.hackathon.plan(input);
+  }
+
+  private async readProjectSnapshot(): Promise<Record<string, string>> {
+    if (!this.workspace) throw new Error('Open a workspace first');
+    const snapshot: Record<string, string> = {};
+    let totalBytes = 0;
+    for (const path of (await this.workspace.listFiles()).slice(0, 200)) {
+      if (totalBytes >= 1_000_000) break;
+      try {
+        const content = await this.workspace.readFile(path);
+        totalBytes += content.length;
+        if (totalBytes <= 1_000_000) snapshot[path] = content;
+      } catch {
+        // Binary or concurrently removed files are not useful to learning modes.
+      }
+    }
+    return snapshot;
+  }
+
   async listModels(): Promise<ModelCatalogEntry[]> {
     const response = await fetch(`${this.apiBaseUrl}/v1/models`);
     if (!response.ok) throw new Error(`Lyntar API model catalog failed with ${response.status}`);
     const body = ModelCatalogResponseSchema.parse(await response.json());
     return body.models.map((model) => ModelCatalogEntrySchema.parse(model));
+  }
+
+  async authLogin(input: {
+    email: string;
+    password: string;
+    device: { label: string; platform: string; architecture: string; appVersion: string };
+  }): Promise<PublicUser> {
+    const response = await fetch(`${this.apiBaseUrl}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) throw new Error(`Authentication failed with ${response.status}`);
+    const session = AuthSessionResultSchema.parse(await response.json());
+    await this.credentials.set(session);
+    this.authSession = session;
+    return session.user;
+  }
+
+  async authStatus(): Promise<PublicUser | null> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) return null;
+    const response = await fetch(`${this.apiBaseUrl}/v1/auth/me`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) {
+      const refreshed = await fetch(`${this.apiBaseUrl}/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: session.refreshToken }),
+      });
+      if (!refreshed.ok) {
+        await this.credentials.clear();
+        this.authSession = null;
+        return null;
+      }
+      const rotated = AuthSessionResultSchema.parse(await refreshed.json());
+      await this.credentials.set(rotated);
+      this.authSession = rotated;
+      return rotated.user;
+    }
+    const body = (await response.json()) as { user: unknown };
+    const user = PublicUserSchema.parse(body.user);
+    this.authSession = { ...session, user };
+    return user;
+  }
+
+  async authLogout(): Promise<void> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (session) {
+      await fetch(`${this.apiBaseUrl}/v1/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      }).catch(() => undefined);
+    }
+    this.authSession = null;
+    await this.credentials.clear();
+  }
+
+  async billingWallet(): Promise<Wallet | null> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) return null;
+    this.authSession = session;
+    const response = await fetch(`${this.apiBaseUrl}/v1/wallet`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { wallet: unknown };
+    return WalletSchema.parse(body.wallet);
   }
 
   async startTask(input: {
@@ -168,13 +322,97 @@ export class DesktopRuntime {
   }): Promise<IpcTaskResult> {
     if (!this.runner) throw new Error('Open a workspace first');
     if (!this.descriptor) throw new Error('Open a workspace first');
-    return IpcTaskResultSchema.parse(
-      await this.runner.start({
-        ...input,
-        workspaceId: this.descriptor.workspaceId,
-        agentSessionId: this.agentSessionId,
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    const reservationId = session ? await this.reserveTask(input) : null;
+    if (reservationId) this.activeReservationIds.set(input.taskId, reservationId);
+    try {
+      const taskResult = IpcTaskResultSchema.parse(
+        await this.runner.start({
+          ...input,
+          workspaceId: this.descriptor.workspaceId,
+          agentSessionId: this.agentSessionId,
+        }),
+      );
+      if (reservationId) await this.settleTask(taskResult, reservationId, input.taskId);
+      return taskResult;
+    } catch (error) {
+      if (reservationId)
+        await this.settleTask(null, reservationId, input.taskId).catch(() => undefined);
+      throw error;
+    } finally {
+      this.activeReservationIds.delete(input.taskId);
+    }
+  }
+
+  private async reserveTask(input: {
+    taskId: string;
+    modelId: string;
+    budget: Parameters<AgentTaskRunner['start']>[0]['budget'];
+  }): Promise<string> {
+    const session = this.authSession;
+    if (!session) throw new Error('Authentication is required for a billable task');
+    const amountCredits =
+      (Math.max(0, input.budget.maxEstimatedCostUsd) * 1000)
+        .toFixed(7)
+        .replace(/0+$/, '')
+        .replace(/\.$/, '') || '0';
+    const response = await fetch(`${this.apiBaseUrl}/v1/billing/reservations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({
+        taskId: input.taskId,
+        modelId: input.modelId,
+        mode: 'BUILD',
+        amountCredits,
+        idempotencyKey: `desktop:${input.taskId}:reservation`,
       }),
-    );
+    });
+    if (!response.ok) throw new Error(`Task credit reservation failed with ${response.status}`);
+    const body = (await response.json()) as { reservation: unknown };
+    return CreditReservationSchema.parse(body.reservation).reservationId;
+  }
+
+  private async settleTask(
+    result: IpcTaskResult | null,
+    reservationId: string,
+    taskId: string,
+  ): Promise<void> {
+    const session = this.authSession;
+    if (!session) return;
+    const providerCost = this.taskCostUsd(taskId);
+    const customerCost = result?.state === 'FAILED' ? '0' : providerCost;
+    const response = await fetch(`${this.apiBaseUrl}/v1/billing/settlements`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({
+        reservationId,
+        providerActualCostUsd: providerCost,
+        customerBillableCostUsd: customerCost,
+        idempotencyKey: `desktop:${taskId}:settlement`,
+      }),
+    });
+    if (!response.ok) throw new Error(`Task credit settlement failed with ${response.status}`);
+  }
+
+  private taskCostUsd(taskId: string): string {
+    const scale = 10_000_000_000n;
+    const total = this.receiptValues
+      .filter((receipt) => receipt.taskId === taskId && receipt.actualCostUsd !== null)
+      .reduce(
+        (sum, receipt) =>
+          sum + BigInt(Math.max(0, Math.round((receipt.actualCostUsd ?? 0) * Number(scale)))),
+        0n,
+      );
+    const whole = total / scale;
+    const fraction = (total % scale).toString().padStart(10, '0').replace(/0+$/, '');
+    return fraction ? `${whole}.${fraction}` : whole.toString();
   }
 
   cancelTask(taskId: string): void {
