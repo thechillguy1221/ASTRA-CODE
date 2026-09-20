@@ -15,21 +15,21 @@ certifications remain unavailable or incomplete.
 
 ## B. Release identity
 
-| Field                                | Evidence                                                                                     |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Branch                               | `main`                                                                                       |
-| Starting SHA                         | `8fdaaa7c4e3eea761b9b8930ddf825caa77b3ea7`                                                   |
-| Final SHA                            | `b679597d3fe03efab9a6622de8f8c46468496131`                                                  |
-| Version                              | `0.1.0`                                                                                      |
-| Working tree                         | Dirty with the migration changes listed by `git status --short`.                             |
-| Certified desktop artifact           | `apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe`                        |
-| Artifact size                        | 166,008,031 bytes                                                                            |
-| Artifact SHA-256                     | `D8A964B303AD982ECD49094B4602F34BE923B9DBA5C0EEA64106B1FF17F403B0`                           |
-| Bundled Codex runtime                | `resources/codex/codex-app-server.exe`, 245,798,704 bytes                                    |
-| Bundled Codex SHA-256                | `616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395`                           |
-| Runtime package status               | PASS — installer includes executable, manifest, Codex LICENSE/NOTICE, and Cline LICENSE      |
-| Code signing                         | BLOCKED — no signing credential was available; the artifact is unsigned.                     |
-| Web/API/relay deployment identifiers | None supplied or verified in this workspace.                                                 |
+| Field                                | Evidence                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Branch                               | `main`                                                                                          |
+| Starting SHA                         | `8fdaaa7c4e3eea761b9b8930ddf825caa77b3ea7`                                                      |
+| Final SHA                            | `b679597d3fe03efab9a6622de8f8c46468496131`                                                      |
+| Version                              | `0.1.0`                                                                                         |
+| Working tree                         | Clean; generated unsigned release output and the 245 MB Codex binary are intentionally ignored. |
+| Certified desktop artifact           | `apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe`                           |
+| Artifact size                        | 166,008,031 bytes                                                                               |
+| Artifact SHA-256                     | `D8A964B303AD982ECD49094B4602F34BE923B9DBA5C0EEA64106B1FF17F403B0`                              |
+| Bundled Codex runtime                | `resources/codex/codex-app-server.exe`, 245,798,704 bytes                                       |
+| Bundled Codex SHA-256                | `616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395`                              |
+| Runtime package status               | PASS — installer includes executable, manifest, Codex LICENSE/NOTICE, and Cline LICENSE         |
+| Code signing                         | BLOCKED — no signing credential was available; the artifact is unsigned.                        |
+| Web/API/relay deployment identifiers | None supplied or verified in this workspace.                                                    |
 
 ## C. Architecture audit
 
