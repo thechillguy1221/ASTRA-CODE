@@ -215,6 +215,42 @@ requested acceptance criteria against actual verification results.
 The UI exposes operational events and concise summaries, not hidden
 chain-of-thought. A model assertion of success is insufficient.
 
+### 11. Astra Web Search and Web Fetch
+
+Web research is an Astra-owned tool capability available to the Codex-derived
+runtime. It is independent of Cline, Codex login state, browser sessions,
+customer API keys, and MCP. The path is:
+
+```text
+Codex tool request
+  -> Astra tool/policy layer
+  -> authentication, Room permission, budget, and billing context
+  -> Astra Web Search Service
+  -> configured server-side provider
+  -> normalized results or sanitized page content
+  -> Codex evidence with source metadata
+```
+
+`web_search` and `web_fetch` are separate capabilities. Search never grants
+arbitrary HTTP access. Browser automation is a separate future capability.
+Provider credentials remain server-side and are absent from Electron,
+preload, Cline UI, Codex configuration, Room members, and model context.
+
+The provider abstraction exposes normalized search results and sanitized fetch
+content rather than provider-specific response objects. Each task has bounded
+search count, fetch count, bytes, time, repeated-query, and provider-cost
+budgets. Room policy controls `WEB_SEARCH` and `WEB_FETCH`; Room research uses
+the same immutable personal or organization billing context as model calls.
+
+Fetched URLs are restricted to public HTTP(S) destinations by default. The
+service validates schemes, DNS/IP ranges, redirects, response size, content
+type, encoding, and timeouts. It rejects loopback, private/link-local,
+metadata, internal DNS, `file:`, `ftp:`, and custom protocols. Retrieved text
+and snippets are untrusted data: prompt-injection instructions cannot alter
+Astra policy, permissions, wallet context, tools, approvals, or host access.
+Search/fetch events include query/URL, source IDs, provider, timestamps,
+content hashes where practical, policy decisions, and budget state.
+
 ## Migration phases
 
 ### Phase 0 — provenance and audit
@@ -267,6 +303,14 @@ tests, agent autonomy benchmark, desktop build/package, provenance checks,
 license inventory, and available live certifications. Record blocked external
 certifications without promoting them.
 
+### Phase 7 — Web Search and Web Fetch
+
+Add the Astra-owned normalized provider interface, server-only configuration,
+SSRF-safe fetcher, content sanitizer, tool policy, Room billing attribution,
+bounded research budgets, Workspace Bridge events, source provenance, and
+deterministic/live certification harnesses. Search-provider live certification
+remains blocked until a real provider configuration is available.
+
 ## Error and recovery rules
 
 - Upstream fetch/build failure blocks the corresponding integration; no
@@ -280,6 +324,11 @@ certifications without promoting them.
   preserves audit state.
 - Import validation failure leaves the upload quarantined and creates no
   project write.
+- Web-search provider failure returns `WEB SEARCH UNAVAILABLE`; no fabricated
+  result or external-verification claim is emitted.
+- Web fetch rejects unsafe schemes, private destinations, unsafe redirects,
+  oversized responses, unsupported content, and invalid policy context before
+  content reaches the runtime.
 - Completion failure produces `BLOCKED` or `FAILED`, never a model-only
   success.
 
@@ -302,6 +351,8 @@ Required evidence includes:
 - Room File upload/reference/import/ZIP security tests;
 - path, command, reparse-point, MCP, Plugin, and Skill boundary tests;
 - personal and organization reservation/settlement attribution tests;
+- web-search normalization, fetch sanitization, SSRF/redirect, prompt-injection,
+  Room policy, budget, cancellation, provenance, and billing-context tests;
 - 65-feature matrix with implementation and test evidence;
 - `npm.cmd test`, typecheck, lint, format, build, audit, and
   `git diff --check` results;
@@ -320,3 +371,7 @@ service marked `BLOCKED`; deterministic mocks do not upgrade that status.
 The final report must contain every Feature 1–65 row, source provenance,
 runtime path evidence, Room/billing/security evidence, exact test results,
 artifact identity, and remaining risks.
+
+It must also report Web Search implementation, Web Fetch implementation,
+provider live certification, SSRF tests, Room permission tests,
+billing-context tests, and web prompt-injection tests separately.

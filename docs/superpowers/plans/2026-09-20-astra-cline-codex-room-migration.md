@@ -32,6 +32,7 @@
 - Billing-context drift: a multi-call Room task must never switch from organization wallet to personal wallet; `tests/integration/room-billing-context.test.ts` owns this.
 - Archive/path collision attacks: traversal, reserved names, case/Unicode collisions, links, and oversized archives must remain quarantined with zero project writes; `tests/security/room-files.test.ts` owns this.
 - Revocation during execution: suspension/removal/device revocation must prevent the next privileged action and preserve audit/billing state; `tests/integration/room-revocation-during-task.test.ts` owns this.
+- Web research safety: search/fetch must normalize provider results, reject SSRF/private redirects, treat content as untrusted, preserve Room billing context, and stop on budget/revocation; `tests/security/web-research.test.ts` owns this.
 
 ## File Map and Boundary Decisions
 
@@ -777,6 +778,82 @@ export interface BenchmarkResult {
 
   Run `git status --short`, inspect the complete diff, scan for secrets, run `git diff --check`, commit with `git commit -m "feat: integrate Cline workspace and Codex runtime"`, capture the final SHA, and rerun the certification commands against that exact commit/artifact. Any post-certification source change invalidates the relevant evidence.
 
+### Task 13: Add Astra Web Search, Web Fetch, and research policy
+
+**Files:**
+
+- Create: `packages/web-research/package.json`.
+- Create: `packages/web-research/src/types.ts`.
+- Create: `packages/web-research/src/provider.ts`.
+- Create: `packages/web-research/src/ssrf.ts`.
+- Create: `packages/web-research/src/sanitize.ts`.
+- Create: `packages/web-research/src/service.ts`.
+- Create: `packages/web-research/src/index.ts`.
+- Create: `packages/contracts/src/domain/web-research.ts`.
+- Create: `apps/api/src/web-research-route.ts`.
+- Create: `tests/unit/web-research.test.ts`.
+- Create: `tests/security/web-research.test.ts`.
+- Create: `tests/integration/web-research-api.test.ts`.
+- Modify: `packages/config/src/index.ts`, `.env.example`, `packages/remote-protocol/src/access.ts`, `packages/contracts/src/domain/workspace.ts`, `packages/codex-runtime/src/protocol.ts`, `packages/workspace-bridge/src/events.ts`, `apps/api/src/app.ts`, `apps/api/src/server.ts`, and the renderer activity mapping.
+- Modify: `docs/source-provenance.md`, `docs/supply-chain.md`, and `docs/migration-certification.md` with provider/configuration and live-certification evidence.
+
+**Interfaces:**
+
+```ts
+export interface WebSearchRequest {
+  query: string;
+  maxResults?: number;
+  recency?: string;
+  domains?: string[];
+  excludeDomains?: string[];
+  safeSearch?: boolean;
+}
+
+export interface WebSearchProvider {
+  search(request: WebSearchRequest, signal: AbortSignal): Promise<NormalizedSearchResponse>;
+  fetch(request: WebFetchRequest, signal: AbortSignal): Promise<SanitizedPageResponse>;
+}
+
+export interface WebResearchService {
+  search(context: WebResearchContext, request: WebSearchRequest): Promise<NormalizedSearchResponse>;
+  fetch(context: WebResearchContext, request: WebFetchRequest): Promise<SanitizedPageResponse>;
+}
+```
+
+- [ ] **Step 1: Write failing normalization, policy, SSRF, and injection tests**
+
+  Cover normalized search output, source metadata/hash, authorized personal/Team/Business search, unauthorized Viewer/Room search, provider credentials absent from desktop inputs, localhost/private/link-local/metadata/file/ftp/custom URL rejection, public-to-private redirect rejection, size/timeout/content-type limits, cancellation, provider failure, budget exhaustion, Room suspension/removal, prompt injection in snippets/pages, and personal-versus-organization billing attribution.
+
+- [ ] **Step 2: Run focused tests**
+
+  Run: `npm.cmd test -- tests/unit/web-research.test.ts tests/security/web-research.test.ts tests/integration/web-research-api.test.ts`
+
+  Expected: FAIL because no Web Research package, API route, policy, or events exist.
+
+- [ ] **Step 3: Implement provider abstraction and normalized contracts**
+
+  Add `WebSearchProvider` and a server-only configured provider adapter. Normalize provider output into stable result/source records; never pass raw provider response objects to Codex. Keep live provider URL/key configuration server-only and support deterministic provider fixtures without labeling them live.
+
+- [ ] **Step 4: Implement SSRF-safe fetch and content sanitization**
+
+  Validate HTTP(S) scheme, resolve and reject private/loopback/link-local/metadata/internal destinations, disable automatic unsafe redirects, revalidate every redirect, enforce redirect/byte/time/content-type limits, reject binary/unsupported content, normalize encoding, strip executable HTML/browser content, and mark fetched text as untrusted data. Do not execute JavaScript, download files automatically, access browser cookies, or perform browser automation.
+
+- [ ] **Step 5: Implement Astra policy, budgets, and billing context**
+
+  Add separate `WEB_SEARCH` and `WEB_FETCH` permission checks, task search/fetch/byte/time/repeated-query/provider-cost limits, cancellation, current Room authorization checks, and immutable personal/Team/Business billing-context attribution. Record search usage separately from model usage while retaining task/session/turn/member/Room/organization IDs.
+
+- [ ] **Step 6: Wire runtime and Workspace Bridge events**
+
+  Add typed `web.search.started`, `web.search.completed`, `web.fetch.started`, `web.fetch.completed`, `web.fetch.blocked`, and `web.budget.warning` events. Make Codex request the Astra tool boundary, route through the API/service, and render concise activity/source entries in the Cline-derived workspace without exposing hidden chain-of-thought.
+
+- [ ] **Step 7: Run focused, extension, billing, and security suites**
+
+  Run focused tests plus `tests/security/extension-room-boundary.test.ts`, `tests/integration/room-billing-context.test.ts`, `tests/security/path-security.test.ts`, `tests/unit/model-gateway-cancellation.test.ts`, and the full existing suite. Expected: local deterministic provider tests pass; live provider status remains `BLOCKED` unless real server credentials are configured.
+
+- [ ] **Step 8: Commit Web Research integration**
+
+  Commit with: `git add packages/web-research packages/contracts packages/config packages/remote-protocol packages/codex-runtime packages/workspace-bridge apps/api apps/desktop tests docs .env.example package.json package-lock.json && git commit -m "feat: add Astra web research tools"`.
+
 ## Plan Self-Review
 
 - Coverage: Tasks 1–2 cover upstream acquisition, licenses, provenance, Codex artifact identity, protocol compatibility, isolated runtime home, and fail-closed launch. Tasks 3–6 cover Astra transport, billing context, bridge, Cline UI, production cutover, no fallback, budgets, cancellation, and completion. Tasks 7–11 cover Room Files, imports, ZIP security, host binding, revocation, offline/handoff, extension policy, UI, and attribution. Task 12 covers Feature 1–65 evidence, benchmark, packaging, and release certification.
@@ -784,3 +861,4 @@ export interface BenchmarkResult {
 - Type consistency: `RuntimeBillingContext`, `WorkspaceCommand`, `WorkspaceEvent`, `RoomFileRecord`, `ImportProposal`, `RoomCapabilityLease`, `RoomSecurityEvent`, and `RoomWorkspaceViewModel` are defined before consumers.
 - Regression coverage: each review-focus failure mode has an owning test file and a full-suite verification step.
 - Explicit blockers: missing live AI, PostgreSQL, OAuth, Resend, Razorpay, relay, or signing infrastructure remains `BLOCKED`; it never becomes a deterministic PASS.
+- Web Research is a separate Astra capability; deterministic provider tests can pass without live search credentials, but live search-provider certification remains `BLOCKED` until actual server configuration is exercised.
