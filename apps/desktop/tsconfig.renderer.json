@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist/renderer-types",
+    "tsBuildInfoFile": "dist/renderer-types/tsconfig.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "references": [{ "path": "../../packages/contracts" }],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "desktop.d.ts"]
+}

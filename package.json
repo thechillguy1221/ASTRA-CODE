@@ -1,0 +1,38 @@
+{
+  "name": "lyntar",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "vitest run --maxWorkers=1",
+    "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "typecheck": "tsc -b",
+    "build:packages": "npm run build --workspace @lyntar/contracts && npm run build --workspace @lyntar/config && npm run build --workspace @lyntar/db && npm run build --workspace @lyntar/model-gateway && npm run build --workspace @lyntar/workspace && npm run build --workspace @lyntar/agent-core && npm run build --workspace @lyntar/test-utils",
+    "build": "npm run build:packages && npm run build --workspace @lyntar/api && npm run build --workspace @lyntar/desktop",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "golden-path": "node --import tsx scripts/run-golden-path.mjs",
+    "certify:postgres": "npm run build:packages && node --import tsx scripts/postgres-certification.mjs",
+    "dev:api": "npm run build:packages && tsx apps/api/src/server.ts",
+    "dev:desktop": "npm run dev --workspace @lyntar/desktop"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.22.0",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.11",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.22.0",
+    "eslint-config-prettier": "^10.1.1",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0",
+    "vitest": "^5.0.1"
+  }
+}

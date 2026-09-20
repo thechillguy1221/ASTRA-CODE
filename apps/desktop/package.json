@@ -1,0 +1,30 @@
+{
+  "name": "@lyntar/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:renderer && npm run build:electron",
+    "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "start": "electron dist/electron/main.js",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@lyntar/agent-core": "0.1.0",
+    "@lyntar/config": "0.1.0",
+    "@lyntar/contracts": "0.1.0",
+    "@lyntar/model-gateway": "0.1.0",
+    "@lyntar/workspace": "0.1.0",
+    "electron": "^44.4.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0"
+  }
+}

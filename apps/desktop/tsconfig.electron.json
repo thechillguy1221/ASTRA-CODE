@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "electron",
+    "outDir": "dist/electron",
+    "tsBuildInfoFile": "dist/electron/tsconfig.tsbuildinfo",
+    "types": ["node", "electron"]
+  },
+  "references": [
+    { "path": "../../packages/agent-core" },
+    { "path": "../../packages/config" },
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/model-gateway" },
+    { "path": "../../packages/workspace" }
+  ],
+  "include": ["electron/**/*.ts", "electron/**/*.cts"]
+}

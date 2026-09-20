@@ -1,0 +1,97 @@
+import {
+  IpcCommandSchema,
+  type AgentEvent,
+  type IpcCommand,
+  type LyntarIpcApi,
+  type WorkspaceDescriptor,
+} from '@lyntar/contracts';
+import { DesktopRuntime } from './desktop-runtime.js';
+
+function parseCommand<T extends IpcCommand['type']>(
+  type: T,
+  payload: Record<string, unknown> = {},
+): Extract<IpcCommand, { type: T }> {
+  return IpcCommandSchema.parse({ type, ...payload }) as Extract<IpcCommand, { type: T }>;
+}
+
+export function buildCapabilityApiForTest(): LyntarIpcApi {
+  const listeners = new Set<(event: AgentEvent) => void>();
+  return {
+    workspace: {
+      async open(): Promise<WorkspaceDescriptor | null> {
+        return null;
+      },
+      async readFile(): Promise<string> {
+        throw new Error('No test workspace configured');
+      },
+      async search(): Promise<Array<{ path: string; line: number; text: string }>> {
+        return [];
+      },
+    },
+    agent: {
+      async startTask() {
+        throw new Error('No test agent configured');
+      },
+      async cancelTask() {},
+      async approveAction() {},
+      async rejectAction() {},
+    },
+    models: {
+      async list() {
+        return [];
+      },
+    },
+    events: {
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+  };
+}
+
+export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void> {
+  const { BrowserWindow, dialog, ipcMain } = await import('electron');
+  ipcMain.handle('workspace.open', async () => {
+    parseCommand('workspace.open');
+    const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    const selectedPath = result.filePaths[0];
+    if (result.canceled || !selectedPath) return null;
+    return runtime.openWorkspace(selectedPath);
+  });
+  ipcMain.handle('workspace.readFile', (_event, relativePath: unknown) => {
+    const command = parseCommand('workspace.readFile', { relativePath });
+    return runtime.readFile(command.relativePath);
+  });
+  ipcMain.handle('workspace.search', (_event, query: unknown) => {
+    const command = parseCommand('workspace.search', { query });
+    return runtime.search(command.query);
+  });
+  ipcMain.handle('agent.startTask', (_event, input: unknown) => {
+    const command = parseCommand(
+      'agent.startTask',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.startTask(command);
+  });
+  ipcMain.handle('agent.cancelTask', (_event, taskId: unknown) => {
+    const command = parseCommand('agent.cancelTask', { taskId });
+    return runtime.cancelTask(command.taskId);
+  });
+  ipcMain.handle('agent.approveAction', (_event, taskId: unknown, requestId: unknown) => {
+    const command = parseCommand('agent.approveAction', { taskId, requestId });
+    return runtime.approveAction(command.taskId, command.requestId);
+  });
+  ipcMain.handle('agent.rejectAction', (_event, taskId: unknown, requestId: unknown) => {
+    const command = parseCommand('agent.rejectAction', { taskId, requestId });
+    return runtime.rejectAction(command.taskId, command.requestId);
+  });
+  ipcMain.handle('models.list', () => {
+    parseCommand('models.list');
+    return runtime.listModels();
+  });
+  runtime.subscribe((event) => {
+    for (const window of BrowserWindow.getAllWindows())
+      window.webContents.send('agent.event', event);
+  });
+}
