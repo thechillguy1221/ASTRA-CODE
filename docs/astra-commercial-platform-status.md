@@ -30,6 +30,10 @@ not a production-ready claim.
 - Authenticated WebSocket relay transport with token-based connection authentication, heartbeat,
   backpressure bounds, broker authorization, replay-safe message forwarding, and immediate broker
   revocation when a device or Room member is revoked/suspended/removed.
+- Organization-scoped fixed-point pooled wallets for Team/Business, including bounded reservations,
+  exact settlement/release, rollover, idempotent Razorpay grants, and member/Room/host attribution.
+- Typed desktop device identity IPC and a host-side remote message bridge that applies authorization
+  before dispatching agent, terminal, session, and approval actions.
 - Reproducible Windows x64 NSIS packaging configuration with separate signed and explicitly unsigned
   build commands. The unsigned installer build was exercised; code-signing remains an external release
   gate.
@@ -44,10 +48,9 @@ not a production-ready claim.
 - AI Gateway: existing live harness remains; provider credentials are not present.
 - Windows installer: unsigned x64 NSIS artifact builds locally; Authenticode signing and production
   distribution remain pending.
-- Remote relay: the WebSocket transport is implemented and deterministically tested; grant issuance,
-- desktop host/client integration, durable multi-instance relay state, and staging network certification
-  remain pending. Team/Business organization wallets are schema-ready but are not yet wired into the
-  live model-reservation path; current billable reservations use the authenticated user's wallet.
+- Remote relay: the WebSocket transport, grant issuance, typed host bridge, and organization wallet
+  reservation path are implemented and deterministically tested. Installed desktop host/client
+  integration, durable multi-instance relay state, and staging network certification remain pending.
 
 ## Compatibility note
 

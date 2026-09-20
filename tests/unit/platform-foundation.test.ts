@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { canInstallWindowsUpdate, ReleaseManifestSchema } from '@lyntar/releases';
+import { generateKeyPairSync } from 'node:crypto';
+import {
+  canInstallWindowsUpdate,
+  ReleaseManifestSchema,
+  sha256,
+  signReleaseManifest,
+  verifyReleaseSignature,
+  verifyWindowsUpdatePayload,
+} from '@lyntar/releases';
 import { EmailPolicy } from '@lyntar/email';
 import { RedactedLogger, SupportBundleBuilder } from '@lyntar/observability';
 
@@ -34,6 +42,35 @@ describe('platform foundations', () => {
         arch: 'x64',
         currentVersion: '0.1.0',
       }),
+    ).toBe(false);
+  });
+
+  it('requires a valid release signature and installer digest before update install', () => {
+    const bytes = new TextEncoder().encode('Astra installer bytes');
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const unsigned = {
+      version: '0.2.0',
+      channel: 'stable' as const,
+      platform: 'win32' as const,
+      arch: 'x64' as const,
+      installerUrl: 'https://downloads.example.test/astra-0.2.0.exe',
+      sha256: sha256(bytes),
+      size: bytes.byteLength,
+      minimumOs: 'Windows 10',
+      publishedAt: new Date().toISOString(),
+      releaseNotesUrl: 'https://example.test/releases/0.2.0',
+      mandatory: false,
+      rolloutPercentage: 100,
+    };
+    const manifest = ReleaseManifestSchema.parse({
+      ...unsigned,
+      signature: signReleaseManifest(unsigned, privateKey),
+    });
+
+    expect(verifyReleaseSignature(manifest, publicKey)).toBe(true);
+    expect(verifyWindowsUpdatePayload(manifest, bytes, publicKey)).toBe(true);
+    expect(
+      verifyWindowsUpdatePayload(manifest, new TextEncoder().encode('tampered'), publicKey),
     ).toBe(false);
   });
 

@@ -6,6 +6,9 @@ import type {
   WalletLedgerEntry,
   WalletBucket,
   WalletBucketSourceType,
+  OrganizationWallet,
+  OrganizationWalletLedgerEntry,
+  OrganizationWalletBucket,
 } from '@lyntar/contracts';
 
 export interface GrantCreditsInput {
@@ -69,4 +72,58 @@ export interface BillingStore {
   listLedger(userId: string): Promise<WalletLedgerEntry[]>;
   countActiveReservations?(userId: string): Promise<number>;
   listBuckets?(userId: string): Promise<WalletBucket[]>;
+}
+
+export interface OrganizationGrantCreditsInput {
+  organizationId: string;
+  actorUserId: string;
+  amountCredits: string;
+  transactionType: Exclude<
+    LedgerTransactionType,
+    'USAGE_RESERVE' | 'USAGE_SETTLEMENT' | 'RESERVE_RELEASE'
+  >;
+  idempotencyKey: string;
+  reason: string;
+  roomId?: string | null;
+  taskId?: string;
+  metadata?: Record<string, unknown>;
+  sourceType?: WalletBucketSourceType;
+  expiresAt?: string | null;
+  referenceId?: string | null;
+  planCycle?: string | null;
+}
+
+export interface OrganizationReserveCreditsInput {
+  organizationId: string;
+  actorUserId: string;
+  roomId?: string | null;
+  hostDeviceId?: string | null;
+  taskId: string;
+  modelId?: string;
+  amountCredits: string;
+  idempotencyKey: string;
+}
+
+export interface OrganizationRolloverSubscriptionCreditsInput {
+  organizationId: string;
+  actorUserId: string;
+  monthlyAllocation: string;
+  periodStart: string;
+  newExpiresAt?: string | null;
+  idempotencyKey: string;
+  referenceId?: string | null;
+}
+
+export interface OrganizationBillingStore {
+  getWallet(organizationId: string): Promise<OrganizationWallet>;
+  getReservation(reservationId: string): Promise<CreditReservation | undefined>;
+  grantCredits(input: OrganizationGrantCreditsInput): Promise<OrganizationWalletLedgerEntry>;
+  reserveCredits(input: OrganizationReserveCreditsInput): Promise<CreditReservation>;
+  settleCredits(input: SettleCreditsInput): Promise<UsageSettlement>;
+  listLedger(organizationId: string): Promise<OrganizationWalletLedgerEntry[]>;
+  listBuckets?(organizationId: string): Promise<OrganizationWalletBucket[]>;
+  countActiveReservations?(organizationId: string): Promise<number>;
+  rolloverSubscriptionCredits?(
+    input: OrganizationRolloverSubscriptionCreditsInput,
+  ): Promise<string>;
 }

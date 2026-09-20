@@ -291,6 +291,27 @@ textarea:focus-visible {
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 17px;
 }
+
+.setting-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.text-button:hover,
+.text-button:focus-visible {
+  text-decoration: underline;
+}
 .panel {
   border: 1px solid #1e2d3e;
   border-radius: 12px;

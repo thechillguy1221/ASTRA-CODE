@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { RazorpayWebhookService, InMemoryPaymentStore } from '@lyntar/billing';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
+import {
+  RazorpayWebhookService,
+  InMemoryPaymentStore,
+  BillingService,
+  InMemoryBillingStore,
+  InMemoryOrganizationBillingStore,
+  OrganizationBillingService,
+} from '@lyntar/billing';
 import { createDefaultPlanCatalog } from '@lyntar/plans';
 import { createHmac } from 'node:crypto';
 
@@ -19,21 +25,33 @@ function makeService(options?: {
   onCancelled?: (userId: string, planId: string) => Promise<void>;
   onHalted?: (userId: string, planId: string) => Promise<void>;
   onGranted?: (userId: string, planId: string) => Promise<void>;
+  onOrganizationEntitlementChanged?: (
+    organizationId: string,
+    actorUserId: string,
+    planId: string,
+    status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED',
+  ) => Promise<void>;
 }) {
   const payments = new InMemoryPaymentStore();
   const billingStore = new InMemoryBillingStore();
   const plans = createDefaultPlanCatalog();
   const billing = new BillingService({ store: billingStore, plans });
+  const organizationBilling = new OrganizationBillingService({
+    store: new InMemoryOrganizationBillingStore(),
+    plans,
+  });
   const service = new RazorpayWebhookService({
     secret: SECRET,
     payments,
     billing,
+    organizationBilling,
     plans,
     onPlanGranted: options?.onGranted,
     onSubscriptionCancelled: options?.onCancelled,
     onSubscriptionHalted: options?.onHalted,
+    onOrganizationEntitlementChanged: options?.onOrganizationEntitlementChanged,
   });
-  return { service, payments, billingStore, billing };
+  return { service, payments, billingStore, billing, organizationBilling };
 }
 
 describe('Razorpay state machine (spec §36, §79 items 7-12)', () => {
@@ -68,6 +86,66 @@ describe('Razorpay state machine (spec §36, §79 items 7-12)', () => {
     await service.handle(evt2.body, evt2.sig);
     const wallet2 = await billingStore.getWallet(userId);
     expect(wallet2.availableCredits).toBe('300'); // unchanged
+  });
+
+  it('subscription.charged credits the pooled organization wallet for Team', async () => {
+    const payments = new InMemoryPaymentStore();
+    const billingStore = new InMemoryBillingStore();
+    const organizationBilling = new OrganizationBillingService({
+      store: new InMemoryOrganizationBillingStore(),
+      plans: createDefaultPlanCatalog(),
+    });
+    const billing = new BillingService({ store: billingStore, plans: createDefaultPlanCatalog() });
+    const service = new RazorpayWebhookService({
+      secret: SECRET,
+      payments,
+      billing,
+      organizationBilling,
+      plans: createDefaultPlanCatalog(),
+    });
+    const evt = makeEvent('subscription.charged', {
+      userId: 'team-owner',
+      organizationId: 'org-team',
+      planId: 'TEAM',
+      providerSubscriptionId: 'sub_team_1',
+      providerPaymentId: 'pay_team_1',
+      periodStart: '2026-09-01T00:00:00.000Z',
+      amountInr: '9999',
+    });
+
+    await service.handle(evt.body, evt.sig);
+    expect((await organizationBilling.getWallet('org-team')).availableCredits).toBe('6000');
+    expect((await billing.getWallet('team-owner')).availableCredits).toBe('0');
+  });
+
+  it('emits organization entitlement transitions for pooled renewal and cancellation', async () => {
+    const transitions: string[] = [];
+    const { service } = makeService({
+      onOrganizationEntitlementChanged: async (organizationId, actorUserId, planId, status) => {
+        transitions.push(`${organizationId}:${actorUserId}:${planId}:${status}`);
+      },
+    });
+    const charged = makeEvent('subscription.charged', {
+      userId: 'team-owner-transition',
+      organizationId: 'org-transition',
+      planId: 'TEAM',
+      providerSubscriptionId: 'sub_transition',
+      providerPaymentId: 'pay_transition',
+      periodStart: '2026-09-01T00:00:00.000Z',
+      amountInr: '9999',
+    });
+    await service.handle(charged.body, charged.sig);
+    const cancelled = makeEvent('subscription.cancelled', {
+      userId: 'team-owner-transition',
+      organizationId: 'org-transition',
+      planId: 'TEAM',
+      providerSubscriptionId: 'sub_transition',
+    });
+    await service.handle(cancelled.body, cancelled.sig);
+    expect(transitions).toEqual([
+      'org-transition:team-owner-transition:TEAM:ACTIVE',
+      'org-transition:team-owner-transition:FREE:CLOSED',
+    ]);
   });
 
   it('subscription.cancelled fires onSubscriptionCancelled callback (test 7)', async () => {
@@ -147,6 +225,40 @@ describe('Razorpay state machine (spec §36, §79 items 7-12)', () => {
         (entry) => entry.transactionType === 'CREDIT_PURCHASE',
       ),
     ).toHaveLength(1);
+  });
+
+  it('credits a Team top-up to the organization wallet when the webhook carries organization context', async () => {
+    const payments = new InMemoryPaymentStore();
+    const billing = new BillingService({
+      store: new InMemoryBillingStore(),
+      plans: createDefaultPlanCatalog(),
+    });
+    const organizationBilling = new OrganizationBillingService({
+      store: new InMemoryOrganizationBillingStore(),
+      plans: createDefaultPlanCatalog(),
+    });
+    const service = new RazorpayWebhookService({
+      secret: SECRET,
+      payments,
+      billing,
+      organizationBilling,
+      plans: createDefaultPlanCatalog(),
+    });
+    const body = JSON.stringify({
+      id: 'evt_org_topup_1',
+      event: 'payment.captured',
+      payload: {
+        userId: 'team-owner-topup',
+        organizationId: 'org-team-topup',
+        providerPaymentId: 'pay_org_topup_1',
+        amountInr: '499',
+        topUpSkuId: 'TOPUP_250',
+      },
+    });
+    await service.handle(body, sign(body));
+    await service.handle(body, sign(body));
+    expect((await organizationBilling.getWallet('org-team-topup')).availableCredits).toBe('250');
+    expect((await billing.getWallet('team-owner-topup')).availableCredits).toBe('0');
   });
 
   it('rolls one monthly allocation of unused subscription credits into the next cycle', async () => {

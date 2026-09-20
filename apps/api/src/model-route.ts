@@ -5,7 +5,7 @@ import {
   type UsageReceipt,
 } from '@lyntar/contracts';
 import type { AuthService } from '@lyntar/auth';
-import type { BillingService } from '@lyntar/billing';
+import type { BillingService, OrganizationBillingService } from '@lyntar/billing';
 import type { ModelCatalogStore, UsageReceiptStore } from '@lyntar/db';
 import type { GatewayModelClient } from '@lyntar/model-gateway';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
@@ -17,6 +17,7 @@ export interface ModelRouteDependencies {
   gateway: GatewayModelClient;
   auth?: AuthService;
   billing?: BillingService;
+  organizationBilling?: OrganizationBillingService;
   developmentEntitlement: boolean;
 }
 
@@ -54,9 +55,12 @@ export async function registerModelRoutes(
       if (typeof reservationId !== 'string')
         return reply.code(409).send({ error: 'RESERVATION_REQUIRED' });
       reservation = await dependencies.billing.getReservation(reservationId);
+      if (!reservation && dependencies.organizationBilling)
+        reservation = await dependencies.organizationBilling.getReservation(reservationId);
       if (
         !reservation ||
         reservation.userId !== identity.user.id ||
+        (reservation.organizationId && reservation.actorUserId !== identity.user.id) ||
         reservation.taskId !== parsed.data.taskId ||
         reservation.status !== 'RESERVED'
       )
@@ -77,7 +81,12 @@ export async function registerModelRoutes(
             requestedModelId: parsed.data.modelId,
             planId: identity?.user.planId ?? 'FREE',
             ...(identity && dependencies.billing
-              ? { wallet: await dependencies.billing.getWallet(identity.user.id) }
+              ? {
+                  wallet:
+                    reservation?.organizationId && dependencies.organizationBilling
+                      ? await dependencies.organizationBilling.getWallet(reservation.organizationId)
+                      : await dependencies.billing.getWallet(identity.user.id),
+                }
               : {}),
             inputTokenEstimate: parsed.data.messages.reduce(
               (total, message) => total + Math.ceil(message.content.length / 4),
@@ -104,6 +113,40 @@ export async function registerModelRoutes(
       provider: model.provider ?? model.providerSlug,
       ...(model.costMetadata ? { costMetadata: model.costMetadata } : {}),
     };
+    const wantsStream = request.headers.accept?.includes('application/x-ndjson') === true;
+    if (wantsStream) {
+      reply.hijack();
+      reply.raw.statusCode = 200;
+      reply.raw.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      reply.raw.setHeader('X-Accel-Buffering', 'no');
+      const write = (value: unknown): void => {
+        if (!reply.raw.writableEnded) reply.raw.write(`${JSON.stringify(value)}\n`);
+      };
+      write({
+        type: 'model',
+        selectedModelId: model.modelId,
+        selectedModelDisplayName: model.displayName,
+        selectedByAuto: resolved.selectedByAuto,
+      });
+      try {
+        for await (const event of dependencies.gateway.complete(
+          gatewayRequest,
+          cancellation.signal,
+        )) {
+          if (event.type === 'usage') {
+            receipt = event.receipt;
+            await dependencies.receipts.save(event.receipt);
+          }
+          write(event);
+        }
+      } catch {
+        write({ type: 'error', error: 'model_request_failed' });
+      } finally {
+        if (!reply.raw.writableEnded) reply.raw.end();
+      }
+      return reply;
+    }
     for await (const event of dependencies.gateway.complete(gatewayRequest, cancellation.signal)) {
       if (event.type === 'decision') decision = event.decision;
       if (event.type === 'provider') providerRequestId = event.providerRequestId;

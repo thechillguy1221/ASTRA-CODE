@@ -18,6 +18,8 @@ import {
 import {
   BillingService,
   InMemoryBillingStore,
+  InMemoryOrganizationBillingStore,
+  OrganizationBillingService,
   InMemoryPaymentStore,
   RazorpayWebhookService,
 } from '@lyntar/billing';
@@ -94,6 +96,11 @@ const billing = new BillingService({
   store: postgres?.billing ?? new InMemoryBillingStore(),
   plans,
 });
+const organizationBilling = new OrganizationBillingService({
+  store: postgres?.organizationBilling ?? new InMemoryOrganizationBillingStore(),
+  plans,
+});
+const remote = postgres?.remote ?? new RemoteAccessService();
 const relayBroker = config.relaySecret ? new RemoteRelayBroker(config.relaySecret) : undefined;
 const payments = postgres ? new PostgresPaymentStore(postgres.pool) : new InMemoryPaymentStore();
 const razorpay = config.razorpayWebhookSecret
@@ -101,7 +108,32 @@ const razorpay = config.razorpayWebhookSecret
       secret: config.razorpayWebhookSecret,
       payments,
       billing,
+      organizationBilling,
       plans,
+      onOrganizationEntitlementChanged: async (
+        organizationId,
+        actorUserId,
+        planId,
+        status,
+        eventId,
+      ) => {
+        await remote.setOrganizationEntitlement({
+          organizationId,
+          actorUserId,
+          plan: (() => {
+            const plan = plans.get(planId);
+            return {
+              id: plan.id,
+              seats: plan.seats,
+              monthlyCredits: plan.monthlyCredits,
+              pooledCredits: plan.pooledCredits,
+              crossPersonRooms: plan.crossPersonRooms,
+            };
+          })(),
+          status,
+          reason: `Razorpay webhook ${eventId}`,
+        });
+      },
       onPlanGranted: async (userId, planId, eventId) => {
         await auth.assignPlan(userId, planId);
         const user = await auth.getUserById(userId);
@@ -155,6 +187,7 @@ const app = buildApi({
   ...(gateway ? { gateway } : {}),
   auth,
   billing,
+  organizationBilling,
   plans,
   ...(razorpay ? { razorpay } : {}),
   ...(email ? { email } : {}),
@@ -171,7 +204,7 @@ const app = buildApi({
   ...(postgres ? { analytics: postgres.analytics } : {}),
   ...(postgres ? { audit: postgres.audit } : {}),
   ...(postgres ? { rateLimiter: postgres.rateLimiter } : {}),
-  remote: postgres?.remote ?? new RemoteAccessService(),
+  remote,
   ...(config.relaySecret ? { relaySecret: config.relaySecret } : {}),
   ...(relayBroker ? { relayBroker } : {}),
   developmentEntitlement: config.developmentEntitlement,

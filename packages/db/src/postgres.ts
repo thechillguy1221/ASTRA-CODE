@@ -13,12 +13,14 @@ import {
 import type { AgentEventStore, ModelCatalogStore, UsageReceiptStore } from './repositories.js';
 import { PostgresAuthStore } from './postgres-auth.js';
 import { PostgresBillingStore } from './postgres-billing.js';
+import { PostgresOrganizationBillingStore } from './postgres-organization-billing.js';
 import { PostgresAdminAnalytics, PostgresEmailPreferenceStore } from './postgres-analytics.js';
 import { PostgresEmailCampaignStore, PostgresEmailDeliveryStore } from './postgres-email.js';
 import { PostgresOAuthTransactionStore } from './postgres-oauth.js';
 import { PostgresAdminAuditStore } from './postgres-admin.js';
 import type { AuthStore } from '@lyntar/auth';
 import type { BillingStore } from '@lyntar/billing';
+import type { OrganizationBillingStore } from '@lyntar/billing';
 import { PostgresRateLimitStore } from './postgres-rate-limit.js';
 import { PostgresRemoteAccessService } from './postgres-remote.js';
 import type { RemoteAccessPort } from '@lyntar/remote-protocol';
@@ -30,6 +32,7 @@ export interface PostgresStores {
   events: AgentEventStore;
   auth: AuthStore;
   billing: BillingStore;
+  organizationBilling: OrganizationBillingStore;
   emailPreferences: PostgresEmailPreferenceStore;
   emailDeliveries: PostgresEmailDeliveryStore;
   emailCampaigns: PostgresEmailCampaignStore;
@@ -220,6 +223,7 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     events: new PostgresAgentEventStore(pool),
     auth: new PostgresAuthStore(pool),
     billing: new PostgresBillingStore(pool),
+    organizationBilling: new PostgresOrganizationBillingStore(pool),
     emailPreferences: new PostgresEmailPreferenceStore(pool),
     emailDeliveries: new PostgresEmailDeliveryStore(pool),
     emailCampaigns: new PostgresEmailCampaignStore(pool),
@@ -241,6 +245,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0008_astra_identity_email', file: '0008_astra_identity_email.sql' },
     { version: '0009_oauth_transactions', file: '0009_oauth_transactions.sql' },
     { version: '0010_astra_commercial_matrix', file: '0010_astra_commercial_matrix.sql' },
+    { version: '0011_organization_wallets', file: '0011_organization_wallets.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS lyntar_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

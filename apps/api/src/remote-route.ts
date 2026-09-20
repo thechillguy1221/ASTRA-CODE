@@ -58,7 +58,9 @@ function sendRemoteError(reply: FastifyReply, error: unknown) {
       error.code === 'PERMISSION_DENIED' ||
       error.code === 'PLAN_NOT_ELIGIBLE' ||
       error.code === 'MEMBER_SUSPENDED' ||
-      error.code === 'MEMBER_REMOVED'
+      error.code === 'MEMBER_REMOVED' ||
+      error.code === 'ORGANIZATION_SUSPENDED' ||
+      error.code === 'ORGANIZATION_CLOSED'
         ? 403
         : error.code === 'INVITATION_INVALID' ||
             error.code === 'INVITATION_EXPIRED' ||

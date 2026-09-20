@@ -24,6 +24,20 @@ import {
 } from '../domain/index.js';
 import { TaskBudgetSchema } from '../domain/task.js';
 
+export const DesktopDeviceSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  label: z.string().min(1),
+  platform: z.string().min(1),
+  architecture: z.string().min(1),
+  publicKeyFingerprint: z.string().min(1),
+  credentialVersion: z.number().int().positive(),
+  createdAt: z.string().datetime(),
+  lastSeenAt: z.string().datetime().nullable(),
+  revokedAt: z.string().datetime().nullable(),
+});
+export type DesktopDevice = z.infer<typeof DesktopDeviceSchema>;
+
 export const IpcCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workspace.open') }),
   z.object({ type: z.literal('workspace.readFile'), relativePath: z.string().min(1) }),
@@ -152,6 +166,11 @@ export interface LyntarIpcApi {
   };
   billing: {
     wallet(): Promise<Wallet | null>;
+  };
+  devices: {
+    list(): Promise<DesktopDevice[]>;
+    register(): Promise<DesktopDevice>;
+    revoke(deviceId: string): Promise<void>;
   };
   events: { subscribe(listener: (event: AgentEvent) => void): () => void };
 }

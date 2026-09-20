@@ -21,6 +21,7 @@ function forwardGoogleCallback(url: string): void {
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) app.quit();
 else {
+  app.setAppUserModelId('dev.astra.ai.desktop');
   app.on('second-instance', (_event, commandLine) => {
     const callback = commandLine.find((argument) => argument.startsWith('astra://'));
     if (callback) forwardGoogleCallback(callback);
@@ -44,6 +45,8 @@ async function createWindow(): Promise<void> {
   await registerIpcHandlers(runtime);
   const window = new BrowserWindow({
     title: 'Astra AI',
+    autoHideMenuBar: true,
+    show: false,
     width: 1440,
     height: 920,
     minWidth: 1000,
@@ -58,6 +61,7 @@ async function createWindow(): Promise<void> {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) await window.loadURL(devServerUrl);
   else await window.loadFile(join(currentDirectory, '../renderer/index.html'));
+  window.once('ready-to-show', () => window.show());
 }
 
 if (singleInstance) void app.whenReady().then(() => createWindow());

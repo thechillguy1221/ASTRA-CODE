@@ -3,6 +3,7 @@ productName: Astra AI
 directories:
   output: release
   buildResources: build
+icon: build/icon.ico
 files:
   - dist/**/*
   - package.json

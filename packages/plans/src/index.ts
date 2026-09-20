@@ -16,7 +16,11 @@ function compareCredits(left: string, right: string): -1 | 0 | 1 {
 export class PlanEntitlementError extends Error {
   constructor(
     public readonly code:
-      'MODEL_NOT_ALLOWED' | 'MODE_NOT_ALLOWED' | 'TASK_BUDGET_EXCEEDED' | 'CONCURRENCY_LIMIT',
+      | 'MODEL_NOT_ALLOWED'
+      | 'MODE_NOT_ALLOWED'
+      | 'TASK_BUDGET_EXCEEDED'
+      | 'CONCURRENCY_LIMIT'
+      | 'POOLED_WALLET_NOT_ENABLED',
   ) {
     super(`Plan entitlement denied: ${code}`);
     this.name = 'PlanEntitlementError';

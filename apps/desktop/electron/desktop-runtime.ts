@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import {
   AgentTaskRunner,
   InMemorySessionStore,
@@ -9,17 +9,20 @@ import {
   type PermissionOutcome,
 } from '@lyntar/agent-core';
 import { HackathonService, LearnService, VivaService } from '@lyntar/modes';
-import { MemoryCredentialStore, type CredentialStore } from './credentials.js';
+import { MemoryCredentialStore, type CredentialStore, type DeviceIdentity } from './credentials.js';
 import {
   AuthSessionResultSchema,
+  DesktopDeviceSchema,
   PublicUserSchema,
   IpcTaskResultSchema,
   ModelCatalogEntrySchema,
   ModelCatalogResponseSchema,
   ModelDecisionResponseSchema,
+  ModelStreamEventSchema,
   CreditReservationSchema,
   WalletSchema,
   type AgentEvent,
+  type DesktopDevice,
   type PublicUser,
   type Wallet,
   type IpcTaskResult,
@@ -52,7 +55,10 @@ class ApiModelPort implements ModelPort {
   ) {}
 
   async *complete(request: ModelRequest, signal: AbortSignal): AsyncIterable<ModelStreamEvent> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/x-ndjson, application/json',
+    };
     const token = this.accessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     const reservation = this.reservationId(request.taskId);
@@ -64,6 +70,53 @@ class ApiModelPort implements ModelPort {
       signal,
     });
     if (!response.ok) throw new Error(`Astra AI API model request failed with ${response.status}`);
+    if (response.headers.get('content-type')?.includes('application/x-ndjson')) {
+      if (!response.body) throw new Error('Astra AI API returned no model stream');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      const consume = (line: string): ModelStreamEvent | null => {
+        if (!line.trim()) return null;
+        const value = JSON.parse(line) as Record<string, unknown>;
+        if (value.type === 'error') throw new Error('Astra AI model stream failed');
+        if (value.type === 'model') {
+          const selectedModelId =
+            typeof value.selectedModelId === 'string' ? value.selectedModelId : undefined;
+          if (selectedModelId && selectedModelId !== request.modelId)
+            return {
+              type: 'event',
+              event: {
+                eventId: randomUUID(),
+                taskId: request.taskId,
+                type: 'model.changed',
+                occurredAt: new Date().toISOString(),
+                payload: {
+                  fromModelId: request.modelId,
+                  toModelId: selectedModelId,
+                  ...(request.agentSessionId ? { sessionId: request.agentSessionId } : {}),
+                },
+              },
+            };
+          return null;
+        }
+        return ModelStreamEventSchema.parse(value);
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          const event = consume(line);
+          if (event) yield event;
+        }
+      }
+      buffer += decoder.decode();
+      const event = consume(buffer);
+      if (event) yield event;
+      return;
+    }
     const body = ModelDecisionResponseSchema.parse(await response.json());
     if (body.selectedModelId && body.selectedModelId !== request.modelId) {
       yield {
@@ -291,6 +344,7 @@ export class DesktopRuntime {
     const session = AuthSessionResultSchema.parse(await response.json());
     await this.credentials.set(session);
     this.authSession = session;
+    await this.registerDevice();
     return session.user;
   }
 
@@ -314,11 +368,13 @@ export class DesktopRuntime {
       const rotated = AuthSessionResultSchema.parse(await refreshed.json());
       await this.credentials.set(rotated);
       this.authSession = rotated;
+      await this.registerDevice().catch(() => undefined);
       return rotated.user;
     }
     const body = (await response.json()) as { user: unknown };
     const user = PublicUserSchema.parse(body.user);
     this.authSession = { ...session, user };
+    await this.registerDevice().catch(() => undefined);
     return user;
   }
 
@@ -371,6 +427,7 @@ export class DesktopRuntime {
     await this.credentials.set(session);
     this.authSession = session;
     this.pendingGoogleVerifier = null;
+    await this.registerDevice();
     return session.user;
   }
 
@@ -384,6 +441,72 @@ export class DesktopRuntime {
     if (!response.ok) return null;
     const body = (await response.json()) as { wallet: unknown };
     return WalletSchema.parse(body.wallet);
+  }
+
+  async listDevices(): Promise<DesktopDevice[]> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) return [];
+    this.authSession = session;
+    const response = await fetch(`${this.apiBaseUrl}/v1/devices`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) throw new Error(`Device list failed with ${response.status}`);
+    const body = (await response.json()) as { devices?: unknown };
+    if (!Array.isArray(body.devices)) throw new Error('Device list response is invalid');
+    return body.devices.map((device) => DesktopDeviceSchema.parse(device));
+  }
+
+  async registerDevice(): Promise<DesktopDevice> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) throw new Error('Authentication is required to register a device');
+    this.authSession = session;
+    const identity = await this.getOrCreateDeviceIdentity();
+    const response = await fetch(`${this.apiBaseUrl}/v1/devices/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({
+        label: 'Astra AI desktop',
+        platform: process.platform,
+        architecture: process.arch,
+        publicKeyPem: identity.publicKeyPem,
+      }),
+    });
+    if (!response.ok) throw new Error(`Device registration failed with ${response.status}`);
+    const body = (await response.json()) as { device?: unknown };
+    const device = DesktopDeviceSchema.parse(body.device);
+    if (device.id !== identity.deviceId)
+      await this.credentials.setDeviceIdentity({ ...identity, deviceId: device.id });
+    return device;
+  }
+
+  async revokeDevice(deviceId: string): Promise<void> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) throw new Error('Authentication is required to revoke a device');
+    this.authSession = session;
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/devices/${encodeURIComponent(deviceId)}/revoke`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      },
+    );
+    if (!response.ok) throw new Error(`Device revocation failed with ${response.status}`);
+  }
+
+  private async getOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
+    const existing = await this.credentials.getDeviceIdentity();
+    if (existing) return existing;
+    const pair = generateKeyPairSync('ed25519');
+    const identity: DeviceIdentity = {
+      deviceId: randomUUID(),
+      publicKeyPem: pair.publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+      privateKeyPem: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
+    };
+    await this.credentials.setDeviceIdentity(identity);
+    return identity;
   }
 
   async startTask(input: {

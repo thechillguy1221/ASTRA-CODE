@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { buildApi, createMemoryCatalog } from '@lyntar/api';
 import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
+import {
+  BillingService,
+  InMemoryBillingStore,
+  InMemoryOrganizationBillingStore,
+  OrganizationBillingService,
+} from '@lyntar/billing';
 import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { RemoteAccessService } from '@lyntar/remote-protocol';
 
 describe('authenticated model reservation boundary', () => {
   it('does not let an authenticated task call the model without a reservation', async () => {
@@ -247,5 +253,121 @@ describe('authenticated model reservation boundary', () => {
       },
     });
     expect(response.statusCode).toBe(409);
+  });
+
+  it('accepts an authorized organization reservation at the model boundary', async () => {
+    const authStore = new InMemoryAuthStore();
+    const auth = new AuthService({ store: authStore });
+    const plans = createDefaultPlanCatalog();
+    const billing = new BillingService({ store: new InMemoryBillingStore(), plans });
+    const organizationBilling = new OrganizationBillingService({
+      store: new InMemoryOrganizationBillingStore(),
+      plans,
+    });
+    const remote = new RemoteAccessService();
+    const catalog = createMemoryCatalog([
+      {
+        modelId: 'team-model',
+        displayName: 'Team Model',
+        gatewayModelId: 'test/team-model',
+        providerSlug: 'test',
+        enabled: true,
+        capabilities: {
+          supportsTools: true,
+          supportsStreaming: true,
+          supportsReasoning: false,
+          supportsStructuredOutput: true,
+          supportsImageInput: false,
+        },
+      },
+    ]);
+    const app = buildApi({
+      auth,
+      billing,
+      organizationBilling,
+      remote,
+      catalog,
+      gateway: {
+        async *complete() {
+          yield { type: 'decision' as const, decision: { kind: 'finish' as const, summary: 'ok' } };
+        },
+      },
+      developmentEntitlement: false,
+    });
+    const registration = await auth.register({
+      email: 'team-model@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'Windows', platform: 'win32', architecture: 'x64', appVersion: '0.1.0' },
+    });
+    await auth.verifyEmail(registration.verificationToken);
+    const currentUser = await authStore.getUser(registration.user.id);
+    await authStore.updateUser({ ...currentUser!, planId: 'TEAM' });
+    const login = await auth.login({
+      email: 'team-model@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'Windows', platform: 'win32', architecture: 'x64', appVersion: '0.1.0' },
+    });
+    const device = await remote.registerDevice({
+      userId: login.user.id,
+      label: 'Team host',
+      platform: 'win32',
+      architecture: 'x64',
+      publicKeyPem: 'test-public-key',
+    });
+    const organization = await remote.createOrganization({
+      ownerUserId: login.user.id,
+      displayName: 'Team Model Workspace',
+      plan: {
+        id: 'TEAM',
+        seats: 5,
+        monthlyCredits: '6000',
+        pooledCredits: true,
+        crossPersonRooms: true,
+      },
+    });
+    const room = await remote.createRoom({
+      actorUserId: login.user.id,
+      organizationId: organization.id,
+      hostDeviceId: device.id,
+      name: 'Room',
+      workspaceRootRelative: 'Projects/Room',
+    });
+    await organizationBilling.grantCredits({
+      organizationId: organization.id,
+      actorUserId: login.user.id,
+      amountCredits: '25',
+      transactionType: 'SUBSCRIPTION_GRANT',
+      idempotencyKey: 'team-model-grant',
+      reason: 'Team monthly credits',
+    });
+    const reservation = await organizationBilling.reserveTask({
+      organizationId: organization.id,
+      actorUserId: login.user.id,
+      roomId: room.id,
+      hostDeviceId: device.id,
+      planId: 'TEAM',
+      taskId: 'team-model-task',
+      modelId: 'team-model',
+      mode: 'BUILD',
+      amountCredits: '10',
+      idempotencyKey: 'team-model-reservation',
+      activeSeats: 1,
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/model-requests',
+      headers: {
+        authorization: `Bearer ${login.accessToken}`,
+        'x-lyntar-reservation-id': reservation.reservationId,
+      },
+      payload: {
+        requestId: 'team-model-request',
+        taskId: 'team-model-task',
+        agentSessionId: 'team-model-session',
+        modelId: 'team-model',
+        messages: [{ role: 'user', content: 'finish' }],
+      },
+    });
+    expect(response.statusCode).toBe(200);
   });
 });

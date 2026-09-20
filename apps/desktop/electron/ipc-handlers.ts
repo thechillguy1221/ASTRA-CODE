@@ -64,6 +64,15 @@ export function buildCapabilityApiForTest(): LyntarIpcApi {
         return null;
       },
     },
+    devices: {
+      async list() {
+        return [];
+      },
+      async register() {
+        throw new Error('No test API configured');
+      },
+      async revoke() {},
+    },
     modes: {
       async learnFile() {
         throw new Error('No test workspace configured');
@@ -155,6 +164,12 @@ export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void
   ipcMain.handle('billing.wallet', () => {
     parseCommand('billing.wallet');
     return runtime.billingWallet();
+  });
+  ipcMain.handle('devices.list', () => runtime.listDevices());
+  ipcMain.handle('devices.register', () => runtime.registerDevice());
+  ipcMain.handle('devices.revoke', (_event, deviceId: unknown) => {
+    if (typeof deviceId !== 'string' || !deviceId) throw new Error('Device ID is invalid');
+    return runtime.revokeDevice(deviceId);
   });
   ipcMain.handle('modes.learnFile', (_event, input: unknown) => {
     const command = parseCommand(

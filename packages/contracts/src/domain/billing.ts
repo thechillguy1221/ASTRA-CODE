@@ -70,9 +70,28 @@ export const WalletSchema = z.object({
 });
 export type Wallet = z.infer<typeof WalletSchema>;
 
+/**
+ * Organization wallets are deliberately separate from personal wallets. An
+ * organization balance is pooled across its active human members, while the
+ * actor and Room are retained on every reservation/settlement for audit.
+ */
+export const OrganizationWalletSchema = z.object({
+  walletId: z.string().min(1),
+  organizationId: z.string().min(1),
+  availableCredits: CreditAmountSchema,
+  reservedCredits: CreditAmountSchema,
+  consumedCredits: CreditAmountSchema,
+  updatedAt: z.string().datetime(),
+});
+export type OrganizationWallet = z.infer<typeof OrganizationWalletSchema>;
+
 export const WalletLedgerEntrySchema = z.object({
   id: z.string().min(1),
   userId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
+  actorUserId: z.string().min(1).optional(),
+  roomId: z.string().min(1).nullable().optional(),
+  deviceId: z.string().min(1).nullable().optional(),
   taskId: z.string().min(1).nullable(),
   amountCredits: CreditAmountSchema,
   transactionType: LedgerTransactionTypeSchema,
@@ -86,9 +105,31 @@ export const WalletLedgerEntrySchema = z.object({
 });
 export type WalletLedgerEntry = z.infer<typeof WalletLedgerEntrySchema>;
 
+export const OrganizationWalletLedgerEntrySchema = z.object({
+  id: z.string().min(1),
+  organizationId: z.string().min(1),
+  actorUserId: z.string().min(1),
+  roomId: z.string().min(1).nullable(),
+  taskId: z.string().min(1).nullable(),
+  amountCredits: CreditAmountSchema,
+  transactionType: LedgerTransactionTypeSchema,
+  idempotencyKey: z.string().min(1).nullable(),
+  reason: z.string().min(1),
+  availableDeltaCredits: z.string(),
+  reservedDeltaCredits: z.string(),
+  consumedDeltaCredits: z.string(),
+  createdAt: z.string().datetime(),
+  metadata: z.record(z.unknown()),
+});
+export type OrganizationWalletLedgerEntry = z.infer<typeof OrganizationWalletLedgerEntrySchema>;
+
 export const CreditReservationSchema = z.object({
   reservationId: z.string().min(1),
   userId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
+  actorUserId: z.string().min(1).optional(),
+  roomId: z.string().min(1).nullable().optional(),
+  hostDeviceId: z.string().min(1).nullable().optional(),
   taskId: z.string().min(1),
   modelId: z.string().min(1).optional(),
   amountCredits: CreditAmountSchema,
@@ -105,6 +146,10 @@ export type CreditReservation = z.infer<typeof CreditReservationSchema>;
 export const UsageSettlementSchema = z.object({
   settlementId: z.string().min(1),
   reservationId: z.string().min(1),
+  organizationId: z.string().min(1).optional(),
+  actorUserId: z.string().min(1).optional(),
+  roomId: z.string().min(1).nullable().optional(),
+  hostDeviceId: z.string().min(1).nullable().optional(),
   providerActualCostUsd: UsdAmountSchema,
   customerBillableCostUsd: UsdAmountSchema,
   absorbedCostUsd: UsdAmountSchema,
@@ -140,3 +185,17 @@ export const WalletBucketSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type WalletBucket = z.infer<typeof WalletBucketSchema>;
+
+export const OrganizationWalletBucketSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().min(1),
+  sourceType: WalletBucketSourceTypeSchema,
+  originalCredits: CreditAmountSchema,
+  remainingCredits: CreditAmountSchema,
+  idempotencyKey: z.string().min(1),
+  referenceId: z.string().min(1).nullable(),
+  planCycle: z.string().min(1).nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type OrganizationWalletBucket = z.infer<typeof OrganizationWalletBucketSchema>;

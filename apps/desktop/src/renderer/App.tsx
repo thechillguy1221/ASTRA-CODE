@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import type {
   AgentEvent,
+  DesktopDevice,
   HackathonPlan,
   IpcTaskResult,
   LearnDepth,
@@ -90,6 +91,7 @@ export function App(): ReactElement {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [devices, setDevices] = useState<DesktopDevice[]>([]);
   const [observedCredits, setObservedCredits] = useState('0');
   const progressRows = useMemo(() => deriveProgressRows(events), [events]);
   const selectedQuestion = vivaQuestions.find((question) => question.id === selectedQuestionId);
@@ -108,10 +110,15 @@ export function App(): ReactElement {
       .then((user) => {
         setAuthUser(user);
         if (user)
-          void window.lyntar.billing
-            .wallet()
-            .then(setWallet)
-            .catch(() => setWallet(null));
+          void Promise.all([window.lyntar.billing.wallet(), window.lyntar.devices.list()])
+            .then(([nextWallet, nextDevices]) => {
+              setWallet(nextWallet);
+              setDevices(nextDevices);
+            })
+            .catch(() => {
+              setWallet(null);
+              setDevices([]);
+            });
       })
       .catch((authError: unknown) => setError(errorMessage(authError)));
     return window.lyntar.events.subscribe((event) => {
@@ -128,9 +135,12 @@ export function App(): ReactElement {
         .googleComplete(code)
         .then((user) => {
           setAuthUser(user);
-          return window.lyntar.billing.wallet();
+          return Promise.all([window.lyntar.billing.wallet(), window.lyntar.devices.list()]);
         })
-        .then(setWallet)
+        .then(([nextWallet, nextDevices]) => {
+          setWallet(nextWallet);
+          setDevices(nextDevices);
+        })
         .catch((authError: unknown) => setError(errorMessage(authError)));
     });
   }, []);
@@ -150,6 +160,7 @@ export function App(): ReactElement {
       });
       setAuthUser(user);
       setWallet(await window.lyntar.billing.wallet());
+      setDevices(await window.lyntar.devices.list());
       setAuthPassword('');
     } catch (authError) {
       setError(errorMessage(authError));
@@ -160,6 +171,7 @@ export function App(): ReactElement {
     await window.lyntar.auth.logout();
     setAuthUser(null);
     setWallet(null);
+    setDevices([]);
   }
 
   async function signInGoogle(): Promise<void> {
@@ -287,7 +299,7 @@ export function App(): ReactElement {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand-block">
-          <span className="brand-mark">L</span>
+          <span className="brand-mark">A</span>
           <div>
             <span className="brand">
               ASTRA <small>AI</small>
@@ -438,6 +450,7 @@ export function App(): ReactElement {
             models={models}
             user={authUser}
             wallet={wallet}
+            devices={devices}
             email={authEmail}
             password={authPassword}
             setEmail={setAuthEmail}
@@ -445,6 +458,17 @@ export function App(): ReactElement {
             signIn={() => void signIn()}
             signInGoogle={() => void signInGoogle()}
             signOut={() => void signOut()}
+            refreshDevices={() =>
+              void window.lyntar.devices
+                .list()
+                .then(setDevices)
+                .catch(() => setDevices([]))
+            }
+            revokeDevice={(deviceId) =>
+              void window.lyntar.devices.revoke(deviceId).then(async () => {
+                setDevices(await window.lyntar.devices.list());
+              })
+            }
           />
         )}
       </section>
@@ -990,6 +1014,7 @@ function SettingsView({
   models,
   user,
   wallet,
+  devices,
   email,
   password,
   setEmail,
@@ -997,10 +1022,13 @@ function SettingsView({
   signIn,
   signInGoogle,
   signOut,
+  refreshDevices,
+  revokeDevice,
 }: {
   models: ModelCatalogEntry[];
   user: PublicUser | null;
   wallet: Wallet | null;
+  devices: DesktopDevice[];
   email: string;
   password: string;
   setEmail: (value: string) => void;
@@ -1008,6 +1036,8 @@ function SettingsView({
   signIn: () => void;
   signInGoogle: () => void;
   signOut: () => void;
+  refreshDevices: () => void;
+  revokeDevice: (deviceId: string) => void;
 }): ReactElement {
   return (
     <ModeFrame
@@ -1095,6 +1125,35 @@ function SettingsView({
           </p>
           <span className="safe-chip">Workspace boundary active</span>
         </div>
+        {user && (
+          <div className="panel setting-card">
+            <div className="setting-card-heading">
+              <span className="result-kicker">MY DEVICES</span>
+              <button className="text-button" onClick={refreshDevices}>
+                Refresh
+              </button>
+            </div>
+            <h2>
+              {devices.length
+                ? `${devices.length} authorized device${devices.length === 1 ? '' : 's'}`
+                : 'No devices registered'}
+            </h2>
+            <p className="muted">
+              Remote access is limited to devices registered to this account. Local files remain on
+              each device.
+            </p>
+            {devices.map((device) => (
+              <div className="model-row" key={device.id}>
+                <span>
+                  {device.label} · {device.platform}/{device.architecture}
+                </span>
+                <button className="text-button" onClick={() => revokeDevice(device.id)}>
+                  Revoke
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </ModeFrame>
   );

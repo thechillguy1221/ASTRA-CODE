@@ -46,4 +46,28 @@ describe('desktop credential storage', () => {
     await store.clear();
     expect(await store.get()).toBeNull();
   });
+
+  it('stores the stable device credential through the same OS-encryption boundary', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'astra-device-credentials-'));
+    roots.push(root);
+    const safeStorage = {
+      isEncryptionAvailable: () => true,
+      encryptString: (value: string) =>
+        Buffer.from(Buffer.from(value, 'utf8').toString('base64'), 'utf8'),
+      decryptString: (value: Buffer) => Buffer.from(value.toString(), 'base64').toString('utf8'),
+    };
+    const store = new SecureCredentialStore({ userDataPath: root, safeStorage });
+    const identity = {
+      deviceId: 'device-stable-id',
+      publicKeyPem: 'public-key',
+      privateKeyPem: 'private-key',
+    };
+    await store.setDeviceIdentity(identity);
+    expect((await readFile(join(root, 'astra-device.bin'), 'utf8')).toLowerCase()).not.toContain(
+      'private-key',
+    );
+    expect(await store.getDeviceIdentity()).toEqual(identity);
+    await store.clearDeviceIdentity();
+    expect(await store.getDeviceIdentity()).toBeNull();
+  });
 });

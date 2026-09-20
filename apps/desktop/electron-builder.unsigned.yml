@@ -3,12 +3,13 @@ productName: Astra AI
 directories:
   output: release-unsigned
   buildResources: build
+icon: build/icon.ico
 files:
   - dist/**/*
   - package.json
 asar: true
 win:
-  signAndEditExecutable: false
+  signExecutable: false
   target:
     - target: nsis
       arch:

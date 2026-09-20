@@ -40,6 +40,11 @@ const api: LyntarIpcApi = {
   billing: {
     wallet: () => ipcRenderer.invoke('billing.wallet'),
   },
+  devices: {
+    list: () => ipcRenderer.invoke('devices.list'),
+    register: () => ipcRenderer.invoke('devices.register'),
+    revoke: (deviceId: string) => ipcRenderer.invoke('devices.revoke', deviceId),
+  },
   modes: {
     learnFile: (input: {
       path: string;

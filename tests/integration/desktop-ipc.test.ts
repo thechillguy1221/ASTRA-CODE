@@ -11,6 +11,9 @@ describe('desktop IPC boundary', () => {
     expect(api.modes.hackathonPlan).toBeTypeOf('function');
     expect(api.auth.login).toBeTypeOf('function');
     expect(api.auth.status).toBeTypeOf('function');
+    expect(api.devices.list).toBeTypeOf('function');
+    expect(api.devices.register).toBeTypeOf('function');
+    expect(api.devices.revoke).toBeTypeOf('function');
     expect((api as Record<string, unknown>).fs).toBeUndefined();
     expect((api as Record<string, unknown>).shell).toBeUndefined();
   });

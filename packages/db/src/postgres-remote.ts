@@ -257,6 +257,67 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     }
   }
 
+  async setOrganizationEntitlement(input: {
+    organizationId: string;
+    actorUserId: string;
+    plan: OrganizationPlanInput;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): Promise<RemoteOrganization> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE organizations
+            SET plan_id = $2,
+                seat_limit = $3,
+                pooled_credits = $4,
+                status = $5,
+                updated_at = now()
+          WHERE id = $1 AND owner_user_id = $6
+          RETURNING *`,
+        [
+          input.organizationId,
+          input.plan.id,
+          input.plan.seats,
+          input.plan.monthlyCredits,
+          input.status,
+          input.actorUserId,
+        ],
+      );
+      if (!result.rows[0]) {
+        const organization = await client.query(
+          'SELECT id, owner_user_id FROM organizations WHERE id = $1',
+          [input.organizationId],
+        );
+        if (!organization.rows[0])
+          throw new RemoteAccessError('ORGANIZATION_NOT_FOUND', 'Organization not found');
+        throw new RemoteAccessError(
+          'PERMISSION_DENIED',
+          'Only the organization owner can change its entitlement',
+        );
+      }
+      await client.query(
+        `INSERT INTO room_audit_events(
+           id, organization_id, room_id, actor_user_id, action, target_type, target_id
+         ) VALUES ($1, $2, NULL, $3, $4, 'organization', $2)`,
+        [
+          randomUUID(),
+          input.organizationId,
+          input.actorUserId,
+          `organization.entitlement.changed:${input.reason.slice(0, 240)}`,
+        ],
+      );
+      await client.query('COMMIT');
+      return mapOrganization(result.rows[0] as Record<string, unknown>);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async createRoom(input: {
     actorUserId: string;
     organizationId: string;
@@ -610,6 +671,11 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     permission: RoomPermission,
     roomId?: string,
   ): Promise<RoomMember> {
+    const organization = await this.requireOrganization(organizationId);
+    if (organization.status === 'SUSPENDED')
+      throw new RemoteAccessError('ORGANIZATION_SUSPENDED', 'Organization access is suspended');
+    if (organization.status === 'CLOSED')
+      throw new RemoteAccessError('ORGANIZATION_CLOSED', 'Organization access is closed');
     const member = await this.requireMember(organizationId, userId);
     if (member.status === 'SUSPENDED')
       throw new RemoteAccessError('MEMBER_SUSPENDED', 'Room member is suspended');
@@ -623,6 +689,15 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
         throw new RemoteAccessError('PERMISSION_DENIED', 'Room does not belong to organization');
     }
     return member;
+  }
+
+  private async requireOrganization(organizationId: string): Promise<RemoteOrganization> {
+    const result = await this.pool.query('SELECT * FROM organizations WHERE id = $1', [
+      organizationId,
+    ]);
+    if (!result.rows[0])
+      throw new RemoteAccessError('ORGANIZATION_NOT_FOUND', 'Organization not found');
+    return mapOrganization(result.rows[0] as Record<string, unknown>);
   }
 
   private async requireMember(

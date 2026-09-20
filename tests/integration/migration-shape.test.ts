@@ -33,4 +33,19 @@ describe('database migration foundation', () => {
     expect(migration).toContain('ADD COLUMN IF NOT EXISTS organization_id');
     expect(migration).toContain('TOPUP_250');
   });
+
+  it('contains an isolated organization wallet with immutable pooled ledger and reservation constraints', async () => {
+    const migration = await readFile(
+      'packages/db/migrations/0011_organization_wallets.sql',
+      'utf8',
+    );
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS organization_wallets');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS organization_wallet_buckets');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS organization_credit_reservations');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS organization_usage_settlements');
+    expect(migration).toContain('organization_credit_ledger_entries_no_update');
+    expect(migration).toContain('organization_credit_ledger_entries_no_delete');
+    expect(migration).toContain('UNIQUE (organization_id, idempotency_key)');
+    expect(migration).toContain('FOR UPDATE');
+  });
 });

@@ -137,6 +137,13 @@ export interface RemoteAccessPort {
     displayName: string;
     plan: OrganizationPlanInput;
   }): RemoteOrganization | Promise<RemoteOrganization>;
+  setOrganizationEntitlement(input: {
+    organizationId: string;
+    actorUserId: string;
+    plan: OrganizationPlanInput;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): RemoteOrganization | Promise<RemoteOrganization>;
   createRoom(input: {
     actorUserId: string;
     organizationId: string;
@@ -202,6 +209,8 @@ export class RemoteAccessError extends Error {
       | 'DEVICE_REVOKED'
       | 'DEVICE_OFFLINE'
       | 'ORGANIZATION_NOT_FOUND'
+      | 'ORGANIZATION_SUSPENDED'
+      | 'ORGANIZATION_CLOSED'
       | 'SEAT_LIMIT'
       | 'ROOM_NOT_FOUND'
       | 'ROOM_PATH_INVALID'
@@ -395,6 +404,34 @@ export class RemoteAccessService {
     return { ...organization };
   }
 
+  setOrganizationEntitlement(input: {
+    organizationId: string;
+    actorUserId: string;
+    plan: OrganizationPlanInput;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): RemoteOrganization {
+    const organization = this.requireOrganization(input.organizationId);
+    if (organization.ownerUserId !== input.actorUserId)
+      throw new RemoteAccessError(
+        'PERMISSION_DENIED',
+        'Only the organization owner can change its entitlement',
+      );
+    organization.planId = input.plan.id;
+    organization.seatLimit = input.plan.seats;
+    organization.pooledCredits = input.plan.monthlyCredits;
+    organization.status = input.status;
+    this.recordAudit(
+      organization.id,
+      null,
+      input.actorUserId,
+      'organization.entitlement.changed',
+      'organization',
+      organization.id,
+    );
+    return { ...organization };
+  }
+
   createRoom(input: {
     actorUserId: string;
     organizationId: string;
@@ -482,6 +519,7 @@ export class RemoteAccessService {
         'Invitation email does not match account',
       );
     const room = this.requireRoom(invitation.roomId);
+    this.assertOrganizationActive(room.organizationId);
     const existing = this.findMember(room.organizationId, input.userId);
     if (existing) {
       if (existing.status === 'REMOVED')
@@ -635,6 +673,7 @@ export class RemoteAccessService {
     permission: RoomPermission,
     roomId?: string,
   ): RoomMember {
+    this.assertOrganizationActive(organizationId);
     const member = this.requireMember(organizationId, userId);
     if (member.status === 'SUSPENDED')
       throw new RemoteAccessError('MEMBER_SUSPENDED', 'Room member is suspended');
@@ -684,6 +723,14 @@ export class RemoteAccessService {
     if (!organization)
       throw new RemoteAccessError('ORGANIZATION_NOT_FOUND', 'Organization not found');
     return organization;
+  }
+
+  private assertOrganizationActive(organizationId: string): void {
+    const organization = this.requireOrganization(organizationId);
+    if (organization.status === 'SUSPENDED')
+      throw new RemoteAccessError('ORGANIZATION_SUSPENDED', 'Organization access is suspended');
+    if (organization.status === 'CLOSED')
+      throw new RemoteAccessError('ORGANIZATION_CLOSED', 'Organization access is closed');
   }
 
   private requireRoom(roomId: string): RemoteRoom {

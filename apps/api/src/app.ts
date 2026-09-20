@@ -16,6 +16,8 @@ import {
   BillingService,
   InMemoryAdminAuditStore,
   InMemoryBillingStore,
+  InMemoryOrganizationBillingStore,
+  OrganizationBillingService,
   type AdminAuditStore,
   type RazorpayWebhookService,
   type AdminAnalyticsPort,
@@ -48,6 +50,7 @@ export interface ApiDependencies {
   auth?: AuthService;
   exposeDevelopmentTokens?: boolean;
   billing?: BillingService;
+  organizationBilling?: OrganizationBillingService;
   plans?: PlanCatalog;
   admin?: AdminService;
   audit?: AdminAuditStore;
@@ -95,9 +98,26 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       'POST /v1/auth/password-reset/request': { limit: 5, windowMs: 10 * 60 * 1000 },
       'POST /v1/auth/google/start': { limit: 20, windowMs: 10 * 60 * 1000 },
       'POST /v1/auth/google/exchange': { limit: 20, windowMs: 10 * 60 * 1000 },
+      'POST /v1/devices/register': { limit: 10, windowMs: 10 * 60 * 1000 },
+      'POST /v1/relay/grants': { limit: 30, windowMs: 10 * 60 * 1000 },
+      'POST /v1/rooms/invitations/redeem': { limit: 10, windowMs: 10 * 60 * 1000 },
     };
+    const prefixedLimits: Array<{
+      method: string;
+      prefix: string;
+      limit: number;
+      windowMs: number;
+    }> = [
+      { method: 'POST', prefix: '/v1/rooms/', limit: 30, windowMs: 10 * 60 * 1000 },
+      { method: 'POST', prefix: '/v1/admin/', limit: 60, windowMs: 10 * 60 * 1000 },
+    ];
     app.addHook('onRequest', async (request, reply) => {
-      const rule = limits[`${request.method} ${request.url.split('?', 1)[0]}`];
+      const path = request.url.split('?', 1)[0] ?? '/';
+      const rule =
+        limits[`${request.method} ${path}`] ??
+        prefixedLimits.find(
+          (candidate) => candidate.method === request.method && path.startsWith(candidate.prefix),
+        );
       if (!rule) return;
       const key = `http:${hashRateLimitIdentity(`${request.ip}:${request.method}:${request.url.split('?', 1)[0]}`)}`;
       const decision = await dependencies.rateLimiter?.consume(key, rule);
@@ -112,6 +132,9 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   const plans = dependencies.plans ?? createDefaultPlanCatalog();
   const billing =
     dependencies.billing ?? new BillingService({ store: new InMemoryBillingStore(), plans });
+  const organizationBilling =
+    dependencies.organizationBilling ??
+    new OrganizationBillingService({ store: new InMemoryOrganizationBillingStore(), plans });
   const audit = dependencies.audit ?? new InMemoryAdminAuditStore();
   const admin = dependencies.admin ?? new AdminService({ billing, audit });
   const remote = dependencies.remote ?? new RemoteAccessService();
@@ -122,6 +145,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     gateway: dependencies.gateway ?? unavailableGateway,
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
     billing,
+    organizationBilling,
     developmentEntitlement: dependencies.developmentEntitlement ?? true,
   });
   void registerAgentEventRoutes(app, events);
@@ -140,8 +164,10 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   void registerBillingRoutes(app, {
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
     billing,
+    organizationBilling,
     plans,
     ...(dependencies.catalog ? { catalog } : {}),
+    remote,
     receipts,
   });
   void registerAdminRoutes(app, {

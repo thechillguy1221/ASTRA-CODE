@@ -1,4 +1,9 @@
-import { createHash } from 'node:crypto';
+import {
+  createHash,
+  sign as signDetached,
+  verify as verifyDetached,
+  type KeyLike,
+} from 'node:crypto';
 import { z } from 'zod';
 
 export const ReleaseManifestSchema = z.object({
@@ -56,4 +61,59 @@ export function sha256(bytes: Uint8Array): string {
 
 export function verifyInstallerDigest(bytes: Uint8Array, expectedSha256: string): boolean {
   return sha256(bytes).toLowerCase() === expectedSha256.toLowerCase();
+}
+
+export function releaseManifestSigningPayload(
+  manifest: Omit<ReleaseManifest, 'signature'> | ReleaseManifest,
+): string {
+  return JSON.stringify({
+    version: manifest.version,
+    channel: manifest.channel,
+    platform: manifest.platform,
+    arch: manifest.arch,
+    installerUrl: manifest.installerUrl,
+    sha256: manifest.sha256,
+    size: manifest.size,
+    minimumOs: manifest.minimumOs,
+    publishedAt: manifest.publishedAt,
+    releaseNotesUrl: manifest.releaseNotesUrl,
+    mandatory: manifest.mandatory,
+    rolloutPercentage: manifest.rolloutPercentage,
+  });
+}
+
+export function signReleaseManifest(
+  manifest: Omit<ReleaseManifest, 'signature'>,
+  privateKey: KeyLike,
+): string {
+  return signDetached(
+    null,
+    Buffer.from(releaseManifestSigningPayload(manifest)),
+    privateKey,
+  ).toString('base64url');
+}
+
+export function verifyReleaseSignature(manifest: ReleaseManifest, publicKey: KeyLike): boolean {
+  try {
+    return verifyDetached(
+      null,
+      Buffer.from(releaseManifestSigningPayload(manifest)),
+      publicKey,
+      Buffer.from(manifest.signature, 'base64url'),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function verifyWindowsUpdatePayload(
+  manifest: ReleaseManifest,
+  bytes: Uint8Array,
+  publicKey: KeyLike,
+): boolean {
+  return (
+    bytes.byteLength === manifest.size &&
+    verifyInstallerDigest(bytes, manifest.sha256) &&
+    verifyReleaseSignature(manifest, publicKey)
+  );
 }

@@ -1,5 +1,11 @@
 import type { AuthService } from '@lyntar/auth';
-import { BillingError, BillingService, formatUsd, parseUsd } from '@lyntar/billing';
+import {
+  BillingError,
+  BillingService,
+  OrganizationBillingService,
+  formatUsd,
+  parseUsd,
+} from '@lyntar/billing';
 import { AUTO_MODEL_ID, type BillingMode } from '@lyntar/contracts';
 import type { ModelCatalogStore } from '@lyntar/db';
 import type { UsageReceiptStore } from '@lyntar/db';
@@ -7,8 +13,12 @@ import type { PlanCatalog } from '@lyntar/plans';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveRequestedModel } from './model-selection.js';
+import { RemoteAccessError, type RemoteAccessPort } from '@lyntar/remote-protocol';
 
 const ReservationSchema = z.object({
+  organizationId: z.string().min(1).optional(),
+  roomId: z.string().min(1).optional(),
+  hostDeviceId: z.string().min(1).optional(),
   taskId: z.string().min(1),
   modelId: z.string().min(1),
   mode: z.enum(['BUILD', 'LEARN', 'VIVA', 'HACKATHON']),
@@ -45,15 +55,18 @@ function sendBillingError(reply: FastifyReply, error: unknown) {
   }
   if (error instanceof Error && error.name === 'PlanEntitlementError')
     return reply.code(403).send({ error: 'PLAN_ENTITLEMENT_DENIED' });
+  if (error instanceof RemoteAccessError) return reply.code(403).send({ error: error.code });
   return reply.code(500).send({ error: 'billing_failed' });
 }
 
 export interface BillingRouteDependencies {
   auth?: AuthService;
   billing: BillingService;
+  organizationBilling: OrganizationBillingService;
   plans: PlanCatalog;
   catalog?: ModelCatalogStore;
   receipts?: UsageReceiptStore;
+  remote: RemoteAccessPort;
 }
 
 async function requireUser(
@@ -102,33 +115,92 @@ export async function registerBillingRoutes(
     return reply.send({ buckets: await dependencies.billing.getBuckets(identity.user.id) });
   });
 
+  app.get<{ Params: { roomId: string } }>('/v1/rooms/:roomId/wallet', async (request, reply) => {
+    const identity = await requireUser(dependencies, request, reply);
+    if (!identity) return;
+    try {
+      const room = await dependencies.remote.getRoom(request.params.roomId);
+      await dependencies.remote.authorizeRoomAction({
+        actorUserId: identity.user.id,
+        roomId: room.id,
+        permission: 'room.view',
+      });
+      return reply.send({
+        wallet: await dependencies.organizationBilling.getWallet(room.organizationId),
+      });
+    } catch (error) {
+      return sendBillingError(reply, error);
+    }
+  });
+
   app.post('/v1/billing/reservations', async (request, reply) => {
     const identity = await requireUser(dependencies, request, reply);
     if (!identity) return;
     const parsed = ReservationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     try {
+      const organizationContext = parsed.data.organizationId
+        ? { organizationId: parsed.data.organizationId, roomId: parsed.data.roomId }
+        : null;
+      if (organizationContext && !organizationContext.roomId)
+        return reply.code(400).send({ error: 'ROOM_REQUIRED_FOR_ORGANIZATION_BILLING' });
+      const organizationRoom = organizationContext
+        ? await dependencies.remote.getRoom(organizationContext.roomId as string)
+        : null;
+      if (
+        organizationContext &&
+        (!organizationRoom ||
+          organizationRoom.organizationId !== organizationContext.organizationId)
+      )
+        return reply.code(403).send({ error: 'ROOM_ORGANIZATION_MISMATCH' });
+      if (organizationRoom)
+        await dependencies.remote.authorizeRoomAction({
+          actorUserId: identity.user.id,
+          roomId: organizationRoom.id,
+          permission: 'agent.prompt',
+        });
+      const wallet = organizationContext
+        ? await dependencies.organizationBilling.getWallet(organizationContext.organizationId)
+        : await dependencies.billing.getWallet(identity.user.id);
       const resolved = dependencies.catalog
         ? await resolveRequestedModel(dependencies.catalog, {
             requestedModelId: parsed.data.modelId,
             planId: identity.user.planId,
-            wallet: await dependencies.billing.getWallet(identity.user.id),
+            wallet,
           })
         : parsed.data.modelId === AUTO_MODEL_ID
           ? undefined
           : { model: undefined, selectedByAuto: false };
       if (dependencies.catalog && !resolved)
         return reply.code(404).send({ error: 'model_unavailable' });
-      const reservation = await dependencies.billing.reserveTask({
-        userId: identity.user.id,
-        planId: identity.user.planId,
-        taskId: parsed.data.taskId,
-        modelId: resolved?.model?.modelId ?? parsed.data.modelId,
-        ...(resolved?.model?.planAccess ? { modelPlanAccess: resolved.model.planAccess } : {}),
-        mode: parsed.data.mode as BillingMode,
-        amountCredits: parsed.data.amountCredits,
-        idempotencyKey: parsed.data.idempotencyKey,
-      });
+      const selectedModelId = resolved?.model?.modelId ?? parsed.data.modelId;
+      const reservation = organizationContext
+        ? await dependencies.organizationBilling.reserveTask({
+            organizationId: organizationContext.organizationId,
+            actorUserId: identity.user.id,
+            roomId: organizationRoom?.id ?? null,
+            hostDeviceId: parsed.data.hostDeviceId ?? organizationRoom?.hostDeviceId ?? null,
+            planId: identity.user.planId,
+            taskId: parsed.data.taskId,
+            modelId: selectedModelId,
+            ...(resolved?.model?.planAccess ? { modelPlanAccess: resolved.model.planAccess } : {}),
+            mode: parsed.data.mode as BillingMode,
+            amountCredits: parsed.data.amountCredits,
+            idempotencyKey: parsed.data.idempotencyKey,
+            activeSeats: (
+              await dependencies.remote.listRoomMembers(identity.user.id, organizationRoom!.id)
+            ).filter((member) => member.status === 'ACTIVE').length,
+          })
+        : await dependencies.billing.reserveTask({
+            userId: identity.user.id,
+            planId: identity.user.planId,
+            taskId: parsed.data.taskId,
+            modelId: selectedModelId,
+            ...(resolved?.model?.planAccess ? { modelPlanAccess: resolved.model.planAccess } : {}),
+            mode: parsed.data.mode as BillingMode,
+            amountCredits: parsed.data.amountCredits,
+            idempotencyKey: parsed.data.idempotencyKey,
+          });
       return reply.code(201).send({ reservation });
     } catch (error) {
       return sendBillingError(reply, error);
@@ -141,8 +213,17 @@ export async function registerBillingRoutes(
     const parsed = SettlementSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     try {
-      const reservation = await dependencies.billing.getReservation(parsed.data.reservationId);
-      if (!reservation || reservation.userId !== identity.user.id)
+      const personalReservation = await dependencies.billing.getReservation(
+        parsed.data.reservationId,
+      );
+      const reservation =
+        personalReservation ??
+        (await dependencies.organizationBilling.getReservation(parsed.data.reservationId));
+      if (
+        !reservation ||
+        reservation.userId !== identity.user.id ||
+        (reservation.organizationId && reservation.actorUserId !== identity.user.id)
+      )
         return reply.code(404).send({ error: 'RESERVATION_NOT_FOUND' });
       if (!dependencies.receipts)
         return reply.code(503).send({ error: 'USAGE_RECEIPTS_NOT_CONFIGURED' });
@@ -159,12 +240,19 @@ export async function registerBillingRoutes(
       // Provider receipts are the source of truth. The desktop request fields
       // remain accepted for wire compatibility but are never trusted for
       // financial settlement.
-      const settlement = await dependencies.billing.settleTask({
-        reservationId: reservation.reservationId,
-        providerActualCostUsd: providerCost,
-        customerBillableCostUsd: providerCost,
-        idempotencyKey: parsed.data.idempotencyKey,
-      });
+      const settlement = reservation.organizationId
+        ? await dependencies.organizationBilling.settleTask({
+            reservationId: reservation.reservationId,
+            providerActualCostUsd: providerCost,
+            customerBillableCostUsd: providerCost,
+            idempotencyKey: parsed.data.idempotencyKey,
+          })
+        : await dependencies.billing.settleTask({
+            reservationId: reservation.reservationId,
+            providerActualCostUsd: providerCost,
+            customerBillableCostUsd: providerCost,
+            idempotencyKey: parsed.data.idempotencyKey,
+          });
       return reply.send({ settlement });
     } catch (error) {
       return sendBillingError(reply, error);

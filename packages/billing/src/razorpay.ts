@@ -2,6 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import type { PlanCatalog } from '@lyntar/plans';
 import type { BillingService } from './service.js';
+import type { OrganizationBillingService } from './organization-service.js';
 import { TOP_UP_250, topUpExpiresAt } from './buckets.js';
 
 export interface PaymentRecord {
@@ -131,11 +132,19 @@ export class RazorpayWebhookService {
       secret: string;
       payments: PaymentStore;
       billing: BillingService;
+      organizationBilling?: OrganizationBillingService;
       plans: PlanCatalog;
       onPlanGranted?: (userId: string, planId: string, eventId: string) => Promise<void>;
       onSubscriptionCancelled?: (userId: string, planId: string, eventId: string) => Promise<void>;
       onSubscriptionHalted?: (userId: string, planId: string, eventId: string) => Promise<void>;
       onPaymentFailed?: (userId: string, eventId: string) => Promise<void>;
+      onOrganizationEntitlementChanged?: (
+        organizationId: string,
+        actorUserId: string,
+        planId: string,
+        status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED',
+        eventId: string,
+      ) => Promise<void>;
     },
   ) {}
 
@@ -172,14 +181,31 @@ export class RazorpayWebhookService {
         const providerPaymentId = String(data.providerPaymentId);
         const periodStart = String(data.periodStart);
         const plan = this.options.plans.get(planId);
-        await this.options.billing.rolloverSubscriptionCredits({
-          userId,
-          monthlyAllocation: plan.monthlyCredits,
-          periodStart,
-          newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
-          idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
-          referenceId: providerSubscriptionId,
-        });
+        const organizationId =
+          typeof data.organizationId === 'string' && data.organizationId
+            ? data.organizationId
+            : null;
+        if (plan.pooledCredits && (!organizationId || !this.options.organizationBilling))
+          throw new Error('Pooled subscription requires an organization billing context');
+        if (plan.pooledCredits && organizationId && this.options.organizationBilling)
+          await this.options.organizationBilling.rolloverSubscriptionCredits({
+            organizationId,
+            actorUserId: userId,
+            monthlyAllocation: plan.monthlyCredits,
+            periodStart,
+            newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+            idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
+            referenceId: providerSubscriptionId,
+          });
+        else if (!plan.pooledCredits)
+          await this.options.billing.rolloverSubscriptionCredits({
+            userId,
+            monthlyAllocation: plan.monthlyCredits,
+            periodStart,
+            newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+            idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
+            referenceId: providerSubscriptionId,
+          });
         await this.options.payments.savePayment({
           paymentId: eventId,
           userId,
@@ -198,18 +224,42 @@ export class RazorpayWebhookService {
           currentPeriodStart: periodStart,
           currentPeriodEnd: typeof data.periodEnd === 'string' ? data.periodEnd : null,
         });
-        await this.options.billing.grantCredits({
-          userId,
-          amountCredits: plan.monthlyCredits,
-          transactionType: 'SUBSCRIPTION_GRANT',
-          idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
-          reason: `${plan.displayName} subscription period grant`,
-          sourceType: 'subscription_monthly',
-          planCycle: periodStart,
-          expiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
-          referenceId: providerSubscriptionId,
-          metadata: { provider: 'razorpay', providerPaymentId, providerEventId: eventId },
-        });
+        if (organizationId && this.options.organizationBilling) {
+          await this.options.organizationBilling.grantCredits({
+            organizationId,
+            actorUserId: userId,
+            amountCredits: plan.monthlyCredits,
+            transactionType: 'SUBSCRIPTION_GRANT',
+            idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
+            reason: `${plan.displayName} organization subscription period grant`,
+            sourceType: 'subscription_monthly',
+            planCycle: periodStart,
+            expiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+            referenceId: providerSubscriptionId,
+            metadata: { provider: 'razorpay', providerPaymentId, providerEventId: eventId },
+          });
+        } else {
+          await this.options.billing.grantCredits({
+            userId,
+            amountCredits: plan.monthlyCredits,
+            transactionType: 'SUBSCRIPTION_GRANT',
+            idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
+            reason: `${plan.displayName} subscription period grant`,
+            sourceType: 'subscription_monthly',
+            planCycle: periodStart,
+            expiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+            referenceId: providerSubscriptionId,
+            metadata: { provider: 'razorpay', providerPaymentId, providerEventId: eventId },
+          });
+        }
+        if (organizationId && this.options.onOrganizationEntitlementChanged)
+          await this.options.onOrganizationEntitlementChanged(
+            organizationId,
+            userId,
+            planId,
+            'ACTIVE',
+            eventId,
+          );
         if (this.options.onPlanGranted) await this.options.onPlanGranted(userId, planId, eventId);
       } else if (event === 'subscription.authenticated') {
         const userId = String(data.userId);
@@ -233,15 +283,31 @@ export class RazorpayWebhookService {
       } else if (event === 'subscription.halted') {
         const userId = String(data.userId);
         const planId = String(data.planId);
+        const organizationId =
+          typeof data.organizationId === 'string' && data.organizationId
+            ? data.organizationId
+            : null;
         const providerSubscriptionId = String(data.providerSubscriptionId);
         await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, 'HALTED', {
           haltedAt: new Date().toISOString(),
         });
         if (this.options.onSubscriptionHalted)
           await this.options.onSubscriptionHalted(userId, planId, eventId);
+        if (organizationId && this.options.onOrganizationEntitlementChanged)
+          await this.options.onOrganizationEntitlementChanged(
+            organizationId,
+            userId,
+            'FREE',
+            'CLOSED',
+            eventId,
+          );
       } else if (event === 'subscription.cancelled' || event === 'subscription.completed') {
         const userId = String(data.userId);
         const planId = String(data.planId);
+        const organizationId =
+          typeof data.organizationId === 'string' && data.organizationId
+            ? data.organizationId
+            : null;
         const providerSubscriptionId = String(data.providerSubscriptionId);
         const status = event === 'subscription.cancelled' ? 'CANCELLED' : 'COMPLETED';
         await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, status, {
@@ -250,25 +316,52 @@ export class RazorpayWebhookService {
         // IMMEDIATE FREE: spec §32 — paid access ends immediately
         if (this.options.onSubscriptionCancelled)
           await this.options.onSubscriptionCancelled(userId, planId, eventId);
+        if (organizationId && this.options.onOrganizationEntitlementChanged)
+          await this.options.onOrganizationEntitlementChanged(
+            organizationId,
+            userId,
+            'FREE',
+            'CLOSED',
+            eventId,
+          );
       } else if (event === 'payment.captured') {
         const userId = String(data.userId);
         const providerPaymentId = String(data.providerPaymentId);
         const topUpSkuId = typeof data.topUpSkuId === 'string' ? data.topUpSkuId : null;
+        const organizationId =
+          typeof data.organizationId === 'string' && data.organizationId
+            ? data.organizationId
+            : null;
         if (topUpSkuId) {
           if (topUpSkuId !== TOP_UP_250.id || String(data.amountInr ?? '') !== TOP_UP_250.priceInr)
             throw new Error('Top-up payment does not match the server catalog');
           const purchasedAt = new Date().toISOString();
-          await this.options.billing.grantCredits({
-            userId,
-            amountCredits: TOP_UP_250.credits,
-            transactionType: 'CREDIT_PURCHASE',
-            idempotencyKey: `topup:${providerPaymentId}`,
-            reason: `${TOP_UP_250.displayName} top-up purchase`,
-            sourceType: 'purchased_topup',
-            expiresAt: topUpExpiresAt(purchasedAt),
-            referenceId: providerPaymentId,
-            metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
-          });
+          if (organizationId && this.options.organizationBilling) {
+            await this.options.organizationBilling.grantCredits({
+              organizationId,
+              actorUserId: userId,
+              amountCredits: TOP_UP_250.credits,
+              transactionType: 'CREDIT_PURCHASE',
+              idempotencyKey: `topup:${providerPaymentId}`,
+              reason: `${TOP_UP_250.displayName} organization top-up purchase`,
+              sourceType: 'purchased_topup',
+              expiresAt: topUpExpiresAt(purchasedAt),
+              referenceId: providerPaymentId,
+              metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
+            });
+          } else {
+            await this.options.billing.grantCredits({
+              userId,
+              amountCredits: TOP_UP_250.credits,
+              transactionType: 'CREDIT_PURCHASE',
+              idempotencyKey: `topup:${providerPaymentId}`,
+              reason: `${TOP_UP_250.displayName} top-up purchase`,
+              sourceType: 'purchased_topup',
+              expiresAt: topUpExpiresAt(purchasedAt),
+              referenceId: providerPaymentId,
+              metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
+            });
+          }
         }
         await this.options.payments.savePayment({
           paymentId: eventId,

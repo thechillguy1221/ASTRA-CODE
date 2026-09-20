@@ -5,7 +5,7 @@ import { chooseAutoModel } from '@lyntar/model-gateway';
 export interface RequestedModelInput {
   requestedModelId: string;
   planId: string;
-  wallet?: Wallet;
+  wallet?: Pick<Wallet, 'availableCredits'>;
   inputTokenEstimate?: number;
   outputTokenEstimate?: number;
 }
