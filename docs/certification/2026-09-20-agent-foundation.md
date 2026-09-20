@@ -44,8 +44,7 @@ The deterministic local-agent track is the certification path for this phase. Li
 - The built Electron shell launched and remained running without a load error until it was manually stopped after the launch check.
 - Browser smoke passed in Chromium, Firefox, and WebKit for public routes, CTA navigation, metadata, and responsive overflow checks.
 - `npm.cmd run package:win:unsigned` produced an unsigned x64 NSIS artifact with SHA-256
-  `4D12BFC945D00E5C31CF7101C3D7598D411F1A411A0322190331E95A7D899D1D`; Authenticode signing is
-  still blocked.
+  recorded in the final release report; Authenticode signing is still blocked.
 
 ## Not yet externally certified
 

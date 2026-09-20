@@ -60,8 +60,7 @@ This document separates code that exists and passes deterministic verification f
 - Browser smoke: Chromium, Firefox, and WebKit passed public-route, CTA, metadata, and responsive
   overflow checks at 320, 360, 390, 768, and 1280 CSS pixels.
 - `npm.cmd run package:win:unsigned`: produced `apps/desktop/release-unsigned/Astra-AI-0.1.0-win-x64-unsigned.exe`;
-  SHA-256 `4D12BFC945D00E5C31CF7101C3D7598D411F1A411A0322190331E95A7D899D1D`; Authenticode status
-  is `NotSigned`.
+  the final build checksum is recorded in the release report; Authenticode status is `NotSigned`.
 
 ## Not live-certified (Blocked per Spec §80)
 
