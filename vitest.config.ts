@@ -27,6 +27,7 @@ const sourceAliases = {
   '@lyntar/model-gateway': resolve(repositoryRoot, 'packages/model-gateway/src/index.ts'),
   '@lyntar/test-utils': resolve(repositoryRoot, 'packages/test-utils/src/index.ts'),
   '@lyntar/workspace': resolve(repositoryRoot, 'packages/workspace/src/index.ts'),
+  '@lyntar/codex-runtime': resolve(repositoryRoot, 'packages/codex-runtime/src/index.ts'),
 };
 
 export default defineConfig({

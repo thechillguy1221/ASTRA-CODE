@@ -14,6 +14,7 @@
     { "path": "../../packages/billing" },
     { "path": "../../packages/config" },
     { "path": "../../packages/contracts" },
+    { "path": "../../packages/codex-runtime" },
     { "path": "../../packages/model-gateway" },
     { "path": "../../packages/modes" },
     { "path": "../../packages/workspace" }

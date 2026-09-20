@@ -12,6 +12,7 @@ const required = [
   ['Codex SHA', /CODEX_SOURCE_SHA`?:\s*`?[0-9a-f]{40}/i],
   ['Cline selected paths', /CLINE_SELECTED_SOURCE_PATHS/],
   ['Codex selected paths', /CODEX_SELECTED_SOURCE_PATHS/],
+  ['Codex protocol fingerprint', /CODEX_PROTOCOL_FINGERPRINT`?:\s*`?[0-9a-f]{64}/i],
   ['Cline integration status', /CLINE_PRODUCTION_INTEGRATION_STATUS/],
   ['Codex integration status', /CODEX_PRODUCTION_INTEGRATION_STATUS/],
 ];

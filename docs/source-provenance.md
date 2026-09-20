@@ -62,7 +62,8 @@ runtime evidence.
   - `codex-rs/ext/web-search/src/`
 - `CODEX_ASTRA_DESTINATION_PATHS`: `packages/codex-runtime/` (planned)
 - `CODEX_INTEGRATION_METHOD`: `PINNED_CODEX_APP_SERVER_OR_CONTROLLED_BUILT_COMPONENT_WITH_TYPED_SUPERVISOR`
-- `CODEX_PROTOCOL_FINGERPRINT`: `PENDING_TASK_2`
+- `CODEX_PROTOCOL_FINGERPRINT`: `1b94b320c014fa02eb89bc613d7beef36b1a400d164eeeaad8dd716d6da81435`
+- `CODEX_PROTOCOL_FINGERPRINT_INPUTS`: sorted `.rs` files under `codex-rs/app-server-protocol/src`, `codex-rs/app-server-client/src`, and `codex-rs/app-server-transport/src`, hashed with `scripts/codex-protocol-fingerprint.mjs`
 - `CODEX_RUNTIME_AUTHORITY`: `PENDING_TASK_6`
 - `CODEX_PROVIDER_AUTHORITY`: `NONE_IN_DESKTOP`
 - `CODEX_BILLING_AUTHORITY`: `NONE`

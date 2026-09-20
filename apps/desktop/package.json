@@ -22,6 +22,7 @@
     "@lyntar/billing": "0.1.0",
     "@lyntar/config": "0.1.0",
     "@lyntar/contracts": "0.1.0",
+    "@lyntar/codex-runtime": "0.1.0",
     "@lyntar/model-gateway": "0.1.0",
     "@lyntar/modes": "0.1.0",
     "@lyntar/workspace": "0.1.0",
