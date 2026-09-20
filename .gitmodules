@@ -1,0 +1,7 @@
+[submodule "vendor/upstream/cline"]
+	path = vendor/upstream/cline
+	url = https://github.com/cline/cline.git
+
+[submodule "vendor/upstream/codex"]
+	path = vendor/upstream/codex
+	url = https://github.com/openai/codex.git
