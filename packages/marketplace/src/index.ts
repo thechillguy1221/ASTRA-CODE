@@ -1,5 +1,5 @@
 export type MarketplaceItemType = 'skill' | 'plugin' | 'mcp';
-export type MarketplaceTrust = 'Lyntar Official' | 'Verified Publisher' | 'Community' | 'Local';
+export type MarketplaceTrust = 'Astra Official' | 'Verified Publisher' | 'Community' | 'Local';
 
 export interface MarketplaceListing {
   id: string;

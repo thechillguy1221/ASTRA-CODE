@@ -3,4 +3,6 @@ export * from './memory.js';
 export * from './ports.js';
 export * from './service.js';
 export * from './razorpay.js';
+export * from './buckets.js';
 export * from './admin.js';
+export * from './analytics.js';

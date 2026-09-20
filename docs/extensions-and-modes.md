@@ -2,7 +2,7 @@
 
 ## Skills
 
-Skill metadata is searched first. Full instructions and resources are loaded only after routing selects a relevant Skill. Built-in Lyntar Essentials are stored as package resources and are not injected wholesale into every request.
+Skill metadata is searched first. Full instructions and resources are loaded only after routing selects a relevant Skill. Built-in Astra Essentials are stored as package resources and are not injected wholesale into every request.
 
 ## MCP and Plugins
 

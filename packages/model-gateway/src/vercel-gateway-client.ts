@@ -3,9 +3,48 @@ import type { ModelStreamEvent } from '@lyntar/contracts';
 import type { GatewayModelClient, GatewayRequest } from './contracts.js';
 import { parseUsageReceipt } from './receipt.js';
 
-interface VercelGatewayClientOptions {
+export interface VercelGatewayClientOptions {
   baseUrl: string;
   apiKey: string;
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  random?: () => number;
+}
+
+export class ModelGatewayError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly retryAfterMs?: number,
+  ) {
+    super(message);
+    this.name = 'ModelGatewayError';
+  }
+}
+
+function retryAfterMs(response: Response, now = Date.now()): number | undefined {
+  const header = response.headers.get('retry-after');
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, Math.min(30_000, seconds * 1000));
+  const date = Date.parse(header);
+  return Number.isFinite(date) ? Math.max(0, Math.min(30_000, date - now)) : undefined;
+}
+
+function waitWithSignal(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted)
+    return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true },
+    );
+  });
 }
 
 function extractDecision(value: unknown): ModelStreamEvent | null {
@@ -28,30 +67,49 @@ export class VercelGatewayClient implements GatewayModelClient {
   constructor(private readonly options: VercelGatewayClientOptions) {}
 
   async *complete(request: GatewayRequest, signal: AbortSignal): AsyncIterable<ModelStreamEvent> {
-    const response = await fetch(`${this.options.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.options.apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Lyntar-Request-Id': request.requestId,
-      },
-      signal,
-      body: JSON.stringify({
-        model: request.gatewayModelId,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Return exactly one JSON object describing one bounded action. Allowed kinds: message, readFile, search, patch, command, finish. Never include hidden reasoning.',
-          },
-          ...request.messages,
-        ],
-        stream: true,
-        stream_options: { include_usage: true },
-        response_format: { type: 'json_object' },
-      }),
-    });
-    if (!response.ok) throw new Error(`Model gateway returned ${response.status}`);
+    const maxAttempts = Math.max(1, this.options.maxAttempts ?? 3);
+    let response: Response | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      response = await fetch(`${this.options.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.options.apiKey}`,
+          'Content-Type': 'application/json',
+          'X-Lyntar-Request-Id': request.requestId,
+        },
+        signal,
+        body: JSON.stringify({
+          model: request.gatewayModelId,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Return exactly one JSON object describing one bounded action. Allowed kinds: message, readFile, search, patch, command, finish. Never include hidden reasoning.',
+            },
+            ...request.messages,
+          ],
+          stream: true,
+          stream_options: { include_usage: true },
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (response.ok) break;
+      const retryable = response.status === 429 || response.status >= 500;
+      const waitMs = retryAfterMs(response);
+      if (!retryable || attempt === maxAttempts) {
+        throw new ModelGatewayError(
+          `Model gateway returned ${response.status}`,
+          response.status,
+          waitMs,
+        );
+      }
+      const jitter = Math.floor((this.options.random ?? Math.random)() * 100);
+      await waitWithSignal(
+        waitMs ?? Math.min(30_000, (this.options.baseDelayMs ?? 250) * 2 ** (attempt - 1) + jitter),
+        signal,
+      );
+    }
+    if (!response?.ok) throw new ModelGatewayError('Model gateway did not return a response');
     if (!response.body) throw new Error('Model gateway returned no streaming body');
 
     const reader = response.body.getReader();

@@ -1,24 +1,30 @@
 {
   "name": "@lyntar/desktop",
+  "productName": "Astra AI",
+  "description": "Astra AI Windows desktop coding workspace.",
+  "author": "Astra AI",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
   "type": "module",
+  "main": "dist/electron/main.js",
   "scripts": {
     "build": "npm run build:renderer && npm run build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "package:win": "npm run build && electron-builder --config electron-builder.yml --win nsis --x64",
+    "package:win:unsigned": "npm run build && electron-builder --config electron-builder.unsigned.yml --win nsis --x64",
     "start": "electron dist/electron/main.js",
     "dev": "vite --host 127.0.0.1"
   },
   "dependencies": {
     "@lyntar/agent-core": "0.1.0",
+    "@lyntar/billing": "0.1.0",
     "@lyntar/config": "0.1.0",
     "@lyntar/contracts": "0.1.0",
     "@lyntar/model-gateway": "0.1.0",
     "@lyntar/modes": "0.1.0",
     "@lyntar/workspace": "0.1.0",
-    "electron": "^44.4.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -26,6 +32,8 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "44.4.3",
+    "electron-builder": "^26.15.3",
     "vite": "^8.3.0"
   }
 }

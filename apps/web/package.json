@@ -1,5 +1,6 @@
 {
   "name": "@lyntar/web",
+  "description": "Astra AI public website and account surface.",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",

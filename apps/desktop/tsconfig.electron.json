@@ -11,6 +11,7 @@
   },
   "references": [
     { "path": "../../packages/agent-core" },
+    { "path": "../../packages/billing" },
     { "path": "../../packages/config" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/model-gateway" },

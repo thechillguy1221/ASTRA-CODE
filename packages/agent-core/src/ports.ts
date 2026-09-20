@@ -9,6 +9,7 @@ import type {
   UsageReceipt,
   UsageSummary,
 } from '@lyntar/contracts';
+import type { SessionStore } from './session.js';
 
 export interface WorkspaceSearchResult {
   path: string;
@@ -98,6 +99,11 @@ export interface ReceiptPort {
   list(taskId?: string): UsageReceipt[];
 }
 
+export interface SessionPort {
+  store: SessionStore;
+  userId: string | (() => string);
+}
+
 export interface AgentPorts {
   model: ModelPort;
   workspace: WorkspacePort;
@@ -108,6 +114,7 @@ export interface AgentPorts {
   event: EventPort;
   permission: PermissionPort;
   receipts: ReceiptPort;
+  session?: SessionPort;
 }
 
 export interface StartTaskInput {

@@ -3,6 +3,7 @@ import { buildApi } from '@lyntar/api';
 import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
 import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
 import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { createMemoryReceiptStore } from '@lyntar/db';
 
 describe('billing API', () => {
   it('returns server plans and reserves credits using the authenticated plan', async () => {
@@ -14,10 +15,12 @@ describe('billing API', () => {
       store: new InMemoryBillingStore(),
       plans: createDefaultPlanCatalog(),
     });
+    const receipts = createMemoryReceiptStore();
     const app = buildApi({
       auth,
       billing,
       plans: createDefaultPlanCatalog(),
+      receipts,
       exposeDevelopmentTokens: true,
     });
     const registration = await app.inject({
@@ -49,8 +52,8 @@ describe('billing API', () => {
     const plans = await app.inject({ method: 'GET', url: '/v1/plans' });
     expect(plans.statusCode).toBe(200);
     expect(
-      plans.json().plans.find((plan: { id: string }) => plan.id === 'STUDENT').monthlyCredits,
-    ).toBe('500');
+      plans.json().plans.find((plan: { id: string }) => plan.id === 'BASIC').monthlyCredits,
+    ).toBe('300');
     const reservation = await app.inject({
       method: 'POST',
       url: '/v1/billing/reservations',
@@ -69,8 +72,25 @@ describe('billing API', () => {
       url: '/v1/wallet',
       headers: { authorization: `Bearer ${accessToken}` },
     });
-    expect(wallet.json().wallet.availableCredits).toBe('40');
+    // Free plan grants 25 credits upon signup; 25 - 10 reserved = 15 available
+    expect(wallet.json().wallet.availableCredits).toBe('15');
     expect(wallet.json().wallet.reservedCredits).toBe('10');
+    await receipts.save({
+      requestId: 'billing-request-1',
+      gatewayRequestId: 'gateway-billing-1',
+      taskId: 'task-wallet',
+      agentTaskId: 'task-wallet',
+      agentSessionId: 'session-wallet',
+      modelId: 'approved-core',
+      gatewayModelId: 'test/core',
+      provider: 'test',
+      providerRoute: 'test/core',
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheTokens: null,
+      actualCostUsd: 0.005,
+      receivedAt: '2026-09-20T00:00:00.000Z',
+    });
     const settlement = await app.inject({
       method: 'POST',
       url: '/v1/billing/settlements',
@@ -88,9 +108,10 @@ describe('billing API', () => {
       url: '/v1/wallet',
       headers: { authorization: `Bearer ${accessToken}` },
     });
-    expect(settledWallet.json().wallet.availableCredits).toBe('45');
+    // $0.005 USD = 0.5 credits settled; 9.5 credits released; 15 + 9.5 = 24.5 available
+    expect(settledWallet.json().wallet.availableCredits).toBe('24.5');
     expect(settledWallet.json().wallet.reservedCredits).toBe('0');
-    expect(settledWallet.json().wallet.consumedCredits).toBe('5');
+    expect(settledWallet.json().wallet.consumedCredits).toBe('0.5');
   });
 
   it('does not expose wallet data without a session', async () => {

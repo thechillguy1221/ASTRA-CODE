@@ -1,8 +1,10 @@
 import type { Pool } from 'pg';
-import { DeviceSessionSchema, type DeviceSession } from '@lyntar/contracts';
+import { DeviceSessionSchema, type AuthProvider, type DeviceSession } from '@lyntar/contracts';
 import type {
   AuthStore,
+  EmailOtpRecord,
   EmailVerificationRecord,
+  ExternalIdentity,
   PasswordResetRecord,
   StoredSession,
   StoredUser,
@@ -12,13 +14,16 @@ function mapUser(row: Record<string, unknown>): StoredUser {
   return {
     id: String(row.id),
     email: String(row.email),
-    passwordVerifier: String(row.password_verifier),
+    passwordVerifier: row.password_verifier ? String(row.password_verifier) : '',
     emailVerifiedAt: row.email_verified_at
       ? new Date(String(row.email_verified_at)).toISOString()
       : null,
     status: row.status === 'DISABLED' ? 'DISABLED' : 'ACTIVE',
     role:
-      row.role === 'SUPER_ADMIN' || row.role === 'FINANCE' || row.role === 'SUPPORT'
+      row.role === 'ADMIN' ||
+      row.role === 'SUPER_ADMIN' ||
+      row.role === 'FINANCE' ||
+      row.role === 'SUPPORT'
         ? row.role
         : 'USER',
     planId: String(row.plan_id ?? 'FREE'),
@@ -60,6 +65,11 @@ export class PostgresAuthStore implements AuthStore {
   async findUserByEmail(email: string): Promise<StoredUser | undefined> {
     const result = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
     return result.rows[0] ? mapUser(result.rows[0] as Record<string, unknown>) : undefined;
+  }
+
+  async listUsers(): Promise<StoredUser[]> {
+    const result = await this.pool.query('SELECT * FROM users ORDER BY created_at DESC');
+    return result.rows.map((row) => mapUser(row as Record<string, unknown>));
   }
 
   async getUser(userId: string): Promise<StoredUser | undefined> {
@@ -252,5 +262,79 @@ export class PostgresAuthStore implements AuthStore {
       record.tokenHash,
       record.usedAt,
     ]);
+  }
+
+  async saveEmailOtp(record: EmailOtpRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO email_verification_otps (id, user_id, email, code_hash, expires_at, attempts, max_attempts, sent_at, used_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        record.id,
+        record.userId,
+        record.email,
+        record.codeHash,
+        record.expiresAt,
+        record.attempts,
+        record.maxAttempts,
+        record.sentAt,
+        record.usedAt,
+      ],
+    );
+  }
+
+  async getActiveEmailOtp(userId: string): Promise<EmailOtpRecord | undefined> {
+    const result = await this.pool.query(
+      'SELECT * FROM email_verification_otps WHERE user_id = $1 AND used_at IS NULL ORDER BY sent_at DESC LIMIT 1',
+      [userId],
+    );
+    const row = result.rows[0] as Record<string, unknown> | undefined;
+    return row
+      ? {
+          id: String(row.id),
+          userId: String(row.user_id),
+          email: String(row.email),
+          codeHash: String(row.code_hash),
+          expiresAt: new Date(String(row.expires_at)).toISOString(),
+          attempts: Number(row.attempts),
+          maxAttempts: Number(row.max_attempts),
+          sentAt: new Date(String(row.sent_at)).toISOString(),
+          usedAt: row.used_at ? new Date(String(row.used_at)).toISOString() : null,
+        }
+      : undefined;
+  }
+
+  async updateEmailOtp(record: EmailOtpRecord): Promise<void> {
+    await this.pool.query(
+      'UPDATE email_verification_otps SET attempts = $2, used_at = $3 WHERE id = $1',
+      [record.id, record.attempts, record.usedAt],
+    );
+  }
+
+  async findUserByExternalIdentity(
+    provider: AuthProvider,
+    subject: string,
+  ): Promise<StoredUser | undefined> {
+    const result = await this.pool.query(
+      `SELECT u.* FROM identities i JOIN users u ON u.id = i.user_id
+       WHERE i.provider = $1 AND i.subject = $2`,
+      [provider, subject],
+    );
+    return result.rows[0] ? mapUser(result.rows[0] as Record<string, unknown>) : undefined;
+  }
+
+  async saveExternalIdentity(identity: ExternalIdentity): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO identities (id, user_id, provider, subject, email, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (provider, subject) DO NOTHING`,
+      [
+        identity.id,
+        identity.userId,
+        identity.provider,
+        identity.subject,
+        identity.email,
+        identity.createdAt,
+      ],
+    );
   }
 }

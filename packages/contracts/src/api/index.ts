@@ -63,5 +63,7 @@ export const ModelDecisionResponseSchema = z.object({
   decision: ModelDecisionSchema,
   usage: UsageReceiptSchema.nullable(),
   providerRequestId: z.string().min(1).nullable().optional(),
+  selectedModelId: z.string().min(1).optional(),
+  selectedModelDisplayName: z.string().min(1).optional(),
 });
 export type ModelDecisionResponse = z.infer<typeof ModelDecisionResponseSchema>;

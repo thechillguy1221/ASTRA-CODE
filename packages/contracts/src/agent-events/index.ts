@@ -62,6 +62,7 @@ const UsageReceivedEventSchema = EventBaseSchema.extend({
   payload: z.object({
     requestId: z.string().min(1),
     actualCostUsd: z.number().nonnegative().nullable(),
+    creditsUsed: z.string().min(1).optional(),
   }),
 });
 
@@ -88,12 +89,123 @@ const TerminalEventSchema = EventBaseSchema.extend({
   payload: z.object({ summary: z.string().min(1) }),
 });
 
+const ModelChangedEventSchema = EventBaseSchema.extend({
+  type: z.literal('model.changed'),
+  payload: z.object({
+    fromModelId: z.string().min(1),
+    toModelId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+  }),
+});
+
+const CheckpointCreatedEventSchema = EventBaseSchema.extend({
+  type: z.literal('checkpoint.created'),
+  payload: z.object({
+    checkpointId: z.string().min(1),
+    sessionId: z.string().min(1).optional(),
+    reason: z.string().min(1),
+  }),
+});
+
+const SessionPausedEventSchema = EventBaseSchema.extend({
+  type: z.literal('session.paused'),
+  payload: z.object({
+    sessionId: z.string().min(1),
+    reason: z.string().min(1).optional(),
+  }),
+});
+
+const SessionResumedEventSchema = EventBaseSchema.extend({
+  type: z.literal('session.resumed'),
+  payload: z.object({
+    sessionId: z.string().min(1),
+    fromCheckpointId: z.string().min(1).optional(),
+  }),
+});
+
+const CreditEventSchema = EventBaseSchema.extend({
+  type: z.enum(['credit.reserved', 'credit.settled', 'credit.released']),
+  payload: z.object({
+    amountCredits: z.string().min(1),
+    reservationId: z.string().min(1).optional(),
+    taskId: z.string().min(1).optional(),
+  }),
+});
+
+const UserApprovalEventSchema = EventBaseSchema.extend({
+  type: z.literal('user.approval'),
+  payload: z.object({
+    requestId: z.string().min(1),
+    action: z.string().min(1),
+    approved: z.boolean(),
+  }),
+});
+
+const ErrorEventSchema = EventBaseSchema.extend({
+  type: z.literal('session.error'),
+  payload: z.object({
+    message: z.string().min(1),
+    code: z.string().min(1).optional(),
+    recoverable: z.boolean().optional(),
+  }),
+});
+
+const SessionCompletedEventSchema = EventBaseSchema.extend({
+  type: z.literal('session.completed'),
+  payload: z.object({
+    sessionId: z.string().min(1),
+    summary: z.string().min(1),
+  }),
+});
+
+const FileCreatedEventSchema = EventBaseSchema.extend({
+  type: z.literal('file.created'),
+  payload: z.object({ path: z.string().min(1) }),
+});
+
+const FileDeletedEventSchema = EventBaseSchema.extend({
+  type: z.literal('file.deleted'),
+  payload: z.object({ path: z.string().min(1) }),
+});
+
+const TestResultEventSchema = EventBaseSchema.extend({
+  type: z.literal('test.result'),
+  payload: z.object({
+    command: z.string().min(1),
+    passed: z.boolean(),
+    summary: z.string().min(1),
+    exitCode: z.number().int().nullable(),
+  }),
+});
+
+const BuildResultEventSchema = EventBaseSchema.extend({
+  type: z.literal('build.result'),
+  payload: z.object({
+    command: z.string().min(1),
+    passed: z.boolean(),
+    summary: z.string().min(1),
+    exitCode: z.number().int().nullable(),
+  }),
+});
+
+const LintResultEventSchema = EventBaseSchema.extend({
+  type: z.literal('lint.result'),
+  payload: z.object({
+    command: z.string().min(1),
+    passed: z.boolean(),
+    summary: z.string().min(1),
+    issueCount: z.number().int().nonnegative().optional(),
+  }),
+});
+
 export const AgentEventSchema = z.discriminatedUnion('type', [
   SummaryEventSchema,
   ModelRequestedEventSchema,
   ToolRequestedEventSchema,
   PermissionEventSchema,
   FileReadEventSchema,
+  FileCreatedEventSchema,
+  FileDeletedEventSchema,
   PatchEventSchema,
   PatchRollbackEventSchema,
   CommandEventSchema,
@@ -101,5 +213,16 @@ export const AgentEventSchema = z.discriminatedUnion('type', [
   RepairStartedEventSchema,
   UsageReceivedEventSchema,
   TerminalEventSchema,
+  ModelChangedEventSchema,
+  CheckpointCreatedEventSchema,
+  SessionPausedEventSchema,
+  SessionResumedEventSchema,
+  CreditEventSchema,
+  UserApprovalEventSchema,
+  ErrorEventSchema,
+  SessionCompletedEventSchema,
+  TestResultEventSchema,
+  BuildResultEventSchema,
+  LintResultEventSchema,
 ]);
 export type AgentEvent = z.infer<typeof AgentEventSchema>;

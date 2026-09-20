@@ -9,10 +9,10 @@ import {
 
 describe('fixed-point credit math', () => {
   it('converts provider USD amounts without floating-point drift', () => {
-    expect(creditsFromUsd('0.001000')).toBe('1');
-    expect(creditsFromUsd('0.027000')).toBe('27');
-    expect(creditsFromUsd('0.037826')).toBe('37.826');
-    expect(creditsToUsd('37.826')).toBe('0.037826');
+    expect(creditsFromUsd('0.001000')).toBe('0.1');
+    expect(creditsFromUsd('0.027000')).toBe('2.7');
+    expect(creditsFromUsd('0.037826')).toBe('3.7826');
+    expect(creditsToUsd('3.7826')).toBe('0.037826');
   });
 
   it('adds and subtracts fractional credits exactly', () => {

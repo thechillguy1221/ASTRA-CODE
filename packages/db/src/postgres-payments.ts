@@ -115,6 +115,54 @@ export class PostgresPaymentStore implements PaymentStore {
     return mapSubscription(result.rows[0] as Record<string, unknown>);
   }
 
+  async findSubscriptionByProvider(
+    providerSubscriptionId: string,
+  ): Promise<SubscriptionRecord | undefined> {
+    const result = await this.pool.query(
+      'SELECT * FROM subscriptions WHERE provider_subscription_id = $1',
+      [providerSubscriptionId],
+    );
+    return result.rows[0] ? mapSubscription(result.rows[0] as Record<string, unknown>) : undefined;
+  }
+
+  async updateSubscriptionStatus(
+    providerSubscriptionId: string,
+    status: SubscriptionRecord['status'],
+    extra?: { cancelledAt?: string; haltedAt?: string },
+  ): Promise<void> {
+    await this.pool.query(
+      `UPDATE subscriptions
+       SET status = $2,
+           cancelled_at = COALESCE($3, cancelled_at),
+           halted_at = COALESCE($4, halted_at),
+           updated_at = now()
+       WHERE provider_subscription_id = $1`,
+      [providerSubscriptionId, status, extra?.cancelledAt ?? null, extra?.haltedAt ?? null],
+    );
+  }
+
+  async saveRefund(
+    refund: import('@lyntar/billing').RefundRecord,
+  ): Promise<import('@lyntar/billing').RefundRecord> {
+    await this.pool.query(
+      `INSERT INTO payments
+         (id, user_id, provider, provider_payment_id, amount_inr, status, refunded_at, created_at, updated_at)
+       VALUES ($1, $2, 'razorpay', $3, $4, 'REFUNDED', now(), $5, now())
+       ON CONFLICT (provider_payment_id) DO UPDATE SET
+         status = 'REFUNDED',
+         refunded_at = now(),
+         updated_at = now()`,
+      [
+        refund.refundId,
+        requireUuid(refund.userId, 'userId'),
+        refund.providerPaymentId || refund.providerRefundId,
+        refund.amountInr,
+        refund.createdAt,
+      ],
+    );
+    return refund;
+  }
+
   async countPayments(): Promise<number> {
     const result = await this.pool.query('SELECT count(*)::int AS count FROM payments');
     return Number(result.rows[0]?.count ?? 0);

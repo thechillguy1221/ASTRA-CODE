@@ -1,6 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import {
   AgentTaskRunner,
+  InMemorySessionStore,
+  type SessionStore,
   type AgentPorts,
   type ModelPort,
   type PermissionAction,
@@ -40,6 +42,7 @@ import {
   LocalWorkspace,
   verifyProject,
 } from '@lyntar/workspace';
+import { creditsFromUsd, formatUsd, parseUsd } from '@lyntar/billing';
 
 class ApiModelPort implements ModelPort {
   constructor(
@@ -60,8 +63,24 @@ class ApiModelPort implements ModelPort {
       body: JSON.stringify(request),
       signal,
     });
-    if (!response.ok) throw new Error(`Lyntar API model request failed with ${response.status}`);
+    if (!response.ok) throw new Error(`Astra AI API model request failed with ${response.status}`);
     const body = ModelDecisionResponseSchema.parse(await response.json());
+    if (body.selectedModelId && body.selectedModelId !== request.modelId) {
+      yield {
+        type: 'event',
+        event: {
+          eventId: randomUUID(),
+          taskId: request.taskId,
+          type: 'model.changed',
+          occurredAt: new Date().toISOString(),
+          payload: {
+            fromModelId: request.modelId,
+            toModelId: body.selectedModelId,
+            ...(request.agentSessionId ? { sessionId: request.agentSessionId } : {}),
+          },
+        },
+      };
+    }
     if (body.providerRequestId)
       yield { type: 'provider', providerRequestId: body.providerRequestId };
     yield { type: 'decision', decision: body.decision };
@@ -93,12 +112,13 @@ export class DesktopRuntime {
   private git: GitWorkspace | undefined;
   private descriptor: WorkspaceDescriptor | undefined;
   private runner: AgentTaskRunner | undefined;
-  private agentSessionId = randomUUID();
+  private agentSessionId: string = randomUUID();
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly learn = new LearnService();
   private readonly viva = new VivaService();
   private readonly hackathon = new HackathonService();
   private authSession: ReturnType<typeof AuthSessionResultSchema.parse> | null = null;
+  private pendingGoogleVerifier: string | null = null;
   private readonly activeReservationIds = new Map<string, string>();
   private readonly receiptValues: NonNullable<ReturnType<AgentPorts['receipts']['list']>> = [];
   private readonly receipts: AgentPorts['receipts'] = {
@@ -112,6 +132,7 @@ export class DesktopRuntime {
   constructor(
     private readonly apiBaseUrl = process.env.LYNTAR_API_URL ?? 'http://127.0.0.1:4317',
     private readonly credentials: CredentialStore = new MemoryCredentialStore(),
+    private readonly sessionStore: SessionStore = new InMemorySessionStore(),
   ) {}
 
   async openWorkspace(root: string): Promise<WorkspaceDescriptor> {
@@ -124,9 +145,16 @@ export class DesktopRuntime {
     }
     this.workspace = workspace;
     this.git = git;
-    this.agentSessionId = randomUUID();
+    const workspaceId = `workspace-${createHash('sha256')
+      .update(normalizeWindowsPath(workspace.canonical.root))
+      .digest('hex')}`;
+    const currentUserId = this.authSession?.user.id ?? 'local-desktop';
+    const previousSession = (await this.sessionStore.listSessions(currentUserId)).find(
+      (session) => session.workspaceId === workspaceId,
+    );
+    this.agentSessionId = previousSession?.sessionId ?? randomUUID();
     this.descriptor = {
-      workspaceId: randomUUID(),
+      workspaceId,
       displayName: root.split(/[\\/]/).at(-1) ?? root,
       canonicalRoot: workspace.canonical.root,
       selectedAt: new Date().toISOString(),
@@ -164,11 +192,15 @@ export class DesktopRuntime {
             body: JSON.stringify(event),
           });
           if (!response.ok)
-            throw new Error(`Lyntar event persistence failed with ${response.status}`);
+            throw new Error(`Astra AI event persistence failed with ${response.status}`);
         },
       },
       permission: new DesktopPermissionPort(),
       receipts: this.receipts,
+      session: {
+        store: this.sessionStore,
+        userId: () => this.authSession?.user.id ?? 'local-desktop',
+      },
     });
     return this.descriptor;
   }
@@ -240,7 +272,7 @@ export class DesktopRuntime {
 
   async listModels(): Promise<ModelCatalogEntry[]> {
     const response = await fetch(`${this.apiBaseUrl}/v1/models`);
-    if (!response.ok) throw new Error(`Lyntar API model catalog failed with ${response.status}`);
+    if (!response.ok) throw new Error(`Astra AI model catalog failed with ${response.status}`);
     const body = ModelCatalogResponseSchema.parse(await response.json());
     return body.models.map((model) => ModelCatalogEntrySchema.parse(model));
   }
@@ -302,6 +334,46 @@ export class DesktopRuntime {
     await this.credentials.clear();
   }
 
+  async authGoogleStart(): Promise<{ authorizationUrl: string }> {
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const response = await fetch(`${this.apiBaseUrl}/v1/auth/google/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        codeChallenge: challenge,
+        device: {
+          label: 'Astra AI desktop',
+          platform: process.platform,
+          architecture: process.arch,
+          appVersion: '0.1.0',
+        },
+      }),
+    });
+    if (!response.ok) throw new Error(`Astra Google sign-in unavailable with ${response.status}`);
+    const body = (await response.json()) as { authorizationUrl?: unknown };
+    if (typeof body.authorizationUrl !== 'string')
+      throw new Error('Google authorization URL is invalid');
+    this.pendingGoogleVerifier = verifier;
+    return { authorizationUrl: body.authorizationUrl };
+  }
+
+  async authGoogleComplete(code: string): Promise<PublicUser> {
+    const verifier = this.pendingGoogleVerifier;
+    if (!verifier) throw new Error('No Google sign-in is pending');
+    const response = await fetch(`${this.apiBaseUrl}/v1/auth/google/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, verifier }),
+    });
+    if (!response.ok) throw new Error(`Google sign-in exchange failed with ${response.status}`);
+    const session = AuthSessionResultSchema.parse(await response.json());
+    await this.credentials.set(session);
+    this.authSession = session;
+    this.pendingGoogleVerifier = null;
+    return session.user;
+  }
+
   async billingWallet(): Promise<Wallet | null> {
     const session = this.authSession ?? (await this.credentials.get());
     if (!session) return null;
@@ -352,11 +424,7 @@ export class DesktopRuntime {
   }): Promise<string> {
     const session = this.authSession;
     if (!session) throw new Error('Authentication is required for a billable task');
-    const amountCredits =
-      (Math.max(0, input.budget.maxEstimatedCostUsd) * 1000)
-        .toFixed(7)
-        .replace(/0+$/, '')
-        .replace(/\.$/, '') || '0';
+    const amountCredits = creditsFromUsd(Math.max(0, input.budget.maxEstimatedCostUsd).toFixed(10));
     const response = await fetch(`${this.apiBaseUrl}/v1/billing/reservations`, {
       method: 'POST',
       headers: {
@@ -402,17 +470,13 @@ export class DesktopRuntime {
   }
 
   private taskCostUsd(taskId: string): string {
-    const scale = 10_000_000_000n;
     const total = this.receiptValues
       .filter((receipt) => receipt.taskId === taskId && receipt.actualCostUsd !== null)
       .reduce(
-        (sum, receipt) =>
-          sum + BigInt(Math.max(0, Math.round((receipt.actualCostUsd ?? 0) * Number(scale)))),
+        (sum, receipt) => sum + parseUsd(Math.max(0, receipt.actualCostUsd ?? 0).toFixed(10)),
         0n,
       );
-    const whole = total / scale;
-    const fraction = (total % scale).toString().padStart(10, '0').replace(/0+$/, '');
-    return fraction ? `${whole}.${fraction}` : whole.toString();
+    return formatUsd(total);
   }
 
   cancelTask(taskId: string): void {

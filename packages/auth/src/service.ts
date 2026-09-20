@@ -1,12 +1,23 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { PublicUserSchema, type DeviceSession, type PublicUser } from '@lyntar/contracts';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
+import {
+  PublicUserSchema,
+  type AuthProvider,
+  type DeviceSession,
+  type PublicUser,
+} from '@lyntar/contracts';
 import { hashPassword, verifyPassword } from './password.js';
+import {
+  hashRateLimitIdentity,
+  InMemoryRateLimitStore,
+  type RateLimitStore,
+} from './rate-limit.js';
 import type {
   AuthSessionResult,
   AuthStore,
   DeviceInput,
   EmailVerificationRecord,
   PasswordResetRecord,
+  EmailOtpRecord,
   StoredSession,
   StoredUser,
 } from './ports.js';
@@ -23,7 +34,12 @@ export type AuthErrorCode =
   | 'SESSION_EXPIRED'
   | 'ACCOUNT_DISABLED'
   | 'DEVICE_NOT_FOUND'
-  | 'PASSWORD_RESET_INVALID';
+  | 'PASSWORD_RESET_INVALID'
+  | 'OTP_INVALID'
+  | 'OTP_EXPIRED'
+  | 'OTP_ATTEMPTS_EXCEEDED'
+  | 'OTP_COOLDOWN'
+  | 'EXTERNAL_IDENTITY_INVALID';
 
 export class AuthError extends Error {
   constructor(
@@ -37,11 +53,22 @@ export class AuthError extends Error {
 
 export interface AuthServiceOptions {
   store: AuthStore;
+  rateLimiter?: RateLimitStore;
   now?: () => Date;
   accessTtlMs?: number;
   refreshTtlMs?: number;
   verificationTtlMs?: number;
   resetTtlMs?: number;
+  otpTtlMs?: number;
+  otpResendCooldownMs?: number;
+  otpMaxAttempts?: number;
+  loginMaxFailures?: number;
+  loginLockoutMs?: number;
+}
+
+interface LoginFailureState {
+  attempts: number;
+  lockedUntil: number;
 }
 
 function hashToken(token: string): string {
@@ -88,6 +115,13 @@ export class AuthService {
   private readonly refreshTtlMs: number;
   private readonly verificationTtlMs: number;
   private readonly resetTtlMs: number;
+  private readonly otpTtlMs: number;
+  private readonly otpResendCooldownMs: number;
+  private readonly otpMaxAttempts: number;
+  private readonly loginMaxFailures: number;
+  private readonly loginLockoutMs: number;
+  private readonly rateLimiter: RateLimitStore;
+  private readonly loginFailures = new Map<string, LoginFailureState>();
 
   constructor(private readonly options: AuthServiceOptions) {
     this.now = options.now ?? (() => new Date());
@@ -95,13 +129,21 @@ export class AuthService {
     this.refreshTtlMs = options.refreshTtlMs ?? 30 * DAY_MS;
     this.verificationTtlMs = options.verificationTtlMs ?? 24 * 60 * 60 * 1000;
     this.resetTtlMs = options.resetTtlMs ?? 60 * 60 * 1000;
+    this.otpTtlMs = options.otpTtlMs ?? 10 * 60 * 1000;
+    this.otpResendCooldownMs = options.otpResendCooldownMs ?? 60 * 1000;
+    this.otpMaxAttempts = options.otpMaxAttempts ?? 5;
+    this.loginMaxFailures = options.loginMaxFailures ?? 5;
+    this.loginLockoutMs = options.loginLockoutMs ?? 60 * 1000;
+    this.rateLimiter = options.rateLimiter ?? new InMemoryRateLimitStore();
   }
 
-  async register(input: { email: string; password: string; device: DeviceInput }): Promise<{
-    user: StoredUser;
-    verificationToken: string;
-    device: DeviceInput;
-  }> {
+  async register(input: { email: string; password: string; device: DeviceInput }): Promise<
+    {
+      user: StoredUser;
+      verificationToken: string;
+      device: DeviceInput;
+    } & { verificationOtp: string }
+  > {
     const email = normalizeEmail(input.email);
     if (await this.options.store.findUserByEmail(email))
       throw new AuthError('EMAIL_IN_USE', 'An account already exists for this email');
@@ -125,7 +167,54 @@ export class AuthService {
       usedAt: null,
     };
     await this.options.store.saveEmailVerification(record);
-    return { user, verificationToken, device: input.device };
+    const verificationOtp = await this.issueEmailOtp(user);
+    return { user, verificationToken, verificationOtp, device: input.device };
+  }
+
+  async resendVerificationOtp(email: string): Promise<string | null> {
+    const user = await this.options.store.findUserByEmail(normalizeEmail(email));
+    if (!user || user.emailVerifiedAt || user.status === 'DISABLED') return null;
+    const active = await this.options.store.getActiveEmailOtp(user.id);
+    if (
+      active &&
+      this.now().getTime() - new Date(active.sentAt).getTime() < this.otpResendCooldownMs
+    )
+      throw new AuthError('OTP_COOLDOWN', 'Please wait before requesting another code');
+    return this.issueEmailOtp(user);
+  }
+
+  async getUserByEmail(email: string): Promise<StoredUser | undefined> {
+    return this.options.store.findUserByEmail(normalizeEmail(email));
+  }
+
+  async listUsers(): Promise<PublicUser[]> {
+    return (await this.options.store.listUsers()).map((user) => publicUser(user));
+  }
+
+  async getUserById(userId: string): Promise<StoredUser | undefined> {
+    return this.options.store.getUser(userId);
+  }
+
+  async verifyEmailOtp(email: string, value: string): Promise<PublicUser> {
+    const user = await this.options.store.findUserByEmail(normalizeEmail(email));
+    if (!user || user.emailVerifiedAt)
+      throw new AuthError('OTP_INVALID', 'Verification code is invalid');
+    const record = await this.options.store.getActiveEmailOtp(user.id);
+    if (!record) throw new AuthError('OTP_INVALID', 'Verification code is invalid');
+    if (new Date(record.expiresAt).getTime() <= this.now().getTime())
+      throw new AuthError('OTP_EXPIRED', 'Verification code has expired');
+    if (record.attempts >= record.maxAttempts)
+      throw new AuthError('OTP_ATTEMPTS_EXCEEDED', 'Verification attempts exceeded');
+    if (hashToken(value) !== record.codeHash) {
+      await this.options.store.updateEmailOtp({ ...record, attempts: record.attempts + 1 });
+      if (record.attempts + 1 >= record.maxAttempts)
+        throw new AuthError('OTP_ATTEMPTS_EXCEEDED', 'Verification attempts exceeded');
+      throw new AuthError('OTP_INVALID', 'Verification code is invalid');
+    }
+    const verifiedAt = this.now().toISOString();
+    await this.options.store.updateUser({ ...user, emailVerifiedAt: verifiedAt });
+    await this.options.store.updateEmailOtp({ ...record, usedAt: verifiedAt });
+    return publicUser({ ...user, emailVerifiedAt: verifiedAt });
   }
 
   async verifyEmail(verificationToken: string): Promise<PublicUser> {
@@ -144,16 +233,46 @@ export class AuthService {
     password: string;
     device: DeviceInput;
   }): Promise<AuthSessionResult> {
-    const user = await this.options.store.findUserByEmail(normalizeEmail(input.email));
-    if (!user || !verifyPassword(input.password, user.passwordVerifier))
+    const email = normalizeEmail(input.email);
+    const now = this.now();
+    const rateLimitKey = `auth:login:${hashRateLimitIdentity(email)}`;
+    const admission = await this.rateLimiter.consume(rateLimitKey, {
+      limit: this.loginMaxFailures,
+      windowMs: this.loginLockoutMs,
+      now: now.getTime(),
+    });
+    if (!admission.allowed) throw new AuthError('INVALID_CREDENTIALS', 'Invalid email or password');
+    const throttle = this.loginFailures.get(email);
+    if (throttle && throttle.lockedUntil > now.getTime())
       throw new AuthError('INVALID_CREDENTIALS', 'Invalid email or password');
+    if (throttle?.lockedUntil && throttle.lockedUntil <= now.getTime())
+      this.loginFailures.delete(email);
+
+    const user = await this.options.store.findUserByEmail(email);
+    if (!user || !verifyPassword(input.password, user.passwordVerifier)) {
+      this.recordLoginFailure(email, now.getTime());
+      throw new AuthError('INVALID_CREDENTIALS', 'Invalid email or password');
+    }
+    this.loginFailures.delete(email);
+    await this.rateLimiter.reset?.(rateLimitKey);
     if (user.status === 'DISABLED') throw new AuthError('ACCOUNT_DISABLED', 'Account is disabled');
     if (!user.emailVerifiedAt)
       throw new AuthError('EMAIL_NOT_VERIFIED', 'Verify your email before logging in');
-    const now = this.now();
     const device = deviceFromInput(user.id, input.device, now.toISOString());
     await this.options.store.saveDevice(device);
     return this.createSession(user, device, now);
+  }
+
+  private recordLoginFailure(email: string, nowMs: number): void {
+    const previous = this.loginFailures.get(email);
+    const attempts = (previous?.attempts ?? 0) + 1;
+    this.loginFailures.set(email, {
+      attempts,
+      lockedUntil:
+        attempts >= this.loginMaxFailures
+          ? nowMs + this.loginLockoutMs
+          : (previous?.lockedUntil ?? 0),
+    });
   }
 
   async refresh(refreshToken: string): Promise<AuthSessionResult> {
@@ -266,10 +385,75 @@ export class AuthService {
     return publicUser(updated);
   }
 
+  async loginExternal(input: {
+    provider: AuthProvider;
+    subject: string;
+    email: string;
+    emailVerified: boolean;
+    device: DeviceInput;
+  }): Promise<AuthSessionResult> {
+    if (!input.emailVerified)
+      throw new AuthError('EXTERNAL_IDENTITY_INVALID', 'External email is not verified');
+    const email = normalizeEmail(input.email);
+    let user = await this.options.store.findUserByExternalIdentity(input.provider, input.subject);
+    if (!user) user = await this.options.store.findUserByEmail(email);
+    if (!user) {
+      user = {
+        id: randomUUID(),
+        email,
+        passwordVerifier: '',
+        emailVerifiedAt: this.now().toISOString(),
+        status: 'ACTIVE',
+        role: 'USER',
+        planId: 'FREE',
+        createdAt: this.now().toISOString(),
+      };
+      await this.options.store.saveUser(user);
+    }
+    if (user.status === 'DISABLED') throw new AuthError('ACCOUNT_DISABLED', 'Account is disabled');
+    const existing = await this.options.store.findUserByExternalIdentity(
+      input.provider,
+      input.subject,
+    );
+    if (!existing)
+      await this.options.store.saveExternalIdentity({
+        id: randomUUID(),
+        provider: input.provider,
+        subject: input.subject,
+        userId: user.id,
+        email,
+        createdAt: this.now().toISOString(),
+      });
+    const device = deviceFromInput(user.id, input.device, this.now().toISOString());
+    await this.options.store.saveDevice(device);
+    return this.createSession(user, device, this.now());
+  }
+
   private async requireUser(userId: string): Promise<StoredUser> {
     const user = await this.options.store.getUser(userId);
     if (!user) throw new AuthError('INVALID_CREDENTIALS', 'Account not found');
     return user;
+  }
+
+  private async issueEmailOtp(user: StoredUser): Promise<string> {
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const now = this.now();
+    const previous = await this.options.store.getActiveEmailOtp(user.id);
+    if (previous)
+      await this.options.store.updateEmailOtp({ ...previous, usedAt: now.toISOString() });
+    const record: EmailOtpRecord = {
+      id: randomUUID(),
+      userId: user.id,
+      email: user.email,
+      codeHash: hashToken(code),
+      expiresAt: new Date(now.getTime() + this.otpTtlMs).toISOString(),
+      attempts: 0,
+      maxAttempts: this.otpMaxAttempts,
+      sentAt: now.toISOString(),
+      usedAt: null,
+    };
+    await this.options.store.saveEmailOtp(record);
+    return code;
   }
 
   private async logoutAllForUser(userId: string): Promise<void> {

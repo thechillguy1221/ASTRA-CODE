@@ -11,7 +11,7 @@ Billable execution follows:
 5. Aggregate every request receipt at task completion.
 6. Settle actual customer cost and release unused reservation.
 
-`1 Lyntar Credit = $0.001` is represented as fixed-precision decimal text at the API boundary. PostgreSQL uses numeric columns; in-memory deterministic tests use bigint-backed arithmetic. Floating point is not the financial source of truth.
+`1 Astra Credit = $0.01` of billable model usage. Credit amounts are represented as fixed-precision decimal text at the API boundary. PostgreSQL uses numeric columns; in-memory deterministic tests use bigint-backed arithmetic. Floating point is not the financial source of truth.
 
 The provider cost, customer-billable cost, and absorbed cost are distinct. An internal failure can therefore be recorded without rewriting provider usage history.
 

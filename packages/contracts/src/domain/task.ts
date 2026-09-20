@@ -21,6 +21,8 @@ export const TaskBudgetSchema = z.object({
   maxCommands: z.number().int().positive(),
   maxWallTimeMs: z.number().int().positive(),
   maxEstimatedCostUsd: z.number().finite().nonnegative(),
+  overrunAllowanceUsd: z.number().finite().positive().optional(),
+  maxCostCheckpoints: z.number().int().nonnegative().optional(),
 });
 export type TaskBudget = z.infer<typeof TaskBudgetSchema>;
 

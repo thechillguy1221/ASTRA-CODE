@@ -40,5 +40,8 @@ export const ModelCatalogEntrySchema = z.object({
   fallbackModelId: z.string().min(1).nullable().optional(),
   deprecatedAt: z.string().datetime().nullable().optional(),
   releaseDate: z.string().date().nullable().optional(),
+  logicalModelId: z.string().min(1).optional(),
 });
 export type ModelCatalogEntry = z.infer<typeof ModelCatalogEntrySchema>;
+
+export const AUTO_MODEL_ID = 'AUTO';

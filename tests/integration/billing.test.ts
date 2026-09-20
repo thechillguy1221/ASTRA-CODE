@@ -28,12 +28,12 @@ describe('wallet reservation and settlement', () => {
       providerActualCostUsd: '0.037826',
       customerBillableCostUsd: '0.037826',
     });
-    expect(settlement.settledCredits).toBe('37.826');
-    expect(settlement.releasedCredits).toBe('62.174');
+    expect(settlement.settledCredits).toBe('3.7826');
+    expect(settlement.releasedCredits).toBe('96.2174');
     expect(settlement.absorbedCostUsd).toBe('0');
-    expect((await billing.getWallet('user-1')).availableCredits).toBe('62.174');
+    expect((await billing.getWallet('user-1')).availableCredits).toBe('96.2174');
     expect((await billing.getWallet('user-1')).reservedCredits).toBe('0');
-    expect((await billing.getWallet('user-1')).consumedCredits).toBe('37.826');
+    expect((await billing.getWallet('user-1')).consumedCredits).toBe('3.7826');
   });
 
   it('keeps provider cost separate when a Lyntar failure absorbs the cost', async () => {
@@ -158,6 +158,34 @@ describe('wallet reservation and settlement', () => {
       customerBillableCostUsd: '0.001000',
     });
     expect(replay.settlementId).toBe(first.settlementId);
-    expect((await billing.getWallet('user-4')).availableCredits).toBe('9');
+    expect((await billing.getWallet('user-4')).availableCredits).toBe('9.9');
+  });
+});
+
+describe('Wallet ledger append-only (spec §79 item 37)', () => {
+  it('ledger only grows — entries cannot be removed', async () => {
+    const store = new InMemoryBillingStore();
+    const userId = 'user-append-only';
+
+    await store.grantCredits({
+      userId,
+      amountCredits: '100',
+      transactionType: 'SUBSCRIPTION_GRANT',
+      idempotencyKey: 'l1',
+      reason: 'g',
+    });
+    const before = await store.listLedger(userId);
+    expect(before).toHaveLength(1);
+
+    await store.grantCredits({
+      userId,
+      amountCredits: '50',
+      transactionType: 'CREDIT_PURCHASE',
+      idempotencyKey: 'l2',
+      reason: 'g2',
+    });
+    const after = await store.listLedger(userId);
+    expect(after).toHaveLength(2);
+    expect(after[0]).toEqual(before[0]); // First entry unchanged
   });
 });

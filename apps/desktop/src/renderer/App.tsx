@@ -14,6 +14,7 @@ import type {
   WorkspaceDescriptor,
   Wallet,
 } from '@lyntar/contracts';
+import { addCredits } from '@lyntar/billing/math';
 import { deriveProgressRows } from './view-model.js';
 
 type PendingPermission = {
@@ -32,7 +33,12 @@ const defaultBudget: TaskBudget = {
   maxRepairs: 2,
   maxCommands: 6,
   maxWallTimeMs: 120_000,
-  maxEstimatedCostUsd: 1,
+  // Free-plan-safe starting ceiling: $0.25 = 25 credits under the
+  // server-authoritative $0.01-per-credit rule. Higher plans can later expose
+  // a server-provided per-task budget without changing the IPC contract.
+  maxEstimatedCostUsd: 0.25,
+  overrunAllowanceUsd: 0.15,
+  maxCostCheckpoints: 2,
 };
 
 const navItems: Array<{ id: ViewId; label: string; hint: string }> = [
@@ -84,6 +90,7 @@ export function App(): ReactElement {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [observedCredits, setObservedCredits] = useState('0');
   const progressRows = useMemo(() => deriveProgressRows(events), [events]);
   const selectedQuestion = vivaQuestions.find((question) => question.id === selectedQuestionId);
   const selectedModel = models.find((model) => model.modelId === selectedModelId);
@@ -93,7 +100,7 @@ export function App(): ReactElement {
       .list()
       .then((nextModels) => {
         setModels(nextModels);
-        setSelectedModelId(nextModels[0]?.modelId ?? '');
+        setSelectedModelId(nextModels.length > 0 ? 'AUTO' : '');
       })
       .catch((loadError: unknown) => setError(errorMessage(loadError)));
     void window.lyntar.auth
@@ -110,6 +117,21 @@ export function App(): ReactElement {
     return window.lyntar.events.subscribe((event) => {
       setEvents((current) => [...current, event]);
       if (event.type === 'permission.requested') setPendingPermission(event.payload);
+      if (event.type === 'usage.received' && event.payload.creditsUsed)
+        setObservedCredits((current) => addCredits(current, event.payload.creditsUsed ?? '0'));
+    });
+  }, []);
+
+  useEffect(() => {
+    return window.lyntar.auth.onGoogleCallback((code) => {
+      void window.lyntar.auth
+        .googleComplete(code)
+        .then((user) => {
+          setAuthUser(user);
+          return window.lyntar.billing.wallet();
+        })
+        .then(setWallet)
+        .catch((authError: unknown) => setError(errorMessage(authError)));
     });
   }, []);
 
@@ -120,7 +142,7 @@ export function App(): ReactElement {
         email: authEmail.trim(),
         password: authPassword,
         device: {
-          label: 'Lyntar desktop',
+          label: 'Astra AI desktop',
           platform: 'win32',
           architecture: 'x64',
           appVersion: '0.1.0',
@@ -140,6 +162,18 @@ export function App(): ReactElement {
     setWallet(null);
   }
 
+  async function signInGoogle(): Promise<void> {
+    try {
+      setError(null);
+      await window.lyntar.auth.googleStart();
+      setError(
+        'Google opened in your system browser. Return through the Astra callback to finish sign-in.',
+      );
+    } catch (authError) {
+      setError(errorMessage(authError));
+    }
+  }
+
   async function openWorkspace(): Promise<void> {
     try {
       setError(null);
@@ -157,6 +191,7 @@ export function App(): ReactElement {
     setResult(null);
     setError(null);
     setEvents([]);
+    setObservedCredits('0');
     try {
       const taskResult = await window.lyntar.agent.startTask({
         taskId: nextTaskId,
@@ -254,7 +289,9 @@ export function App(): ReactElement {
         <div className="brand-block">
           <span className="brand-mark">L</span>
           <div>
-            <span className="brand">LYNTAR</span>
+            <span className="brand">
+              ASTRA <small>AI</small>
+            </span>
             <span className="brand-subtitle">Build it. Understand it. Ship it.</span>
           </div>
         </div>
@@ -299,7 +336,9 @@ export function App(): ReactElement {
           </div>
           <div className="topbar-actions">
             <span className="model-pill">
-              {selectedModel?.displayName ?? 'No server model configured'}
+              {selectedModelId === 'AUTO'
+                ? 'Auto · server-routed'
+                : (selectedModel?.displayName ?? 'No server model configured')}
             </span>
             {authUser ? (
               <button
@@ -348,6 +387,7 @@ export function App(): ReactElement {
             pendingPermission={pendingPermission}
             resolvePermission={(approved) => void resolvePermission(approved)}
             result={result}
+            observedCredits={observedCredits}
           />
         )}
         {view === 'learn' && (
@@ -403,6 +443,7 @@ export function App(): ReactElement {
             setEmail={setAuthEmail}
             setPassword={setAuthPassword}
             signIn={() => void signIn()}
+            signInGoogle={() => void signInGoogle()}
             signOut={() => void signOut()}
           />
         )}
@@ -425,6 +466,7 @@ function BuildView(props: {
   pendingPermission: PendingPermission | null;
   resolvePermission: (approved: boolean) => void;
   result: IpcTaskResult | null;
+  observedCredits: string;
 }): ReactElement {
   return (
     <>
@@ -432,8 +474,8 @@ function BuildView(props: {
         <p className="section-kicker">A local development partner</p>
         <h1>What do you want to build?</h1>
         <p>
-          Give Lyntar a focused task. It will inspect the repository, make bounded changes, run the
-          right checks, and show exactly what changed.
+          Give Astra AI a focused task. It will inspect the repository, make bounded changes, run
+          the right checks, and show exactly what changed.
         </p>
       </section>
       <section className="build-grid">
@@ -445,13 +487,14 @@ function BuildView(props: {
             </div>
             <span className="budget">8 calls · 2 repairs</span>
           </div>
-          {props.models.length > 1 && (
+          {props.models.length > 0 && (
             <label className="field-label">
               Model
               <select
                 value={props.selectedModelId}
                 onChange={(event) => props.setSelectedModelId(event.target.value)}
               >
+                <option value="AUTO">Auto · Astra chooses an eligible model</option>
                 {props.models.map((model) => (
                   <option key={model.modelId} value={model.modelId}>
                     {model.displayName}
@@ -517,6 +560,12 @@ function BuildView(props: {
               ))
             )}
           </div>
+          {(props.taskId || props.observedCredits !== '0') && (
+            <p className="usage-line" aria-live="polite">
+              Actual observed usage: {props.observedCredits} credits
+              {props.taskId ? ' · still running' : ''}
+            </p>
+          )}
         </div>
       </section>
       {props.result && <ResultPanel result={props.result} />}
@@ -535,7 +584,11 @@ function PermissionCard({
     <div className="permission">
       <div>
         <strong>
-          {permission.risk === 'destructive' ? 'High-risk approval needed' : 'Approval needed'}
+          {permission.action === 'budget.overrun'
+            ? 'Budget checkpoint'
+            : permission.risk === 'destructive'
+              ? 'High-risk approval needed'
+              : 'Approval needed'}
         </strong>
         <span>{permission.summary ?? permission.action}</span>
       </div>
@@ -543,10 +596,10 @@ function PermissionCard({
       {permission.reason && <span className="muted">{permission.reason}</span>}
       <div className="actions">
         <button className="primary" onClick={() => resolve(true)}>
-          Allow
+          {permission.action === 'budget.overrun' ? 'Continue' : 'Allow'}
         </button>
         <button className="secondary" onClick={() => resolve(false)}>
-          Reject
+          {permission.action === 'budget.overrun' ? 'Stop task' : 'Reject'}
         </button>
       </div>
     </div>
@@ -573,7 +626,7 @@ function ResultPanel({ result }: { result: IpcTaskResult }): ReactElement {
       </p>
       <div className="diff-grid">
         <div>
-          <h3>Lyntar changes</h3>
+          <h3>Astra changes</h3>
           <ul>
             {result.gitDiff.lyntarPaths.map((path) => (
               <li key={path}>{path}</li>
@@ -668,7 +721,7 @@ function LearnView(props: {
           ) : (
             <EmptyMode
               title="Choose a file"
-              body="Open a repository, enter a relative path, and Lyntar will explain the actual source snapshot."
+              body="Open a repository, enter a relative path, and Astra will explain the actual source snapshot."
             />
           )}
         </div>
@@ -769,7 +822,7 @@ function VivaView(props: {
         <div className="panel empty-wide">
           <EmptyMode
             title="Start a project-specific round"
-            body="Lyntar will scan the local project and create a small set of questions from its real structure."
+            body="Astra will scan the local project and create a small set of questions from its real structure."
           />
         </div>
       )}
@@ -853,7 +906,7 @@ function HackathonView(props: {
           <div className="panel insight-panel">
             <EmptyMode
               title="Keep the scope honest"
-              body="Start with the problem and the criteria. Lyntar will separate must-have work from future ideas."
+              body="Start with the problem and the criteria. Astra will separate must-have work from future ideas."
             />
           </div>
         )}
@@ -873,7 +926,7 @@ function ProjectsView({
     <ModeFrame
       kicker="Projects"
       title="Your repositories stay on your computer."
-      description="Lyntar works inside a selected local Git repository and preserves pre-existing changes."
+      description="Astra works inside a selected local Git repository and preserves pre-existing changes."
       workspace={workspace}
     >
       <div className="panel project-card">
@@ -908,7 +961,7 @@ function ExtensionsView(): ReactElement {
     <ModeFrame
       kicker="Extensions"
       title="Good defaults, quietly applied."
-      description="Lyntar Essentials route only when a task is relevant. They do not bypass workspace or permission boundaries."
+      description="Astra Essentials route only when a task is relevant. They do not bypass workspace or permission boundaries."
       workspace={null}
     >
       <div className="extension-list">
@@ -942,6 +995,7 @@ function SettingsView({
   setEmail,
   setPassword,
   signIn,
+  signInGoogle,
   signOut,
 }: {
   models: ModelCatalogEntry[];
@@ -952,13 +1006,14 @@ function SettingsView({
   setEmail: (value: string) => void;
   setPassword: (value: string) => void;
   signIn: () => void;
+  signInGoogle: () => void;
   signOut: () => void;
 }): ReactElement {
   return (
     <ModeFrame
       kicker="Settings"
       title="Keep the important things clear."
-      description="Provider routing and model availability are controlled by the Lyntar API."
+      description="Provider routing and model availability are controlled by the Astra API."
       workspace={null}
     >
       <div className="settings-grid">
@@ -1005,6 +1060,9 @@ function SettingsView({
               </label>
               <button className="primary" disabled={!email.trim() || !password} onClick={signIn}>
                 Sign in
+              </button>
+              <button className="secondary" onClick={signInGoogle}>
+                Continue with Google
               </button>
             </>
           )}

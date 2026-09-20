@@ -29,6 +29,13 @@ const api: LyntarIpcApi = {
     }) => ipcRenderer.invoke('auth.login', input),
     status: () => ipcRenderer.invoke('auth.status'),
     logout: () => ipcRenderer.invoke('auth.logout'),
+    googleStart: () => ipcRenderer.invoke('auth.googleStart'),
+    googleComplete: (code: string) => ipcRenderer.invoke('auth.googleComplete', code),
+    onGoogleCallback(listener: (code: string) => void) {
+      const handler = (_event: Electron.IpcRendererEvent, code: string) => listener(code);
+      ipcRenderer.on('auth.google-callback', handler);
+      return () => ipcRenderer.removeListener('auth.google-callback', handler);
+    },
   },
   billing: {
     wallet: () => ipcRenderer.invoke('billing.wallet'),

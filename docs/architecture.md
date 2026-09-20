@@ -1,8 +1,8 @@
-# Lyntar architecture
+# Astra AI architecture
 
 ## First milestone
 
-The first product milestone is a Windows-local coding workflow. A repository is selected on the user's computer, the agent inspects only that workspace, makes bounded atomic edits, runs a detected verification command, repairs within budget, and reports a Lyntar-owned diff separately from pre-existing changes.
+The first product milestone is a Windows-local coding workflow. A repository is selected on the user's computer, the agent inspects only that workspace, makes bounded atomic edits, runs a detected verification command, repairs within budget, and reports an Astra-owned diff separately from pre-existing changes.
 
 The repository is not uploaded to the backend as a workspace representation. The backend receives model requests and safe task metadata; the selected files and Git working tree remain local.
 
@@ -29,7 +29,7 @@ packages/agent-core
         └── packages/model-gateway   server-side provider adapter and receipts
 ```
 
-The Electron main process does not own the agent loop. It creates adapters and forwards capability calls to `AgentTaskRunner`. The renderer receives `window.lyntar` methods only; it does not receive `fs`, `child_process`, a shell function, or raw `ipcRenderer`.
+The Electron main process does not own the agent loop. It creates adapters and forwards capability calls to `AgentTaskRunner`. The renderer receives the compatibility-preserved `window.lyntar` capability surface only; it does not receive `fs`, `child_process`, a shell function, or raw `ipcRenderer`.
 
 ## Monorepo responsibilities
 
@@ -53,7 +53,7 @@ The Electron main process does not own the agent loop. It creates adapters and f
 6. Patches are checkpointed and rolled back if a multi-file write fails.
 7. Verification uses the detected project command through `VerificationPort`, not an unrestricted agent command path.
 8. Failed verification can enter a bounded repair state. Model calls, repairs, commands, wall time, and estimated/provider-reported cost are checked before work starts.
-9. The final Git result classifies Lyntar, pre-existing, and mixed paths. Only Lyntar-owned paths are presented as Lyntar changes.
+9. The final Git result classifies Astra, pre-existing, and mixed paths. Only Astra-owned paths are presented as Astra changes.
 10. The renderer derives progress from append-only safe events and receives no hidden model reasoning.
 
 ## Persistence

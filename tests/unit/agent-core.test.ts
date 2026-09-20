@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEvent, GitDiff, ModelDecision, UsageReceipt } from '@lyntar/contracts';
-import { AgentTaskRunner, type AgentPorts } from '@lyntar/agent-core';
+import { AgentTaskRunner, InMemorySessionStore, type AgentPorts } from '@lyntar/agent-core';
 
 function makePorts(
   decisions: ModelDecision[],
@@ -135,6 +135,38 @@ describe('agent core', () => {
     expect(events).toHaveLength(result.events.length);
   });
 
+  it('persists a compact session checkpoint without storing raw model context', async () => {
+    const { ports } = makePorts([
+      { kind: 'readFile', path: 'src/file.ts', summary: 'Inspecting implementation' },
+      { kind: 'finish', summary: 'Verified implementation' },
+    ]);
+    const sessions = new InMemorySessionStore();
+    ports.session = { store: sessions, userId: 'user-session' };
+
+    const result = await new AgentTaskRunner(ports).start({
+      taskId: 'task-session',
+      agentSessionId: 'session-1',
+      workspaceId: 'workspace-1',
+      prompt: 'Explain the implementation and verify it',
+      modelId: 'configured-model',
+      budget: {
+        maxModelCalls: 4,
+        maxRepairs: 1,
+        maxCommands: 2,
+        maxWallTimeMs: 30_000,
+        maxEstimatedCostUsd: 1,
+      },
+    });
+
+    const session = await sessions.getSession('session-1');
+    const checkpoint = await sessions.getLatestCheckpoint('session-1');
+    expect(result.state).toBe('COMPLETED');
+    expect(session?.status).toBe('COMPLETED');
+    expect(session?.lastCheckpointId).toBe(checkpoint?.checkpointId);
+    expect(checkpoint?.structuredState.filesRead).toContain('src/file.ts');
+    expect(JSON.stringify(checkpoint)).not.toContain('source');
+  });
+
   it('stops after maxRepairs and reports BLOCKED', async () => {
     const { ports } = makePorts(
       [
@@ -210,6 +242,67 @@ describe('agent core', () => {
     });
   });
 
+  it('waits for explicit bounded approval before continuing after an overrun', async () => {
+    const { ports, events } = makePorts([{ kind: 'finish', summary: 'Result' }]);
+    ports.model = {
+      async *complete() {
+        yield {
+          type: 'usage' as const,
+          receipt: {
+            requestId: 'req-checkpoint',
+            taskId: 'task-checkpoint',
+            modelId: 'configured-model',
+            providerRoute: 'gateway',
+            inputTokens: 10,
+            outputTokens: 10,
+            cacheTokens: null,
+            actualCostUsd: 0.06,
+            receivedAt: new Date().toISOString(),
+          },
+        };
+        yield {
+          type: 'decision' as const,
+          decision: { kind: 'finish' as const, summary: 'Result' },
+        };
+      },
+    };
+    const runner = new AgentTaskRunner(ports);
+    ports.event = {
+      async append(event) {
+        events.push(event);
+        if (event.type === 'permission.requested')
+          runner.resolvePermission(event.taskId, event.payload.requestId, true);
+      },
+    };
+    const result = await runner.start({
+      taskId: 'task-checkpoint',
+      workspaceId: 'workspace-1',
+      prompt: 'Run the check',
+      modelId: 'configured-model',
+      budget: {
+        maxModelCalls: 2,
+        maxRepairs: 0,
+        maxCommands: 2,
+        maxWallTimeMs: 30_000,
+        maxEstimatedCostUsd: 0.05,
+        overrunAllowanceUsd: 0.15,
+        maxCostCheckpoints: 1,
+      },
+    });
+    expect(result.state).toBe('COMPLETED');
+    expect(
+      events.some(
+        (event) =>
+          event.type === 'permission.requested' && event.payload.action === 'budget.overrun',
+      ),
+    ).toBe(true);
+    expect(
+      events.some(
+        (event) => event.type === 'permission.granted' && event.payload.action === 'budget.overrun',
+      ),
+    ).toBe(true);
+  });
+
   it('blocks when the wall-time budget expires during a model request', async () => {
     const { ports } = makePorts([{ kind: 'finish', summary: 'unused' }]);
     ports.model = {
@@ -246,5 +339,30 @@ describe('agent core', () => {
 
     expect(result.state).toBe('BLOCKED');
     expect(result.summary).toContain('wallTime');
+  });
+
+  it('blocks a repeated identical tool loop before it can spend indefinitely', async () => {
+    const repeatedRead = { kind: 'readFile' as const, path: 'src/file.ts', summary: 'Read file' };
+    const { ports } = makePorts([
+      repeatedRead,
+      repeatedRead,
+      repeatedRead,
+      { kind: 'finish', summary: 'unused' },
+    ]);
+    const result = await new AgentTaskRunner(ports).start({
+      taskId: 'task-runaway',
+      workspaceId: 'workspace-1',
+      prompt: 'Inspect the file',
+      modelId: 'configured-model',
+      budget: {
+        maxModelCalls: 8,
+        maxRepairs: 0,
+        maxCommands: 2,
+        maxWallTimeMs: 30_000,
+        maxEstimatedCostUsd: 1,
+      },
+    });
+    expect(result.state).toBe('BLOCKED');
+    expect(result.summary).toContain('repeated identical action');
   });
 });

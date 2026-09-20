@@ -1,5 +1,10 @@
 import type { AuthError, AuthService } from '@lyntar/auth';
-import { AdminService, InMemoryAdminAuditStore, type AdminRole } from '@lyntar/billing';
+import {
+  AdminService,
+  type AdminAnalyticsPort,
+  type AdminAuditStore,
+  type AdminRole,
+} from '@lyntar/billing';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -10,11 +15,18 @@ const AdjustmentSchema = z.object({
   requestId: z.string().min(1).max(120),
 });
 
-const adminRoles: AdminRole[] = ['SUPER_ADMIN', 'FINANCE', 'SUPPORT'];
+const adminRoles: AdminRole[] = ['ADMIN', 'SUPER_ADMIN', 'FINANCE', 'SUPPORT'];
 
 function bearer(request: FastifyRequest): string | null {
   const value = request.headers.authorization;
-  return value?.startsWith('Bearer ') ? value.slice('Bearer '.length).trim() || null : null;
+  if (value?.startsWith('Bearer ')) return value.slice('Bearer '.length).trim() || null;
+  const cookieHeader = request.headers.cookie;
+  const access = cookieHeader
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('astra_access='))
+    ?.slice('astra_access='.length);
+  return access ? decodeURIComponent(access) : null;
 }
 
 function sendAuthError(reply: FastifyReply, error: unknown) {
@@ -28,13 +40,49 @@ function sendAuthError(reply: FastifyReply, error: unknown) {
 export interface AdminRouteDependencies {
   auth?: AuthService;
   admin?: AdminService;
-  audit?: InMemoryAdminAuditStore;
+  audit?: AdminAuditStore;
+  analytics?: AdminAnalyticsPort;
 }
 
 export async function registerAdminRoutes(
   app: FastifyInstance,
   dependencies: AdminRouteDependencies,
 ): Promise<void> {
+  app.get<{
+    Querystring: {
+      search?: string;
+      planId?: string;
+      status?: string;
+      limit?: string;
+      offset?: string;
+    };
+  }>('/v1/admin/users', async (request, reply) => {
+    if (!dependencies.auth || !dependencies.admin)
+      return reply.code(503).send({ error: 'admin_not_configured' });
+    const token = bearer(request);
+    if (!token) return reply.code(401).send({ error: 'SESSION_INVALID' });
+    try {
+      const identity = await dependencies.auth.authenticate(token);
+      const role = identity.user.role as AdminRole;
+      if (!adminRoles.includes(role)) return reply.code(403).send({ error: 'ADMIN_FORBIDDEN' });
+      dependencies.admin.assertCan(role, 'read_usage');
+      const search = request.query.search?.trim().toLowerCase();
+      const planId = request.query.planId?.trim();
+      const status = request.query.status?.trim();
+      const limit = Math.min(Math.max(Number(request.query.limit ?? 50) || 50, 1), 100);
+      const offset = Math.max(Number(request.query.offset ?? 0) || 0, 0);
+      const users = (await dependencies.auth.listUsers()).filter(
+        (user) =>
+          (!search || user.email.toLowerCase().includes(search) || user.id.includes(search)) &&
+          (!planId || user.planId === planId) &&
+          (!status || user.status === status),
+      );
+      return reply.send({ users: users.slice(offset, offset + limit), total: users.length });
+    } catch (error) {
+      return sendAuthError(reply, error);
+    }
+  });
+
   app.get('/v1/admin/overview', async (request, reply) => {
     if (!dependencies.auth || !dependencies.admin)
       return reply.code(503).send({ error: 'admin_not_configured' });
@@ -44,16 +92,50 @@ export async function registerAdminRoutes(
       const identity = await dependencies.auth.authenticate(token);
       if (!adminRoles.includes(identity.user.role as AdminRole))
         return reply.code(403).send({ error: 'ADMIN_FORBIDDEN' });
-      return reply.send({
-        dataStatus: 'NO_LIVE_DATA',
-        users: null,
-        paidUsers: null,
-        providerCostUsd: null,
-        customerCostUsd: null,
-        creditsConsumed: null,
-        paymentFailures: null,
-        billingAnomalies: null,
-      });
+      return reply.send(
+        dependencies.analytics
+          ? await dependencies.analytics.overview()
+          : {
+              dataStatus: 'NO_LIVE_DATA',
+              totalUsers: null,
+              verifiedUsers: null,
+              activeUsers: null,
+              dailyActiveUsers: null,
+              monthlyActiveUsers: null,
+              paidUsers: null,
+              freeUsers: null,
+              creditsIssued: null,
+              creditsConsumed: null,
+              providerCostUsd: null,
+              customerCostUsd: null,
+              absorbedCostUsd: null,
+              revenueUsd: null,
+              grossMarginUsd: null,
+              grossMarginPercent: null,
+              paymentFailures: null,
+              billingAnomalies: null,
+            },
+      );
+    } catch (error) {
+      return sendAuthError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/analytics/usage', async (request, reply) => {
+    if (!dependencies.auth || !dependencies.admin)
+      return reply.code(503).send({ error: 'admin_not_configured' });
+    const token = bearer(request);
+    if (!token) return reply.code(401).send({ error: 'SESSION_INVALID' });
+    try {
+      const identity = await dependencies.auth.authenticate(token);
+      const role = identity.user.role as AdminRole;
+      if (!adminRoles.includes(role)) return reply.code(403).send({ error: 'ADMIN_FORBIDDEN' });
+      dependencies.admin.assertCan(role, 'read_usage');
+      return reply.send(
+        dependencies.analytics
+          ? await dependencies.analytics.usage()
+          : { dataStatus: 'NO_LIVE_DATA', rows: [] },
+      );
     } catch (error) {
       return sendAuthError(reply, error);
     }

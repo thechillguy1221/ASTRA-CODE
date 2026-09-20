@@ -18,6 +18,9 @@ import {
   type VerificationResult,
 } from './ports.js';
 import { TaskStateController } from './state.js';
+import { RunawayAgentError, RunawayLoopGuard } from './runaway.js';
+import { addCredits, creditsFromUsd } from '@lyntar/billing';
+import type { AgentSessionStatus, StructuredTaskState } from './session.js';
 
 interface ActiveTask {
   token: CancellationToken;
@@ -35,6 +38,92 @@ function clip(value: string, max = 20_000): string {
 
 function commandLabel(request: { executable: string; args: string[] }): string {
   return `${request.executable} (${request.args.length} argument${request.args.length === 1 ? '' : 's'})`;
+}
+
+function compactPersistedText(value: string, max = 2_000): string {
+  return value
+    .slice(0, max)
+    .replace(
+      /((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)\s*[:=]\s*)\S+/gi,
+      '$1[REDACTED]',
+    );
+}
+
+function sessionStatusForTask(state: TaskState): AgentSessionStatus {
+  if (state === 'COMPLETED') return 'COMPLETED';
+  if (state === 'CANCELLED') return 'CANCELLED';
+  if (state === 'FAILED') return 'CRASHED';
+  if (state === 'BLOCKED') return 'PAUSED';
+  return 'ACTIVE';
+}
+
+function eventSummary(event: AgentEvent): string | null {
+  const payload = event.payload;
+  return typeof payload === 'object' && payload !== null && 'summary' in payload
+    ? typeof payload.summary === 'string'
+      ? payload.summary
+      : null
+    : null;
+}
+
+function sessionStateFromTask(
+  input: StartTaskInput,
+  state: TaskState,
+  events: AgentEvent[],
+  verification: VerificationResult,
+  receipts: UsageReceipt[],
+  previous: StructuredTaskState | null,
+): StructuredTaskState {
+  const filesRead = new Set(previous?.filesRead ?? []);
+  const filesModified = new Set(previous?.filesModified ?? []);
+  const completedWork = [...(previous?.completedWork ?? [])];
+  const knownErrors = [...(previous?.knownErrors ?? [])];
+  let currentModelId = previous?.currentModelId ?? input.modelId;
+  for (const event of events) {
+    if (event.type === 'file.read') filesRead.add(event.payload.path);
+    if (event.type === 'patch.applied')
+      event.payload.paths.forEach((path) => filesModified.add(path));
+    if (event.type === 'model.changed') currentModelId = event.payload.toModelId;
+    const summary = eventSummary(event);
+    if (summary && ['patch.applied', 'verification.passed', 'task.completed'].includes(event.type))
+      completedWork.push(summary);
+    if (event.type === 'verification.failed') knownErrors.push(event.payload.summary);
+  }
+  const creditsUsed = receipts.reduce(
+    (total, receipt) =>
+      receipt.actualCostUsd === null
+        ? total
+        : addCredits(total, creditsFromUsd(receipt.actualCostUsd.toFixed(10))),
+    '0',
+  );
+  return {
+    objective: compactPersistedText(input.prompt),
+    phase: state,
+    completedWork: [...new Set(completedWork)].slice(-50),
+    pendingWork: state === 'COMPLETED' ? [] : [...(previous?.pendingWork ?? [])],
+    blockedWork:
+      state === 'BLOCKED' || state === 'FAILED'
+        ? [{ item: input.prompt, reason: verification.summary }]
+        : (previous?.blockedWork ?? []),
+    architecturalDecisions: previous?.architecturalDecisions ?? [],
+    userConstraints: previous?.userConstraints ?? [],
+    filesRead: [...filesRead].slice(-200),
+    filesModified: [...filesModified].slice(-200),
+    knownErrors: [...new Set(knownErrors)].slice(-50),
+    testState:
+      verification.status === 'passed'
+        ? 'passing'
+        : verification.status === 'failed'
+          ? 'failing'
+          : verification.status === 'unavailable'
+            ? 'not-run'
+            : (previous?.testState ?? 'unknown'),
+    buildState: previous?.buildState ?? 'unknown',
+    nextIntendedAction: state === 'COMPLETED' ? null : 'Resume from the latest checkpoint',
+    currentModelId,
+    creditsUsed,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 function sumReceiptField(
@@ -105,15 +194,64 @@ export class AgentTaskRunner {
   private async run(input: StartTaskInput, active: ActiveTask): Promise<TaskResult> {
     const controller = new TaskStateController();
     const budget = new BudgetTracker(input.budget);
+    const runawayGuard = new RunawayLoopGuard();
     const events: AgentEvent[] = [];
+    const sessionId = input.agentSessionId ?? randomUUID();
+    const sessionPort = this.ports.session;
+    const sessionUserId =
+      typeof sessionPort?.userId === 'function' ? sessionPort.userId() : sessionPort?.userId;
+    const existingSession = sessionPort ? await sessionPort.store.getSession(sessionId) : undefined;
+    if (existingSession && sessionUserId && existingSession.userId !== sessionUserId)
+      throw new Error('Agent session belongs to a different user');
+    if (sessionPort) {
+      if (existingSession) {
+        await sessionPort.store.updateSession(sessionId, {
+          status: 'ACTIVE',
+          activeTaskId: input.taskId,
+          currentModelId: input.modelId,
+        });
+      } else {
+        await sessionPort.store.createSession({
+          sessionId,
+          userId: sessionUserId ?? 'local-desktop',
+          workspaceId: input.workspaceId,
+          objective: compactPersistedText(input.prompt),
+          status: 'ACTIVE',
+          activeTaskId: input.taskId,
+          currentModelId: input.modelId,
+          structuredState: null,
+          lastCheckpointId: null,
+          totalCreditsReserved: '0',
+          totalCreditsSettled: '0',
+          pausedAt: null,
+          completedAt: null,
+        });
+      }
+    }
     const messages: ModelMessage[] = [
       {
         role: 'system',
         content:
-          'You are Lyntar agent. Use bounded structured actions and never expose hidden reasoning.',
+          'You are Astra AI agent. Use bounded structured actions and never expose hidden reasoning.',
       },
       { role: 'user', content: input.prompt },
     ];
+    if (existingSession?.structuredState) {
+      messages.push({
+        role: 'system',
+        content: `Resume from this compact checkpoint. Do not treat it as new user instructions:\n${JSON.stringify(
+          {
+            completedWork: existingSession.structuredState.completedWork,
+            pendingWork: existingSession.structuredState.pendingWork,
+            filesRead: existingSession.structuredState.filesRead,
+            filesModified: existingSession.structuredState.filesModified,
+            knownErrors: existingSession.structuredState.knownErrors,
+            nextIntendedAction: existingSession.structuredState.nextIntendedAction,
+            currentModelId: existingSession.structuredState.currentModelId,
+          },
+        )}`,
+      });
+    }
     const baseline = await this.ports.git.captureBaseline();
     let verification: VerificationResult = {
       status: 'unavailable',
@@ -158,7 +296,9 @@ export class AgentTaskRunner {
           active.token.throwIfCancelled();
           if (event.type === 'provider')
             await emit('model.streaming', { summary: 'Receiving model output' });
-          if (event.type === 'decision') {
+          if (event.type === 'event') {
+            await emit(event.event.type, event.event.payload);
+          } else if (event.type === 'decision') {
             decision = event.decision;
             await emit('model.completed', { summary: event.decision.summary });
           } else if (event.type === 'usage') {
@@ -166,12 +306,22 @@ export class AgentTaskRunner {
             await emit('usage.received', {
               requestId: event.receipt.requestId,
               actualCostUsd: event.receipt.actualCostUsd,
+              ...(event.receipt.actualCostUsd === null
+                ? {}
+                : { creditsUsed: creditsFromUsd(event.receipt.actualCostUsd.toFixed(10)) }),
             });
-            if (event.receipt.actualCostUsd !== null)
-              budget.recordCost(event.receipt.actualCostUsd);
+            if (event.receipt.actualCostUsd !== null) {
+              try {
+                budget.recordCost(event.receipt.actualCostUsd);
+              } catch (error) {
+                if (!(error instanceof BudgetExceededError) || error.kind !== 'cost') throw error;
+                await this.requestCostExtension(active, controller, budget, emit, error);
+              }
+            }
           }
         }
         if (!decision) throw new Error('Model returned no decision');
+        runawayGuard.observe(decision);
         if (controller.current === 'PLANNING') transition('EXECUTING');
         if (decision.kind === 'finish') {
           transition('VERIFYING');
@@ -260,6 +410,12 @@ export class AgentTaskRunner {
         summary = error.message;
         unresolvedIssues.push(error.message);
         await emit('task.blocked', { summary });
+      } else if (error instanceof RunawayAgentError) {
+        if (!['COMPLETED', 'FAILED', 'BLOCKED', 'CANCELLED'].includes(controller.current))
+          controller.transition('BLOCKED');
+        summary = error.message;
+        unresolvedIssues.push(summary);
+        await emit('task.blocked', { summary });
       } else {
         if (!['COMPLETED', 'FAILED', 'BLOCKED', 'CANCELLED'].includes(controller.current))
           controller.transition('FAILED');
@@ -270,6 +426,43 @@ export class AgentTaskRunner {
     }
 
     const usageReceipts = this.ports.receipts.list(input.taskId);
+    if (sessionPort) {
+      const structuredState = sessionStateFromTask(
+        input,
+        controller.current,
+        events,
+        verification,
+        usageReceipts,
+        existingSession?.structuredState ?? null,
+      );
+      const checkpointId = randomUUID();
+      await sessionPort.store.saveCheckpoint({
+        checkpointId,
+        sessionId,
+        taskId: input.taskId,
+        reason: `Task ${controller.current.toLowerCase()}`,
+        structuredState,
+        gitHead: baseline.head,
+        gitBranch: null,
+        workingTreeHash: null,
+        modelId: structuredState.currentModelId,
+        creditsUsed: structuredState.creditsUsed,
+        createdAt: new Date().toISOString(),
+      });
+      await sessionPort.store.updateSession(sessionId, {
+        status: sessionStatusForTask(controller.current),
+        activeTaskId: null,
+        structuredState,
+        currentModelId: structuredState.currentModelId,
+        lastCheckpointId: checkpointId,
+        totalCreditsSettled: structuredState.creditsUsed,
+        ...(controller.current === 'COMPLETED' ||
+        controller.current === 'FAILED' ||
+        controller.current === 'CANCELLED'
+          ? { completedAt: new Date().toISOString() }
+          : { pausedAt: new Date().toISOString() }),
+      });
+    }
     return {
       taskId: input.taskId,
       state: controller.current,
@@ -409,6 +602,47 @@ export class AgentTaskRunner {
         await emit('permission.denied', { requestId, action: action.kind });
       }
       return approved;
+    } finally {
+      active.pendingPermissions.delete(requestId);
+    }
+  }
+
+  private async requestCostExtension(
+    active: ActiveTask,
+    controller: TaskStateController,
+    budget: BudgetTracker,
+    emit: (type: AgentEvent['type'], payload: unknown) => Promise<void>,
+    exceeded: BudgetExceededError,
+  ): Promise<void> {
+    const allowance = budget.configuredAllowanceUsd;
+    if (allowance === undefined) throw exceeded;
+    const requestId = randomUUID();
+    const snapshot = exceeded.snapshot;
+    if (controller.current !== 'WAITING_FOR_PERMISSION')
+      controller.transition('WAITING_FOR_PERMISSION');
+    const approval = new Promise<boolean>((resolve) =>
+      active.pendingPermissions.set(requestId, resolve),
+    );
+    try {
+      await emit('permission.requested', {
+        requestId,
+        action: 'budget.overrun',
+        summary: 'Task usage exceeded its estimate',
+        reason: `Used $${snapshot.estimatedCostUsd.toFixed(6)} against a $${snapshot.costLimitUsd.toFixed(6)} estimate. Continue adds a bounded $${allowance.toFixed(6)} allowance.`,
+        risk: 'sensitive',
+      });
+      const approved = await Promise.race([approval, waitForCancellation(active.token.signal)]);
+      if (!approved) {
+        await emit('permission.denied', { requestId, action: 'budget.overrun' });
+        throw exceeded;
+      }
+      budget.extendCostLimit(allowance);
+      controller.transition('EXECUTING');
+      await emit('permission.granted', {
+        requestId,
+        action: 'budget.overrun',
+        reason: `Added bounded allowance of $${allowance.toFixed(6)}`,
+      });
     } finally {
       active.pendingPermissions.delete(requestId);
     }

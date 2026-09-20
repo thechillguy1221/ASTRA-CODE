@@ -1,7 +1,9 @@
 import type { DeviceSession } from '@lyntar/contracts';
 import type {
   AuthStore,
+  EmailOtpRecord,
   EmailVerificationRecord,
+  ExternalIdentity,
   PasswordResetRecord,
   StoredSession,
   StoredUser,
@@ -13,9 +15,15 @@ export class InMemoryAuthStore implements AuthStore {
   readonly sessions = new Map<string, StoredSession>();
   readonly emailVerifications = new Map<string, EmailVerificationRecord>();
   readonly passwordResets = new Map<string, PasswordResetRecord>();
+  readonly emailOtps = new Map<string, EmailOtpRecord>();
+  readonly externalIdentities = new Map<string, ExternalIdentity>();
 
   async findUserByEmail(email: string): Promise<StoredUser | undefined> {
     return [...this.users.values()].find((user) => user.email === email);
+  }
+
+  async listUsers(): Promise<StoredUser[]> {
+    return [...this.users.values()].map((user) => ({ ...user }));
   }
 
   async getUser(userId: string): Promise<StoredUser | undefined> {
@@ -88,5 +96,33 @@ export class InMemoryAuthStore implements AuthStore {
 
   async updatePasswordReset(record: PasswordResetRecord): Promise<void> {
     this.passwordResets.set(record.tokenHash, record);
+  }
+
+  async saveEmailOtp(record: EmailOtpRecord): Promise<void> {
+    this.emailOtps.set(record.id, record);
+  }
+
+  async getActiveEmailOtp(userId: string): Promise<EmailOtpRecord | undefined> {
+    return [...this.emailOtps.values()]
+      .filter((record) => record.userId === userId && !record.usedAt)
+      .sort((left, right) => right.sentAt.localeCompare(left.sentAt))[0];
+  }
+
+  async updateEmailOtp(record: EmailOtpRecord): Promise<void> {
+    this.emailOtps.set(record.id, record);
+  }
+
+  async findUserByExternalIdentity(
+    provider: ExternalIdentity['provider'],
+    subject: string,
+  ): Promise<StoredUser | undefined> {
+    const identity = [...this.externalIdentities.values()].find(
+      (candidate) => candidate.provider === provider && candidate.subject === subject,
+    );
+    return identity ? this.users.get(identity.userId) : undefined;
+  }
+
+  async saveExternalIdentity(identity: ExternalIdentity): Promise<void> {
+    this.externalIdentities.set(`${identity.provider}:${identity.subject}`, identity);
   }
 }

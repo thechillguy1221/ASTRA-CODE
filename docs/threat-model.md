@@ -1,4 +1,4 @@
-# Lyntar threat model
+# Astra AI threat model
 
 ## Scope
 
@@ -7,7 +7,7 @@ This document covers the Windows-local vertical slice: the React renderer, Elect
 ## Assets
 
 - User source files and uncommitted work.
-- Git history and the distinction between existing and Lyntar-created changes.
+- Git history and the distinction between existing and Astra-created changes.
 - Provider credentials and model request metadata.
 - Usage receipts and task identifiers.
 - The integrity of commands executed in the selected repository.
@@ -28,7 +28,7 @@ This document covers the Windows-local vertical slice: the React renderer, Elect
 | Symlink or junction points escape after an apparently safe string check                                                | Existing path segments are resolved before authorization; resolved candidates must remain contained in the canonical root                                                           |
 | Model executes destructive or shell-injection commands                                                                 | Structured executable/args, `shell: false`, metacharacter rejection, command risk classification, approval for sensitive/destructive commands, and rejection of prohibited patterns |
 | Model invokes `git reset --hard`, `git clean`, registry mutation, shutdown, format, or download-and-execute PowerShell | Explicit prohibited command rules                                                                                                                                                   |
-| Existing user edits are shown as agent edits                                                                           | Git baseline captures status paths and hashes before the task; final diff classifies pre-existing, mixed, and Lyntar paths                                                          |
+| Existing user edits are shown as agent edits                                                                           | Git baseline captures status paths and hashes before the task; final diff classifies pre-existing, mixed, and Astra paths                                                           |
 | A partial multi-file write corrupts the repository                                                                     | Affected files are snapshotted and written through temporary files; failure rolls back the batch                                                                                    |
 | A repair loop consumes unbounded provider spend                                                                        | Model-call, repair, command, wall-time, and cost budgets are checked before work starts                                                                                             |
 | User cannot stop a long task                                                                                           | One `AbortSignal` propagates through agent core, model fetch, command child process, verification, and pending permission waits                                                     |

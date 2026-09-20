@@ -50,6 +50,13 @@ export const PlanSchema = z.object({
   maxContextWindow: z.number().int().positive(),
   priority: z.enum(['standard', 'priority', 'highest']),
   enabled: z.boolean(),
+  taxExclusive: z.boolean().optional(),
+  seats: z.number().int().positive().default(1),
+  activeJobsPerSeat: z.number().int().positive().default(1),
+  pooledCredits: z.boolean().default(false),
+  crossPersonRooms: z.boolean().default(false),
+  rolloverCycles: z.number().int().nonnegative().default(1),
+  topUpEnabled: z.boolean().default(false),
 });
 export type Plan = z.infer<typeof PlanSchema>;
 
@@ -83,11 +90,15 @@ export const CreditReservationSchema = z.object({
   reservationId: z.string().min(1),
   userId: z.string().min(1),
   taskId: z.string().min(1),
+  modelId: z.string().min(1).optional(),
   amountCredits: CreditAmountSchema,
   status: z.enum(['RESERVED', 'SETTLED', 'RELEASED', 'CANCELLED']),
   idempotencyKey: z.string().min(1),
   createdAt: z.string().datetime(),
   settledAt: z.string().datetime().nullable(),
+  bucketAllocations: z
+    .array(z.object({ bucketId: z.string().min(1), amountCredits: CreditAmountSchema }))
+    .default([]),
 });
 export type CreditReservation = z.infer<typeof CreditReservationSchema>;
 
@@ -104,3 +115,28 @@ export const UsageSettlementSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type UsageSettlement = z.infer<typeof UsageSettlementSchema>;
+
+export const WalletBucketSourceTypeSchema = z.enum([
+  'free_monthly',
+  'subscription_monthly',
+  'purchased_topup',
+  'promotional',
+  'referral',
+  'refund_adjustment',
+  'admin_adjustment',
+]);
+export type WalletBucketSourceType = z.infer<typeof WalletBucketSourceTypeSchema>;
+
+export const WalletBucketSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().min(1),
+  sourceType: WalletBucketSourceTypeSchema,
+  originalCredits: CreditAmountSchema,
+  remainingCredits: CreditAmountSchema,
+  idempotencyKey: z.string().min(1),
+  referenceId: z.string().min(1).nullable(),
+  planCycle: z.string().min(1).nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+export type WalletBucket = z.infer<typeof WalletBucketSchema>;

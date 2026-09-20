@@ -1,9 +1,15 @@
-import { ModelRequestSchema, type ModelDecision, type UsageReceipt } from '@lyntar/contracts';
+import {
+  AUTO_MODEL_ID,
+  ModelRequestSchema,
+  type ModelDecision,
+  type UsageReceipt,
+} from '@lyntar/contracts';
 import type { AuthService } from '@lyntar/auth';
 import type { BillingService } from '@lyntar/billing';
 import type { ModelCatalogStore, UsageReceiptStore } from '@lyntar/db';
 import type { GatewayModelClient } from '@lyntar/model-gateway';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { resolveRequestedModel } from './model-selection.js';
 
 export interface ModelRouteDependencies {
   catalog: ModelCatalogStore;
@@ -42,11 +48,12 @@ export async function registerModelRoutes(
     } else if (dependencies.auth && !dependencies.developmentEntitlement) {
       return reply.code(401).send({ error: 'SESSION_INVALID' });
     }
+    let reservation: Awaited<ReturnType<BillingService['getReservation']>>;
     if (identity && dependencies.billing) {
       const reservationId = request.headers['x-lyntar-reservation-id'];
       if (typeof reservationId !== 'string')
         return reply.code(409).send({ error: 'RESERVATION_REQUIRED' });
-      const reservation = await dependencies.billing.getReservation(reservationId);
+      reservation = await dependencies.billing.getReservation(reservationId);
       if (
         !reservation ||
         reservation.userId !== identity.user.id ||
@@ -55,8 +62,36 @@ export async function registerModelRoutes(
       )
         return reply.code(409).send({ error: 'RESERVATION_INVALID' });
     }
-    const model = await dependencies.catalog.getEnabled(parsed.data.modelId);
-    if (!model) return reply.code(404).send({ error: 'model_unavailable' });
+    const reservedModel =
+      reservation?.modelId && reservation.modelId !== AUTO_MODEL_ID
+        ? await dependencies.catalog.getEnabled(reservation.modelId)
+        : undefined;
+    const resolved =
+      reservedModel && parsed.data.modelId === AUTO_MODEL_ID
+        ? {
+            model: reservedModel,
+            selectedByAuto: true,
+            disclosure: `Auto selected ${reservedModel.displayName}`,
+          }
+        : await resolveRequestedModel(dependencies.catalog, {
+            requestedModelId: parsed.data.modelId,
+            planId: identity?.user.planId ?? 'FREE',
+            ...(identity && dependencies.billing
+              ? { wallet: await dependencies.billing.getWallet(identity.user.id) }
+              : {}),
+            inputTokenEstimate: parsed.data.messages.reduce(
+              (total, message) => total + Math.ceil(message.content.length / 4),
+              0,
+            ),
+          });
+    if (!resolved) return reply.code(404).send({ error: 'model_unavailable' });
+    if (
+      reservation &&
+      ((parsed.data.modelId !== AUTO_MODEL_ID && reservation.modelId !== parsed.data.modelId) ||
+        (parsed.data.modelId === AUTO_MODEL_ID && reservation.modelId !== resolved.model.modelId))
+    )
+      return reply.code(409).send({ error: 'RESERVATION_INVALID' });
+    const model = resolved.model;
 
     const cancellation = new AbortController();
     request.raw.once('close', () => cancellation.abort('client disconnected'));
@@ -78,6 +113,13 @@ export async function registerModelRoutes(
       }
     }
     if (!decision) return reply.code(502).send({ error: 'missing_model_decision' });
-    return reply.send({ decision, usage: receipt, providerRequestId: providerRequestId ?? null });
+    return reply.send({
+      decision,
+      usage: receipt,
+      providerRequestId: providerRequestId ?? null,
+      ...(resolved.selectedByAuto
+        ? { selectedModelId: model.modelId, selectedModelDisplayName: model.displayName }
+        : {}),
+    });
   });
 }

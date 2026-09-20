@@ -51,7 +51,7 @@ describe('extension boundaries', () => {
     manager.install({
       id: 'test.plugin',
       name: 'Test',
-      publisher: 'Lyntar',
+      publisher: 'Astra AI',
       version: '1.0.0',
       compatibility: '^0.1.0',
       permissions: ['read_workspace', 'network'],

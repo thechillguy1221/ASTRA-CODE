@@ -20,6 +20,46 @@ button {
   color: inherit;
   background: transparent;
 }
+.admin-login {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+.login-card {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 420px);
+  padding: 30px;
+  border: 1px solid #223446;
+  border-radius: 12px;
+  background: #111a24;
+}
+.login-card p {
+  margin: 0;
+  color: #8ca0b4;
+  font-size: 13px;
+  line-height: 1.55;
+}
+input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #29435c;
+  border-radius: 7px;
+  color: #e8f0f7;
+  background: #0d1620;
+}
+.primary-button {
+  padding: 11px 14px;
+  border-radius: 7px;
+  color: #07111b;
+  background: #a4cefa;
+  font-weight: 700;
+}
+.login-message {
+  color: #f0a5a5;
+  font-size: 12px;
+}
 .admin-shell {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
@@ -72,6 +112,15 @@ header {
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 31px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.text-button {
+  color: #8db7e1;
+  font-size: 12px;
 }
 .eyebrow {
   color: #75a9dc;
@@ -132,6 +181,55 @@ select {
   border: 1px solid #223446;
   border-radius: 9px;
   background: #111a24;
+}
+.admin-form {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid #223b50;
+  border-radius: 9px;
+  background: #101b26;
+}
+.admin-form form {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+}
+.admin-form label {
+  display: grid;
+  gap: 7px;
+  color: #a5b7c6;
+  font-size: 12px;
+}
+.admin-form input,
+.admin-form select,
+.admin-form textarea {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #2b4962;
+  border-radius: 5px;
+  background: #091018;
+  color: #e9f0f7;
+  font: inherit;
+}
+.admin-form textarea {
+  min-height: 160px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+.campaign-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #23394c;
+}
+.campaign-actions > span,
+.form-note {
+  color: #8398aa;
+  font-size: 12px;
 }
 .admin-grid span {
   color: #7d91a6;

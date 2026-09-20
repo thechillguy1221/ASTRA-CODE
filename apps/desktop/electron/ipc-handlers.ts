@@ -49,6 +49,15 @@ export function buildCapabilityApiForTest(): LyntarIpcApi {
         return null;
       },
       async logout() {},
+      async googleStart() {
+        throw new Error('No test API configured');
+      },
+      async googleComplete() {
+        throw new Error('No test API configured');
+      },
+      onGoogleCallback() {
+        return () => undefined;
+      },
     },
     billing: {
       async wallet() {
@@ -132,6 +141,16 @@ export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void
   ipcMain.handle('auth.logout', () => {
     parseCommand('auth.logout');
     return runtime.authLogout();
+  });
+  ipcMain.handle('auth.googleStart', async () => {
+    const { shell } = await import('electron');
+    const result = await runtime.authGoogleStart();
+    await shell.openExternal(result.authorizationUrl);
+    return result;
+  });
+  ipcMain.handle('auth.googleComplete', (_event, code: unknown) => {
+    if (typeof code !== 'string') throw new Error('Google authorization code is invalid');
+    return runtime.authGoogleComplete(code);
   });
   ipcMain.handle('billing.wallet', () => {
     parseCommand('billing.wallet');

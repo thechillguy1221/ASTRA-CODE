@@ -146,6 +146,9 @@ export interface LyntarIpcApi {
     }): Promise<PublicUser>;
     status(): Promise<PublicUser | null>;
     logout(): Promise<void>;
+    googleStart(): Promise<{ authorizationUrl: string }>;
+    googleComplete(code: string): Promise<PublicUser>;
+    onGoogleCallback(listener: (code: string) => void): () => void;
   };
   billing: {
     wallet(): Promise<Wallet | null>;

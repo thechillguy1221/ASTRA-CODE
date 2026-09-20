@@ -3,8 +3,19 @@ import { z } from 'zod';
 export const AccountStatusSchema = z.enum(['ACTIVE', 'DISABLED']);
 export type AccountStatus = z.infer<typeof AccountStatusSchema>;
 
-export const UserRoleSchema = z.enum(['USER', 'SUPER_ADMIN', 'FINANCE', 'SUPPORT']);
+export const UserRoleSchema = z.enum(['USER', 'ADMIN', 'SUPER_ADMIN', 'FINANCE', 'SUPPORT']);
 export type UserRole = z.infer<typeof UserRoleSchema>;
+
+export const AuthProviderSchema = z.enum(['google']);
+export type AuthProvider = z.infer<typeof AuthProviderSchema>;
+
+export const MarketingPreferenceSchema = z.object({
+  userId: z.string().uuid(),
+  marketingAllowed: z.boolean(),
+  unsubscribedAt: z.string().datetime().nullable(),
+  updatedAt: z.string().datetime(),
+});
+export type MarketingPreference = z.infer<typeof MarketingPreferenceSchema>;
 
 export const DeviceSessionSchema = z.object({
   deviceSessionId: z.string().uuid(),

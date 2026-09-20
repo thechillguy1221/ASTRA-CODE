@@ -1,0 +1,26 @@
+appId: dev.astra.ai.desktop
+productName: Astra AI
+directories:
+  output: release-unsigned
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+asar: true
+win:
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: Astra-AI-${version}-win-x64-unsigned.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+protocols:
+  - name: Astra AI authentication
+    schemes:
+      - astra

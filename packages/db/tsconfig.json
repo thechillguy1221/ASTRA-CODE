@@ -10,7 +10,9 @@
     { "path": "../contracts" },
     { "path": "../auth" },
     { "path": "../billing" },
-    { "path": "../plans" }
+    { "path": "../plans" },
+    { "path": "../email" },
+    { "path": "../remote-protocol" }
   ],
   "include": ["src/**/*.ts"]
 }

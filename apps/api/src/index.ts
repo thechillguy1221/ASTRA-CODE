@@ -7,3 +7,5 @@ export * from './release-route.js';
 export * from './catalog.js';
 export * from './receipts.js';
 export * from './events.js';
+export * from './email-route.js';
+export * from './remote-route.js';

@@ -1,22 +1,74 @@
-# Lyntar V1 implementation status
+# Astra AI V1 implementation status
 
-This document separates code that exists from infrastructure evidence that has been certified.
+This document separates code that exists and passes deterministic verification from live external infrastructure evidence that has been certified.
 
-## Deterministically implemented
+## Deterministically implemented & verified (73 test files, 203 passed tests on 2026-09-20)
 
-- Windows desktop capability IPC, local workspace confinement, Git baseline isolation, atomic patching, command policy, budgets, cancellation, and append-only agent events.
-- Authentication services with password hashing, email verification, refresh rotation, device sessions, logout-all, password reset, account disable, and encrypted desktop credential storage.
-- Fixed-point wallet arithmetic, immutable ledger entries, reservations, exact settlement/release, provider/customer/absorbed cost fields, plan entitlements, and role-gated admin adjustments.
-- Server model catalog and Auto routing, with no permanent model list in the desktop. Plan values and model plan access can be loaded from PostgreSQL records.
-- Signed/idempotent Razorpay webhook boundary with exact raw-body verification, deterministic event release on processing failure, and a PostgreSQL payment/webhook adapter; no frontend payment state grants credits.
-- Metadata-first Skills, built-in Lyntar Essentials resources, scoped MCP, capability-approved Plugins, API integration secret handles, and unified tool definitions.
-- Project-grounded Learn, Viva, and Hackathon services.
-- Responsive desktop Build/Learn/Viva/Hackathon navigation, public route/SEO shell, admin shell, release manifest validation, email consent policy, and redacted support diagnostics.
+- **User-Controlled Model Selection (spec §3, §4)**: Explicit user model selection is strictly authoritative. `AUTO_MODEL_ID = 'AUTO'` acts as a dedicated selectable option with transparent routing disclosure. Same-model provider failover preserved with `logicalModelId`.
+- **Server-Controlled V1 Pricing & Plans (spec §5, §6, §8, §68)**:
+  - Free: ₹0, 25 monthly credits, 1 active job.
+  - Basic: ₹499/month (+ applicable taxes), 300 monthly credits, 3 active jobs.
+  - Pro: ₹999/month (+ applicable taxes), 600 monthly credits, 5 active jobs.
+  - Max: ₹1,999/month (+ applicable taxes), 1,200 monthly credits, 10 active jobs.
+  - Team: ₹9,999/month (+ applicable taxes), 6,000 pooled credits, 5 seats, 10 active jobs per active seat.
+  - Business: ₹19,999/month (+ applicable taxes), 12,000 pooled credits, 10 seats, 10 active jobs per active seat.
+  - One Astra credit represents USD $0.01 of billable model usage; internal accounting keeps seven decimal places.
+  - Plan models allow all models (`*`) where credits are the sole economic limiter. Tax exclusivity clearly marked.
+- **Wallet Buckets & Immutability (spec §7, §9, §10, §41)**:
+  - Universal wallet with 7-decimal fixed-point math (`CREDIT_SCALE = 10,000,000`).
+  - Bucket schemas defined for `free_monthly`, `subscription_monthly`, `purchased_topup`, `promotional`, `referral`, `refund_adjustment`, `admin_adjustment`.
+  - Append-only ledger; DB triggers prevent UPDATE and DELETE operations.
+  - Concurrent reservation double-spend prevention verified.
+- **Task Cost Estimation & Authorization (spec §11, §12, §13)**:
+  - Pre-task estimate range (min/max credits, token estimates, post-task projected balance).
+  - Multi-tiered cost warning levels (`none`, `info`, `warn`, `auth-required`).
+  - Per-task spending caps and threshold checks to prevent surprise balance depletion.
+- **Canonical Agent Session Architecture (spec §17–§27)**:
+  - Runtime ownership: `AgentSession` and `StructuredTaskState` independent of provider session.
+  - Append-only event history with 25+ discriminated event schemas (`model.changed`, `checkpoint.created`, `session.paused`, `session.resumed`, `test.result`, etc.).
+  - Checkpoint mechanism (`SessionCheckpoint`) supporting safe pause/resume, model switching, and crash recovery.
+- **Complete Razorpay Subscription State Machine (spec §31–§39)**:
+  - Handles `CREATED`, `AUTHENTICATED`, `ACTIVE`, `PENDING`, `HALTED`, `CANCELLED`, `COMPLETED`.
+  - Immediate cancellation rule: on confirmed cancellation, paid access ends immediately, monthly credits expire, purchased credits survive.
+  - Idempotent credit allocation (`subscription-cycle:{id}:{period_start}`) resisting replays and duplicate webhooks.
+  - Refunds and chargebacks tracked with audit logs.
+- **Security Boundaries (spec §43–§47)**:
+  - Command classification policy: SAFE / SENSITIVE / PROHIBITED.
+  - Secret redaction for environment variables, bearer tokens, API keys, private keys, and payment secrets.
+  - Prompt injection defense: untrusted repository content wrapped with non-elevating trust boundary markers.
+- **Astra Remote Protocol (internal package `@lyntar/remote-protocol`, spec §48–§64)**:
+  - Mobile-first structured RPC protocol (`@lyntar/remote-protocol`) over outbound secure connections.
+  - HMAC-signed QR code pairing with 60s TTL and public-key device fingerprinting.
+  - Tiers for remote terminal commands, diff viewing, and spend authorization.
+  - Device and Room-member revocation removes matching active broker connections immediately.
+  - Desktop host/client integration, durable multi-instance relay state, and organization-pooled
+    reservation execution remain incomplete and are not live-certified.
 
-## Not live-certified
+## Final deterministic verification (2026-09-20)
 
-- Live Gateway requests: blocked until the live environment variables are supplied.
-- PostgreSQL connectivity, migrations against a server, transaction rollback, concurrency, and backup/restore: blocked until disposable PostgreSQL URLs/tools are supplied.
-- Razorpay sandbox/live payments: blocked until credentials and a disposable payment environment are supplied.
+- `npm.cmd test`: 73 test files and 203 tests passed; no failures.
+- `npm.cmd run typecheck`: passed.
+- `npm.cmd run lint`: passed.
+- `npm.cmd run format:check`: passed.
+- `npm.cmd run build`: passed; web prerender generated 53 crawlable route documents.
+- `npm.cmd run golden-path`: `COMPLETED`; verification passed; `src/validate.ts` was Astra-owned and
+  `README.md` remained pre-existing.
+- `npm.cmd audit --json`: 0 vulnerabilities across 572 reported dependencies after upgrading
+  `electron-builder` to 26.15.3 and `ws` to 8.21.3.
+- `node scripts/supply-chain-report.mjs`: passed; the direct inventory reports no unreported license
+  value after the remote-protocol package metadata fix.
+- Browser smoke: Chromium, Firefox, and WebKit passed public-route, CTA, metadata, and responsive
+  overflow checks at 320, 360, 390, 768, and 1280 CSS pixels.
+- `npm.cmd run package:win:unsigned`: produced `apps/desktop/release-unsigned/Astra-AI-0.1.0-win-x64-unsigned.exe`;
+  SHA-256 `4D12BFC945D00E5C31CF7101C3D7598D411F1A411A0322190331E95A7D899D1D`; Authenticode status
+  is `NotSigned`.
 
-Mocks and deterministic adapters remain test evidence only. They must never be promoted to live certification.
+## Not live-certified (Blocked per Spec §80)
+
+- **LIVE AI CERTIFICATION**: BLOCKED — external provider/gateway credentials not supplied in environment.
+- **RAZORPAY SANDBOX CERTIFICATION**: BLOCKED — Razorpay test/sandbox account credentials not supplied.
+- **POSTGRESQL CERTIFICATION**: BLOCKED — disposable real PostgreSQL server instance not connected.
+- **WINDOWS LIVE CERTIFICATION**: BLOCKED — live desktop packaging/distribution environment not attached.
+- **ASTRA REMOTE LIVE CERTIFICATION**: BLOCKED — public relay service and DNS not deployed.
+
+Mocks and deterministic test harnesses remain test evidence only. They are not promoted to live certification.

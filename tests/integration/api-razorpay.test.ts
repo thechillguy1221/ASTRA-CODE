@@ -22,11 +22,11 @@ describe('Razorpay API boundary', () => {
       event: 'subscription.charged',
       payload: {
         userId: 'user-route',
-        planId: 'STUDENT',
+        planId: 'BASIC',
         providerSubscriptionId: 'sub-route',
         providerPaymentId: 'pay-route',
         periodStart: '2026-09-20T00:00:00.000Z',
-        amountInr: '149',
+        amountInr: '499',
       },
     };
     const rawBody = ` ${JSON.stringify(body)}\n`;
@@ -47,6 +47,6 @@ describe('Razorpay API boundary', () => {
     expect(first.statusCode).toBe(200);
     expect(second.json().processed).toBe(false);
     expect(await payments.countPayments()).toBe(1);
-    expect((await billing.getWallet('user-route')).availableCredits).toBe('500');
+    expect((await billing.getWallet('user-route')).availableCredits).toBe('300');
   });
 });

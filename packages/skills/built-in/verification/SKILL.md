@@ -1,6 +1,6 @@
 ---
 name: Verification
-publisher: Lyntar
+publisher: Astra AI
 version: 1.0.0
 license: UNLICENSED
 ---

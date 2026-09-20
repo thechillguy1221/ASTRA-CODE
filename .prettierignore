@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+apps/desktop/release/
+apps/desktop/release-unsigned/
+apps/desktop/.vite/
+**/tsconfig.tsbuildinfo

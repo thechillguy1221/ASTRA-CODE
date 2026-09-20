@@ -22,6 +22,7 @@ const sourceAliases = {
   '@lyntar/marketplace': resolve(repositoryRoot, 'packages/marketplace/src/index.ts'),
   '@lyntar/config': resolve(repositoryRoot, 'packages/config/src/index.ts'),
   '@lyntar/contracts': resolve(repositoryRoot, 'packages/contracts/src/index.ts'),
+  '@lyntar/remote-protocol': resolve(repositoryRoot, 'packages/remote-protocol/src/index.ts'),
   '@lyntar/db': resolve(repositoryRoot, 'packages/db/src/index.ts'),
   '@lyntar/model-gateway': resolve(repositoryRoot, 'packages/model-gateway/src/index.ts'),
   '@lyntar/test-utils': resolve(repositoryRoot, 'packages/test-utils/src/index.ts'),

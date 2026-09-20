@@ -2,6 +2,8 @@ import type { CreditAmount, UsdAmount } from '@lyntar/contracts';
 
 export const CREDIT_SCALE = 10_000_000n;
 export const USD_SCALE = 10_000_000_000n;
+/** One displayed credit represents one US cent of billable model usage. */
+export const USD_CENTS_PER_CREDIT = 1n;
 
 function parseScaled(value: string, scale: bigint, maxDecimals: number): bigint {
   if (!/^\d+(?:\.\d+)?$/.test(value)) throw new Error(`Invalid decimal amount: ${value}`);
@@ -22,6 +24,13 @@ function formatScaled(value: bigint, scale: bigint): string {
   return `${whole.toString()}.${decimals}`;
 }
 
+function roundDivide(numerator: bigint, denominator: bigint): bigint {
+  if (denominator <= 0n) throw new Error('Division denominator must be positive');
+  const quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  return remainder * 2n >= denominator ? quotient + 1n : quotient;
+}
+
 export function parseCredits(value: string): bigint {
   return parseScaled(value, CREDIT_SCALE, 7);
 }
@@ -39,11 +48,19 @@ export function formatUsd(value: bigint): UsdAmount {
 }
 
 export function creditsFromUsd(value: string): CreditAmount {
-  return formatCredits(parseUsd(value));
+  // USD is stored at 10 decimal places and credits at 7 decimal places. The
+  // conversion is USD / $0.01, rounded half-up to the supported credit scale.
+  const usdScaled = parseUsd(value);
+  const numerator = usdScaled * 100n * CREDIT_SCALE;
+  return formatCredits(roundDivide(numerator, USD_SCALE * USD_CENTS_PER_CREDIT));
 }
 
 export function creditsToUsd(value: string): UsdAmount {
-  return formatUsd(parseCredits(value));
+  const creditsScaled = parseCredits(value);
+  const numerator = creditsScaled * USD_SCALE;
+  const numeratorWithUnit = numerator * USD_CENTS_PER_CREDIT;
+  const denominator = CREDIT_SCALE * 100n;
+  return formatUsd(roundDivide(numeratorWithUnit, denominator));
 }
 
 export function addCredits(left: string, right: string): CreditAmount {

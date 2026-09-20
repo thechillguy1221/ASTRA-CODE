@@ -7,5 +7,6 @@ coverage/
 .superpowers/sdd/
 *.log
 apps/desktop/release/
+apps/desktop/release-unsigned/
 apps/desktop/.vite/
 **/tsconfig.tsbuildinfo

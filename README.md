@@ -1,10 +1,10 @@
-# Lyntar
+# Astra AI
 
-Lyntar is a Windows-first AI development workspace with a local-repository agent, server-controlled models and plans, deterministic commercial accounting, extensibility boundaries, and public/admin shells. External certification remains separate from deterministic implementation.
+Astra AI is a Windows-first AI development workspace with a local-repository agent, server-controlled models and plans, deterministic commercial accounting, extensibility boundaries, and public/admin shells. External certification remains separate from deterministic implementation. Internal package names and legacy configuration identifiers remain compatible by design.
 
 ## Current milestone
 
-The core milestone is a real local Git workflow: select a repository, submit a coding task, inspect relevant files, apply a safe atomic patch, run a real project command, verify the result, perform bounded repair, and show a diff that distinguishes Lyntar changes from pre-existing edits. Authentication, fixed-point wallet accounting, reservations/settlements, model routing, Skills, MCP, Plugins, modes, release metadata, and support boundaries are implemented with deterministic adapters.
+The core milestone is a real local Git workflow: select a repository, submit a coding task, inspect relevant files, apply a safe atomic patch, run a real project command, verify the result, perform bounded repair, and show a diff that distinguishes Astra changes from pre-existing edits. Authentication, fixed-point wallet accounting, reservations/settlements, model routing, Skills, MCP, Plugins, modes, release metadata, and support boundaries are implemented with deterministic adapters.
 
 ## Development
 

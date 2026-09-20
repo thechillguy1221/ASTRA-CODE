@@ -4,6 +4,8 @@ import type {
   UsageSettlement,
   Wallet,
   WalletLedgerEntry,
+  WalletBucket,
+  WalletBucketSourceType,
 } from '@lyntar/contracts';
 
 export interface GrantCreditsInput {
@@ -17,11 +19,16 @@ export interface GrantCreditsInput {
   reason: string;
   taskId?: string;
   metadata?: Record<string, unknown>;
+  sourceType?: WalletBucketSourceType;
+  expiresAt?: string | null;
+  referenceId?: string | null;
+  planCycle?: string | null;
 }
 
 export interface ReserveCreditsInput {
   userId: string;
   taskId: string;
+  modelId?: string;
   amountCredits: string;
   idempotencyKey: string;
 }
@@ -42,6 +49,15 @@ export interface AdjustCreditsInput {
   metadata?: Record<string, unknown>;
 }
 
+export interface RolloverSubscriptionCreditsInput {
+  userId: string;
+  monthlyAllocation: string;
+  periodStart: string;
+  newExpiresAt?: string | null;
+  idempotencyKey: string;
+  referenceId?: string | null;
+}
+
 export interface BillingStore {
   getWallet(userId: string): Promise<Wallet>;
   getReservation(reservationId: string): Promise<CreditReservation | undefined>;
@@ -49,5 +65,8 @@ export interface BillingStore {
   reserveCredits(input: ReserveCreditsInput): Promise<CreditReservation>;
   settleCredits(input: SettleCreditsInput): Promise<UsageSettlement>;
   adjustCredits(input: AdjustCreditsInput): Promise<WalletLedgerEntry>;
+  rolloverSubscriptionCredits?(input: RolloverSubscriptionCreditsInput): Promise<string>;
   listLedger(userId: string): Promise<WalletLedgerEntry[]>;
+  countActiveReservations?(userId: string): Promise<number>;
+  listBuckets?(userId: string): Promise<WalletBucket[]>;
 }

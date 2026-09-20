@@ -1,9 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { BillingService } from './service.js';
 
-export type AdminRole = 'SUPER_ADMIN' | 'FINANCE' | 'SUPPORT';
+export type AdminRole = 'ADMIN' | 'SUPER_ADMIN' | 'FINANCE' | 'SUPPORT';
 export type AdminAction =
-  'read_usage' | 'adjust_wallet' | 'change_model' | 'refund_payment' | 'revoke_sessions';
+  | 'read_usage'
+  | 'adjust_wallet'
+  | 'change_model'
+  | 'refund_payment'
+  | 'revoke_sessions'
+  | 'manage_email'
+  | 'send_campaign';
 
 export interface AdminAuditEntry {
   id: string;
@@ -48,11 +54,13 @@ export class AdminService {
 
   assertCan(role: AdminRole, action: AdminAction): void {
     const allowed: Record<AdminAction, AdminRole[]> = {
-      read_usage: ['SUPER_ADMIN', 'FINANCE', 'SUPPORT'],
+      read_usage: ['ADMIN', 'SUPER_ADMIN', 'FINANCE', 'SUPPORT'],
       adjust_wallet: ['SUPER_ADMIN', 'FINANCE'],
       change_model: ['SUPER_ADMIN'],
       refund_payment: ['SUPER_ADMIN', 'FINANCE'],
-      revoke_sessions: ['SUPER_ADMIN', 'SUPPORT'],
+      revoke_sessions: ['ADMIN', 'SUPER_ADMIN', 'SUPPORT'],
+      manage_email: ['ADMIN', 'SUPER_ADMIN'],
+      send_campaign: ['SUPER_ADMIN'],
     };
     if (!allowed[action].includes(role)) throw new AdminError(`Role ${role} cannot ${action}`);
   }
@@ -85,6 +93,35 @@ export class AdminService {
       targetId: input.targetUserId,
       before,
       after,
+      reason: input.reason,
+      requestId: input.requestId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  async recordMutation(input: {
+    actor: { userId: string; role: AdminRole };
+    action: Extract<
+      AdminAction,
+      'manage_email' | 'send_campaign' | 'change_model' | 'refund_payment' | 'revoke_sessions'
+    >;
+    targetType: string;
+    targetId: string;
+    before: unknown;
+    after: unknown;
+    reason: string;
+    requestId: string;
+  }): Promise<void> {
+    this.assertCan(input.actor.role, input.action);
+    await this.options.audit.append({
+      id: randomUUID(),
+      actorUserId: input.actor.userId,
+      role: input.actor.role,
+      action: input.action,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      before: input.before,
+      after: input.after,
       reason: input.reason,
       requestId: input.requestId,
       createdAt: new Date().toISOString(),

@@ -29,6 +29,7 @@ export interface TaskEntitlementRequest {
   mode: BillingMode;
   requestedCredits: string;
   activeJobs: number;
+  activeSeats?: number;
 }
 
 export class PlanCatalog {
@@ -47,7 +48,16 @@ export class PlanCatalog {
   }
 
   get(planId: string): Plan {
-    const plan = this.plans.get(planId);
+    const normalizedId = this.plans.has(planId)
+      ? planId
+      : planId === 'STUDENT' || planId === 'BUILDER'
+        ? this.plans.has('BASIC')
+          ? 'BASIC'
+          : planId === 'STUDENT' && this.plans.has('BUILDER')
+            ? 'BUILDER'
+            : planId
+        : planId;
+    const plan = this.plans.get(normalizedId);
     if (!plan) throw new Error(`Unknown plan: ${planId}`);
     return plan;
   }
@@ -55,88 +65,154 @@ export class PlanCatalog {
   assertTaskAllowed(planId: string, request: TaskEntitlementRequest): void {
     const plan = this.get(planId);
     const modelAllowed = request.modelPlanAccess
-      ? request.modelPlanAccess.includes(planId)
-      : plan.allowedModelIds.includes(request.modelId);
+      ? request.modelPlanAccess.includes(planId) || request.modelPlanAccess.includes(plan.id)
+      : plan.allowedModelIds.includes('*') || plan.allowedModelIds.includes(request.modelId);
     if (!plan.enabled || !modelAllowed) throw new PlanEntitlementError('MODEL_NOT_ALLOWED');
     if (!plan.allowedModes.includes(request.mode))
       throw new PlanEntitlementError('MODE_NOT_ALLOWED');
     if (compareCredits(request.requestedCredits, plan.maxTaskBudgetCredits) > 0)
       throw new PlanEntitlementError('TASK_BUDGET_EXCEEDED');
-    if (request.activeJobs >= plan.maxConcurrentJobs)
-      throw new PlanEntitlementError('CONCURRENCY_LIMIT');
+    const activeSeats = Math.max(1, request.activeSeats ?? 1);
+    const seatConcurrency = plan.activeJobsPerSeat * activeSeats;
+    const concurrencyLimit = Math.min(plan.maxConcurrentJobs, seatConcurrency);
+    if (request.activeJobs >= concurrencyLimit) throw new PlanEntitlementError('CONCURRENCY_LIMIT');
   }
 }
 
 export function createDefaultPlanCatalog(): PlanCatalog {
-  const common = {
-    allowedModelIds: ['approved-core'],
-    maxContextWindow: 128_000,
-    enabled: true,
-  } as const;
+  const allModels = ['*'];
   return new PlanCatalog([
     PlanSchema.parse({
       id: 'FREE',
       displayName: 'Free',
       monthlyPriceInr: '0',
-      monthlyCredits: '50',
-      allowedModelIds: common.allowedModelIds,
-      allowedModes: ['BUILD', 'LEARN'],
+      monthlyCredits: '25',
+      allowedModelIds: allModels,
+      allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
       maxTaskBudgetCredits: '25',
       maxConcurrentJobs: 1,
       mcpLimit: 0,
       pluginLimit: 0,
       premiumModeAccess: false,
-      maxContextWindow: common.maxContextWindow,
+      maxContextWindow: 128_000,
       priority: 'standard',
-      enabled: common.enabled,
+      enabled: true,
+      seats: 1,
+      activeJobsPerSeat: 1,
+      pooledCredits: false,
+      crossPersonRooms: false,
+      rolloverCycles: 1,
+      topUpEnabled: false,
     }),
     PlanSchema.parse({
-      id: 'STUDENT',
-      displayName: 'Student',
-      monthlyPriceInr: '149',
-      monthlyCredits: '500',
-      allowedModelIds: ['approved-core', 'frontier'],
+      id: 'BASIC',
+      displayName: 'Basic',
+      monthlyPriceInr: '499',
+      monthlyCredits: '300',
+      allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
-      maxTaskBudgetCredits: '100',
-      maxConcurrentJobs: 2,
+      maxTaskBudgetCredits: '300',
+      maxConcurrentJobs: 3,
       mcpLimit: 5,
       pluginLimit: 5,
       premiumModeAccess: true,
-      maxContextWindow: common.maxContextWindow,
+      maxContextWindow: 128_000,
       priority: 'priority',
-      enabled: common.enabled,
+      enabled: true,
+      seats: 1,
+      activeJobsPerSeat: 3,
+      pooledCredits: false,
+      crossPersonRooms: false,
+      rolloverCycles: 1,
+      topUpEnabled: true,
     }),
     PlanSchema.parse({
       id: 'PRO',
       displayName: 'Pro',
-      monthlyPriceInr: '299',
-      monthlyCredits: '1200',
-      allowedModelIds: ['approved-core', 'frontier'],
+      monthlyPriceInr: '999',
+      monthlyCredits: '600',
+      allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
-      maxTaskBudgetCredits: '250',
-      maxConcurrentJobs: 4,
+      maxTaskBudgetCredits: '600',
+      maxConcurrentJobs: 5,
       mcpLimit: 20,
       pluginLimit: 20,
       premiumModeAccess: true,
       maxContextWindow: 256_000,
       priority: 'priority',
-      enabled: common.enabled,
+      enabled: true,
+      seats: 1,
+      activeJobsPerSeat: 5,
+      pooledCredits: false,
+      crossPersonRooms: false,
+      rolloverCycles: 1,
+      topUpEnabled: true,
     }),
     PlanSchema.parse({
       id: 'MAX',
       displayName: 'Max',
-      monthlyPriceInr: '599',
-      monthlyCredits: '2500',
-      allowedModelIds: ['approved-core', 'frontier'],
+      monthlyPriceInr: '1999',
+      monthlyCredits: '1200',
+      allowedModelIds: allModels,
       allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
-      maxTaskBudgetCredits: '500',
-      maxConcurrentJobs: 8,
+      maxTaskBudgetCredits: '1200',
+      maxConcurrentJobs: 10,
       mcpLimit: 100,
       pluginLimit: 100,
       premiumModeAccess: true,
       maxContextWindow: 1_000_000,
       priority: 'highest',
-      enabled: common.enabled,
+      enabled: true,
+      seats: 1,
+      activeJobsPerSeat: 10,
+      pooledCredits: false,
+      crossPersonRooms: false,
+      rolloverCycles: 1,
+      topUpEnabled: true,
+    }),
+    PlanSchema.parse({
+      id: 'TEAM',
+      displayName: 'Team',
+      monthlyPriceInr: '9999',
+      monthlyCredits: '6000',
+      allowedModelIds: allModels,
+      allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
+      maxTaskBudgetCredits: '1200',
+      maxConcurrentJobs: 50,
+      mcpLimit: 100,
+      pluginLimit: 100,
+      premiumModeAccess: true,
+      maxContextWindow: 1_000_000,
+      priority: 'highest',
+      enabled: true,
+      seats: 5,
+      activeJobsPerSeat: 10,
+      pooledCredits: true,
+      crossPersonRooms: true,
+      rolloverCycles: 1,
+      topUpEnabled: true,
+    }),
+    PlanSchema.parse({
+      id: 'BUSINESS',
+      displayName: 'Business',
+      monthlyPriceInr: '19999',
+      monthlyCredits: '12000',
+      allowedModelIds: allModels,
+      allowedModes: ['BUILD', 'LEARN', 'VIVA', 'HACKATHON'],
+      maxTaskBudgetCredits: '2400',
+      maxConcurrentJobs: 100,
+      mcpLimit: 100,
+      pluginLimit: 100,
+      premiumModeAccess: true,
+      maxContextWindow: 1_000_000,
+      priority: 'highest',
+      enabled: true,
+      seats: 10,
+      activeJobsPerSeat: 10,
+      pooledCredits: true,
+      crossPersonRooms: true,
+      rolloverCycles: 1,
+      topUpEnabled: true,
     }),
   ]);
 }

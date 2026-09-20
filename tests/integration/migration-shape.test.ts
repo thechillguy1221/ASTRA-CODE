@@ -18,4 +18,19 @@ describe('database migration foundation', () => {
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS credit_ledger_entries');
     expect(migration).not.toContain('INSERT INTO credit_ledger_entries');
   });
+
+  it('contains the authoritative commercial matrix and Room/rate-limit foundation', async () => {
+    const migration = await readFile(
+      'packages/db/migrations/0010_astra_commercial_matrix.sql',
+      'utf8',
+    );
+    expect(migration).toContain("('BASIC', 'Basic', 499, 300");
+    expect(migration).toContain("('TEAM', 'Team', 9999, 6000");
+    expect(migration).toContain("('BUSINESS', 'Business', 19999, 12000");
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS organizations');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS room_invitations');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS rate_limit_windows');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS organization_id');
+    expect(migration).toContain('TOPUP_250');
+  });
 });

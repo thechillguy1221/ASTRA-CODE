@@ -7,6 +7,8 @@ export interface BudgetSnapshot {
   repairs: number;
   commands: number;
   estimatedCostUsd: number;
+  costLimitUsd: number;
+  costCheckpoints: number;
   elapsedMs: number;
 }
 
@@ -28,8 +30,12 @@ export class BudgetTracker {
   private repairs = 0;
   private commands = 0;
   private estimatedCostUsd = 0;
+  private costLimitUsd: number;
+  private costCheckpoints = 0;
 
-  constructor(private readonly budget: TaskBudget) {}
+  constructor(private readonly budget: TaskBudget) {
+    this.costLimitUsd = budget.maxEstimatedCostUsd;
+  }
 
   consume(kind: BudgetKind, estimatedCostUsd = 0): void {
     const nextCount = this.countFor(kind) + 1;
@@ -38,7 +44,7 @@ export class BudgetTracker {
     }
 
     const nextCost = this.estimatedCostUsd + estimatedCostUsd;
-    if (nextCost > this.budget.maxEstimatedCostUsd) {
+    if (nextCost > this.costLimitUsd) {
       throw new BudgetExceededError('cost', this.snapshot());
     }
 
@@ -50,10 +56,27 @@ export class BudgetTracker {
   recordCost(actualCostUsd: number): void {
     if (!Number.isFinite(actualCostUsd) || actualCostUsd < 0) return;
     const nextCost = this.estimatedCostUsd + actualCostUsd;
-    if (nextCost > this.budget.maxEstimatedCostUsd) {
+    this.estimatedCostUsd = nextCost;
+    if (nextCost > this.costLimitUsd) {
       throw new BudgetExceededError('cost', this.snapshot());
     }
-    this.estimatedCostUsd = nextCost;
+  }
+
+  extendCostLimit(additionalAllowanceUsd: number): void {
+    const maxCheckpoints = this.budget.maxCostCheckpoints ?? 0;
+    if (
+      !Number.isFinite(additionalAllowanceUsd) ||
+      additionalAllowanceUsd <= 0 ||
+      this.costCheckpoints >= maxCheckpoints
+    ) {
+      throw new BudgetExceededError('cost', this.snapshot());
+    }
+    this.costLimitUsd += additionalAllowanceUsd;
+    this.costCheckpoints += 1;
+  }
+
+  get configuredAllowanceUsd(): number | undefined {
+    return this.budget.overrunAllowanceUsd;
   }
 
   assertWallTime(): void {
@@ -68,6 +91,8 @@ export class BudgetTracker {
       repairs: this.repairs,
       commands: this.commands,
       estimatedCostUsd: this.estimatedCostUsd,
+      costLimitUsd: this.costLimitUsd,
+      costCheckpoints: this.costCheckpoints,
       elapsedMs: Date.now() - this.startedAt,
     };
   }

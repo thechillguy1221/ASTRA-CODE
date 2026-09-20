@@ -1,19 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://lyntar.dev/</loc></url>
-  <url><loc>https://lyntar.dev/download/windows</loc></url>
   <url><loc>https://lyntar.dev/pricing</loc></url>
-  <url><loc>https://lyntar.dev/students</loc></url>
-  <url><loc>https://lyntar.dev/ai-coding-agent</loc></url>
+  <url><loc>https://lyntar.dev/download</loc></url>
+  <url><loc>https://lyntar.dev/download/windows</loc></url>
+  <url><loc>https://lyntar.dev/models</loc></url>
+  <url><loc>https://lyntar.dev/security</loc></url>
+  <url><loc>https://lyntar.dev/docs</loc></url>
+  <url><loc>https://lyntar.dev/blog</loc></url>
   <url><loc>https://lyntar.dev/features/agent</loc></url>
+  <url><loc>https://lyntar.dev/features/codebase</loc></url>
+  <url><loc>https://lyntar.dev/features/model-switching</loc></url>
+  <url><loc>https://lyntar.dev/features/task-estimation</loc></url>
+  <url><loc>https://lyntar.dev/features/mcp</loc></url>
+  <url><loc>https://lyntar.dev/features/remote</loc></url>
+  <url><loc>https://lyntar.dev/features/security</loc></url>
+  <url><loc>https://lyntar.dev/features/cost-control</loc></url>
   <url><loc>https://lyntar.dev/features/learn</loc></url>
   <url><loc>https://lyntar.dev/features/viva</loc></url>
   <url><loc>https://lyntar.dev/features/hackathon</loc></url>
   <url><loc>https://lyntar.dev/features/skills</loc></url>
   <url><loc>https://lyntar.dev/features/plugins</loc></url>
-  <url><loc>https://lyntar.dev/features/mcp</loc></url>
-  <url><loc>https://lyntar.dev/docs</loc></url>
-  <url><loc>https://lyntar.dev/security</loc></url>
+  <url><loc>https://lyntar.dev/use-cases/students</loc></url>
+  <url><loc>https://lyntar.dev/use-cases/freelancers</loc></url>
+  <url><loc>https://lyntar.dev/use-cases/startups</loc></url>
+  <url><loc>https://lyntar.dev/use-cases/developers</loc></url>
+  <url><loc>https://lyntar.dev/use-cases/teams</loc></url>
+  <url><loc>https://lyntar.dev/compare/cursor</loc></url>
+  <url><loc>https://lyntar.dev/compare/kiro</loc></url>
+  <url><loc>https://lyntar.dev/compare/kilo-code</loc></url>
+  <url><loc>https://lyntar.dev/compare/cline</loc></url>
+  <url><loc>https://lyntar.dev/compare/github-copilot</loc></url>
+  <url><loc>https://lyntar.dev/compare/byok</loc></url>
+  <url><loc>https://lyntar.dev/skills</loc></url>
+  <url><loc>https://lyntar.dev/plugins</loc></url>
+  <url><loc>https://lyntar.dev/mcp</loc></url>
   <url><loc>https://lyntar.dev/privacy</loc></url>
   <url><loc>https://lyntar.dev/terms</loc></url>
+  <url><loc>https://lyntar.dev/refund-policy</loc></url>
+  <url><loc>https://lyntar.dev/open-source-notices</loc></url>
 </urlset>

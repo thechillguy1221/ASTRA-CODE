@@ -4,3 +4,7 @@ export * from './agent-runner.js';
 export * from './events.js';
 export * from './ports.js';
 export * from './state.js';
+export * from './session.js';
+export * from './estimator.js';
+export * from './prompt-injection.js';
+export * from './runaway.js';

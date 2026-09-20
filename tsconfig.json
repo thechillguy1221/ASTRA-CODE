@@ -23,6 +23,7 @@
     { "path": "./packages/observability" },
     { "path": "./packages/marketplace" },
     { "path": "./packages/test-utils" },
-    { "path": "./packages/workspace" }
+    { "path": "./packages/workspace" },
+    { "path": "./packages/remote-protocol" }
   ]
 }

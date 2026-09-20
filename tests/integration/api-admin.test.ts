@@ -55,6 +55,13 @@ describe('admin API boundary', () => {
     });
     expect(overview.statusCode).toBe(200);
     expect(overview.json().dataStatus).toBe('NO_LIVE_DATA');
+    const users = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/users?limit=10',
+      headers: { authorization: `Bearer ${session.accessToken}` },
+    });
+    expect(users.statusCode).toBe(200);
+    expect(users.json().total).toBe(1);
     const audit = await app.inject({
       method: 'GET',
       url: '/v1/admin/audit',

@@ -9,12 +9,16 @@ import {
 } from '@lyntar/db';
 import type { GatewayModelClient } from '@lyntar/model-gateway';
 import type { AuthService } from '@lyntar/auth';
+import type { RateLimitStore } from '@lyntar/auth';
+import { hashRateLimitIdentity } from '@lyntar/auth';
 import {
   AdminService,
   BillingService,
   InMemoryAdminAuditStore,
   InMemoryBillingStore,
+  type AdminAuditStore,
   type RazorpayWebhookService,
+  type AdminAnalyticsPort,
 } from '@lyntar/billing';
 import { createDefaultPlanCatalog, type PlanCatalog } from '@lyntar/plans';
 import { registerModelRoutes } from './model-route.js';
@@ -24,7 +28,17 @@ import { registerBillingRoutes } from './billing-route.js';
 import { registerAdminRoutes } from './admin-route.js';
 import { registerRazorpayRoutes } from './razorpay-route.js';
 import { registerReleaseRoutes } from './release-route.js';
+import { registerEmailRoutes } from './email-route.js';
 import type { ReleaseManifest } from '@lyntar/releases';
+import type { EmailService } from '@lyntar/email';
+import type { GoogleDesktopOAuthService } from '@lyntar/auth';
+import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@lyntar/email';
+import {
+  RemoteAccessService,
+  type RemoteAccessPort,
+  type RemoteRelayBroker,
+} from '@lyntar/remote-protocol';
+import { registerRemoteRoutes } from './remote-route.js';
 
 export interface ApiDependencies {
   catalog?: ModelCatalogStore;
@@ -36,9 +50,21 @@ export interface ApiDependencies {
   billing?: BillingService;
   plans?: PlanCatalog;
   admin?: AdminService;
+  audit?: AdminAuditStore;
   razorpay?: RazorpayWebhookService;
   developmentEntitlement?: boolean;
   releaseManifest?: ReleaseManifest;
+  email?: EmailService;
+  publicSiteUrl?: string;
+  googleOAuth?: GoogleDesktopOAuthService;
+  secureCookies?: boolean;
+  campaigns?: EmailCampaignService;
+  listCampaignUsers?: (audience: CampaignAudience) => Promise<CampaignUser[]>;
+  analytics?: AdminAnalyticsPort;
+  rateLimiter?: RateLimitStore;
+  remote?: RemoteAccessPort;
+  relaySecret?: string;
+  relayBroker?: RemoteRelayBroker;
 }
 
 const unavailableGateway: GatewayModelClient = {
@@ -59,14 +85,36 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     (request as FastifyRequest & { rawBody?: string }).rawBody = body;
     defaultJsonParser(request, body, done);
   });
+  if (dependencies.rateLimiter) {
+    const limits: Record<string, { limit: number; windowMs: number }> = {
+      'POST /v1/auth/register': { limit: 10, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/login': { limit: 20, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/verify-email': { limit: 10, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/verify-otp': { limit: 10, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/resend-otp': { limit: 5, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/password-reset/request': { limit: 5, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/google/start': { limit: 20, windowMs: 10 * 60 * 1000 },
+      'POST /v1/auth/google/exchange': { limit: 20, windowMs: 10 * 60 * 1000 },
+    };
+    app.addHook('onRequest', async (request, reply) => {
+      const rule = limits[`${request.method} ${request.url.split('?', 1)[0]}`];
+      if (!rule) return;
+      const key = `http:${hashRateLimitIdentity(`${request.ip}:${request.method}:${request.url.split('?', 1)[0]}`)}`;
+      const decision = await dependencies.rateLimiter?.consume(key, rule);
+      if (!decision || decision.allowed) return;
+      reply.header('Retry-After', Math.ceil(decision.retryAfterMs / 1000));
+      return reply.code(429).send({ error: 'RATE_LIMITED' });
+    });
+  }
   const catalog = dependencies.catalog ?? createMemoryCatalog([]);
   const receipts = dependencies.receipts ?? createMemoryReceiptStore();
   const events = dependencies.events ?? createMemoryEventStore();
   const plans = dependencies.plans ?? createDefaultPlanCatalog();
   const billing =
     dependencies.billing ?? new BillingService({ store: new InMemoryBillingStore(), plans });
-  const audit = new InMemoryAdminAuditStore();
+  const audit = dependencies.audit ?? new InMemoryAdminAuditStore();
   const admin = dependencies.admin ?? new AdminService({ billing, audit });
+  const remote = dependencies.remote ?? new RemoteAccessService();
   app.get('/health', async () => ({ status: 'ok' }));
   void registerModelRoutes(app, {
     catalog,
@@ -84,21 +132,51 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       : { exposeDevelopmentTokens: dependencies.exposeDevelopmentTokens }),
     billing,
     plans,
+    ...(dependencies.email ? { email: dependencies.email } : {}),
+    ...(dependencies.publicSiteUrl ? { publicSiteUrl: dependencies.publicSiteUrl } : {}),
+    ...(dependencies.googleOAuth ? { googleOAuth: dependencies.googleOAuth } : {}),
+    secureCookies: dependencies.secureCookies ?? false,
   });
   void registerBillingRoutes(app, {
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
     billing,
     plans,
     ...(dependencies.catalog ? { catalog } : {}),
+    receipts,
   });
   void registerAdminRoutes(app, {
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
     admin,
     audit,
+    ...(dependencies.analytics ? { analytics: dependencies.analytics } : {}),
+  });
+  void registerEmailRoutes(app, {
+    ...(dependencies.auth ? { auth: dependencies.auth } : {}),
+    ...(dependencies.email ? { email: dependencies.email } : {}),
+    ...(dependencies.campaigns ? { campaigns: dependencies.campaigns } : {}),
+    admin,
+    audit,
+    ...(dependencies.listCampaignUsers
+      ? { listCampaignUsers: dependencies.listCampaignUsers }
+      : {}),
   });
   void registerRazorpayRoutes(app, {
     ...(dependencies.razorpay ? { webhook: dependencies.razorpay } : {}),
   });
   void registerReleaseRoutes(app, dependencies.releaseManifest);
+  if (dependencies.auth) {
+    void registerRemoteRoutes(app, {
+      auth: dependencies.auth,
+      plans,
+      remote,
+      ...(dependencies.relaySecret ? { relaySecret: dependencies.relaySecret } : {}),
+      ...(dependencies.relayBroker ? { relayBroker: dependencies.relayBroker } : {}),
+      ...(dependencies.email ? { email: dependencies.email } : {}),
+      ...(dependencies.publicSiteUrl ? { publicSiteUrl: dependencies.publicSiteUrl } : {}),
+      ...(dependencies.exposeDevelopmentTokens === undefined
+        ? {}
+        : { exposeDevelopmentTokens: dependencies.exposeDevelopmentTokens }),
+    });
+  }
   return app;
 }

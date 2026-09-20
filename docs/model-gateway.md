@@ -17,7 +17,7 @@ It requests streaming structured JSON, includes usage in the stream, normalizes 
 
 `GET /v1/models` returns enabled catalog entries containing:
 
-- `modelId`: stable Lyntar identifier used by tasks.
+- `modelId`: stable internal identifier used by Astra tasks.
 - `displayName`: user-facing name.
 - `gatewayModelId`: provider route selected by the server.
 - `providerSlug`, `enabled`, and capability flags.

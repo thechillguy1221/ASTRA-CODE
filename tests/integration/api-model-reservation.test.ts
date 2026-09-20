@@ -157,4 +157,95 @@ describe('authenticated model reservation boundary', () => {
     });
     expect(response.statusCode).toBe(201);
   });
+
+  it('does not allow a reservation for one model to authorize another model', async () => {
+    const auth = new AuthService({ store: new InMemoryAuthStore() });
+    const billing = new BillingService({
+      store: new InMemoryBillingStore(),
+      plans: createDefaultPlanCatalog(),
+    });
+    const catalog = createMemoryCatalog([
+      {
+        modelId: 'model-a',
+        displayName: 'Model A',
+        gatewayModelId: 'test/a',
+        providerSlug: 'test',
+        enabled: true,
+        capabilities: {
+          supportsTools: true,
+          supportsStreaming: true,
+          supportsReasoning: false,
+          supportsStructuredOutput: true,
+          supportsImageInput: false,
+        },
+      },
+      {
+        modelId: 'model-b',
+        displayName: 'Model B',
+        gatewayModelId: 'test/b',
+        providerSlug: 'test',
+        enabled: true,
+        capabilities: {
+          supportsTools: true,
+          supportsStreaming: true,
+          supportsReasoning: false,
+          supportsStructuredOutput: true,
+          supportsImageInput: false,
+        },
+      },
+    ]);
+    const app = buildApi({
+      auth,
+      billing,
+      catalog,
+      gateway: {
+        async *complete() {
+          yield { type: 'decision' as const, decision: { kind: 'finish' as const, summary: 'ok' } };
+        },
+      },
+      developmentEntitlement: false,
+    });
+    const registration = await auth.register({
+      email: 'model-binding@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'test', platform: 'win32', architecture: 'x64', appVersion: 'test' },
+    });
+    await auth.verifyEmail(registration.verificationToken);
+    const login = await auth.login({
+      email: 'model-binding@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'test', platform: 'win32', architecture: 'x64', appVersion: 'test' },
+    });
+    await billing.grantCredits({
+      userId: login.user.id,
+      amountCredits: '25',
+      transactionType: 'PROMO_CREDIT',
+      idempotencyKey: 'model-binding-grant',
+      reason: 'test',
+    });
+    const reservation = await billing.reserveTask({
+      userId: login.user.id,
+      planId: login.user.planId,
+      taskId: 'model-binding-task',
+      modelId: 'model-a',
+      mode: 'BUILD',
+      amountCredits: '5',
+      idempotencyKey: 'model-binding-reservation',
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/model-requests',
+      headers: {
+        authorization: `Bearer ${login.accessToken}`,
+        'x-lyntar-reservation-id': reservation.reservationId,
+      },
+      payload: {
+        requestId: 'model-binding-request',
+        taskId: 'model-binding-task',
+        modelId: 'model-b',
+        messages: [{ role: 'user', content: 'finish' }],
+      },
+    });
+    expect(response.statusCode).toBe(409);
+  });
 });

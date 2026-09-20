@@ -9,6 +9,6 @@
     "lib": ["ES2022", "DOM"],
     "types": ["node"]
   },
-  "references": [{ "path": "../../packages/contracts" }],
+  "references": [{ "path": "../../packages/billing" }, { "path": "../../packages/contracts" }],
   "include": ["src/**/*.ts", "src/**/*.tsx", "desktop.d.ts"]
 }

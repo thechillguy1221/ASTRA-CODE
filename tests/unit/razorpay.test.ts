@@ -31,11 +31,11 @@ describe('Razorpay webhook boundary', () => {
       event: 'subscription.charged',
       payload: {
         userId: 'user-payment',
-        planId: 'STUDENT',
+        planId: 'BASIC',
         providerSubscriptionId: 'sub_1',
         providerPaymentId: 'pay_1',
         periodStart: '2026-09-20T00:00:00.000Z',
-        amountInr: '149',
+        amountInr: '499',
       },
     });
     const signature = createHmac('sha256', secret).update(body).digest('hex');
@@ -45,13 +45,13 @@ describe('Razorpay webhook boundary', () => {
     expect(results.filter((result) => result.processed)).toHaveLength(1);
     expect(await payments.countPayments()).toBe(1);
     expect(await payments.countWebhookEvents()).toBe(1);
-    expect((await billing.getWallet('user-payment')).availableCredits).toBe('500');
+    expect((await billing.getWallet('user-payment')).availableCredits).toBe('300');
     expect(
       (await billing.getLedger('user-payment')).filter(
         (entry) => entry.transactionType === 'SUBSCRIPTION_GRANT',
       ),
     ).toHaveLength(1);
-    expect(assignedPlan).toEqual({ userId: 'user-payment', planId: 'STUDENT' });
+    expect(assignedPlan).toEqual({ userId: 'user-payment', planId: 'BASIC' });
   });
 
   it('rejects a webhook with an invalid signature', async () => {

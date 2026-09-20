@@ -1,5 +1,6 @@
 {
   "name": "@lyntar/admin",
+  "description": "Astra AI secure operations and financial administration console.",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",

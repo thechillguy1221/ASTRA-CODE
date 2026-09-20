@@ -1,6 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { PlanCatalog } from '@lyntar/plans';
 import type { BillingService } from './service.js';
+import { TOP_UP_250, topUpExpiresAt } from './buckets.js';
 
 export interface PaymentRecord {
   paymentId: string;
@@ -12,14 +14,26 @@ export interface PaymentRecord {
   createdAt: string;
 }
 
+export interface RefundRecord {
+  refundId: string;
+  userId: string;
+  providerPaymentId: string;
+  providerRefundId: string;
+  amountInr: string;
+  status: 'PROCESSED' | 'DISPUTED';
+  createdAt: string;
+}
+
 export interface SubscriptionRecord {
   subscriptionId: string;
   userId: string;
   providerSubscriptionId: string;
   planId: string;
-  status: 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+  status: 'CREATED' | 'AUTHENTICATED' | 'ACTIVE' | 'PENDING' | 'HALTED' | 'CANCELLED' | 'COMPLETED';
   currentPeriodStart: string;
   currentPeriodEnd: string | null;
+  cancelledAt?: string | null;
+  haltedAt?: string | null;
 }
 
 export interface PaymentStore {
@@ -30,6 +44,15 @@ export interface PaymentStore {
   releaseWebhookEvent(providerEventId: string): Promise<void>;
   savePayment(payment: PaymentRecord): Promise<PaymentRecord>;
   saveSubscription(subscription: SubscriptionRecord): Promise<SubscriptionRecord>;
+  findSubscriptionByProvider(
+    providerSubscriptionId: string,
+  ): Promise<SubscriptionRecord | undefined>;
+  updateSubscriptionStatus(
+    providerSubscriptionId: string,
+    status: SubscriptionRecord['status'],
+    extra?: { cancelledAt?: string; haltedAt?: string },
+  ): Promise<void>;
+  saveRefund(refund: RefundRecord): Promise<RefundRecord>;
   countPayments(): Promise<number>;
   countSubscriptions(): Promise<number>;
   countWebhookEvents(): Promise<number>;
@@ -39,6 +62,7 @@ export class InMemoryPaymentStore implements PaymentStore {
   private readonly events = new Set<string>();
   private readonly payments = new Map<string, PaymentRecord>();
   private readonly subscriptions = new Map<string, SubscriptionRecord>();
+  private readonly refunds = new Map<string, RefundRecord>();
 
   async claimWebhookEvent(providerEventId: string): Promise<boolean> {
     if (this.events.has(providerEventId)) return false;
@@ -68,14 +92,34 @@ export class InMemoryPaymentStore implements PaymentStore {
     return subscription;
   }
 
+  async findSubscriptionByProvider(
+    providerSubscriptionId: string,
+  ): Promise<SubscriptionRecord | undefined> {
+    return this.subscriptions.get(providerSubscriptionId);
+  }
+
+  async updateSubscriptionStatus(
+    providerSubscriptionId: string,
+    status: SubscriptionRecord['status'],
+    extra?: { cancelledAt?: string; haltedAt?: string },
+  ): Promise<void> {
+    const existing = this.subscriptions.get(providerSubscriptionId);
+    if (existing) {
+      this.subscriptions.set(providerSubscriptionId, { ...existing, status, ...extra });
+    }
+  }
+
+  async saveRefund(refund: RefundRecord): Promise<RefundRecord> {
+    this.refunds.set(refund.providerRefundId, refund);
+    return refund;
+  }
+
   async countPayments(): Promise<number> {
     return this.payments.size;
   }
-
   async countSubscriptions(): Promise<number> {
     return this.subscriptions.size;
   }
-
   async countWebhookEvents(): Promise<number> {
     return this.events.size;
   }
@@ -88,7 +132,10 @@ export class RazorpayWebhookService {
       payments: PaymentStore;
       billing: BillingService;
       plans: PlanCatalog;
-      onPlanGranted?: (userId: string, planId: string) => Promise<void>;
+      onPlanGranted?: (userId: string, planId: string, eventId: string) => Promise<void>;
+      onSubscriptionCancelled?: (userId: string, planId: string, eventId: string) => Promise<void>;
+      onSubscriptionHalted?: (userId: string, planId: string, eventId: string) => Promise<void>;
+      onPaymentFailed?: (userId: string, eventId: string) => Promise<void>;
     },
   ) {}
 
@@ -116,13 +163,23 @@ export class RazorpayWebhookService {
     if (!claimed) return { processed: false, eventId };
     try {
       const data = payload.payload;
-      if (payload.event === 'subscription.charged') {
+      const event = payload.event;
+
+      if (event === 'subscription.charged') {
         const userId = String(data.userId);
         const planId = String(data.planId);
         const providerSubscriptionId = String(data.providerSubscriptionId);
         const providerPaymentId = String(data.providerPaymentId);
         const periodStart = String(data.periodStart);
         const plan = this.options.plans.get(planId);
+        await this.options.billing.rolloverSubscriptionCredits({
+          userId,
+          monthlyAllocation: plan.monthlyCredits,
+          periodStart,
+          newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+          idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
+          referenceId: providerSubscriptionId,
+        });
         await this.options.payments.savePayment({
           paymentId: eventId,
           userId,
@@ -145,12 +202,126 @@ export class RazorpayWebhookService {
           userId,
           amountCredits: plan.monthlyCredits,
           transactionType: 'SUBSCRIPTION_GRANT',
-          idempotencyKey: `subscription-grant:${providerSubscriptionId}:${periodStart}`,
+          idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
           reason: `${plan.displayName} subscription period grant`,
+          sourceType: 'subscription_monthly',
+          planCycle: periodStart,
+          expiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
+          referenceId: providerSubscriptionId,
           metadata: { provider: 'razorpay', providerPaymentId, providerEventId: eventId },
         });
-        if (this.options.onPlanGranted) await this.options.onPlanGranted(userId, planId);
+        if (this.options.onPlanGranted) await this.options.onPlanGranted(userId, planId, eventId);
+      } else if (event === 'subscription.authenticated') {
+        const userId = String(data.userId);
+        const planId = String(data.planId);
+        const providerSubscriptionId = String(data.providerSubscriptionId);
+        await this.options.payments.saveSubscription({
+          subscriptionId: providerSubscriptionId,
+          userId,
+          providerSubscriptionId,
+          planId,
+          status: 'AUTHENTICATED',
+          currentPeriodStart: new Date().toISOString(),
+          currentPeriodEnd: null,
+        });
+      } else if (event === 'subscription.activated') {
+        const providerSubscriptionId = String(data.providerSubscriptionId);
+        await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, 'ACTIVE');
+      } else if (event === 'subscription.pending') {
+        const providerSubscriptionId = String(data.providerSubscriptionId);
+        await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, 'PENDING');
+      } else if (event === 'subscription.halted') {
+        const userId = String(data.userId);
+        const planId = String(data.planId);
+        const providerSubscriptionId = String(data.providerSubscriptionId);
+        await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, 'HALTED', {
+          haltedAt: new Date().toISOString(),
+        });
+        if (this.options.onSubscriptionHalted)
+          await this.options.onSubscriptionHalted(userId, planId, eventId);
+      } else if (event === 'subscription.cancelled' || event === 'subscription.completed') {
+        const userId = String(data.userId);
+        const planId = String(data.planId);
+        const providerSubscriptionId = String(data.providerSubscriptionId);
+        const status = event === 'subscription.cancelled' ? 'CANCELLED' : 'COMPLETED';
+        await this.options.payments.updateSubscriptionStatus(providerSubscriptionId, status, {
+          cancelledAt: new Date().toISOString(),
+        });
+        // IMMEDIATE FREE: spec §32 — paid access ends immediately
+        if (this.options.onSubscriptionCancelled)
+          await this.options.onSubscriptionCancelled(userId, planId, eventId);
+      } else if (event === 'payment.captured') {
+        const userId = String(data.userId);
+        const providerPaymentId = String(data.providerPaymentId);
+        const topUpSkuId = typeof data.topUpSkuId === 'string' ? data.topUpSkuId : null;
+        if (topUpSkuId) {
+          if (topUpSkuId !== TOP_UP_250.id || String(data.amountInr ?? '') !== TOP_UP_250.priceInr)
+            throw new Error('Top-up payment does not match the server catalog');
+          const purchasedAt = new Date().toISOString();
+          await this.options.billing.grantCredits({
+            userId,
+            amountCredits: TOP_UP_250.credits,
+            transactionType: 'CREDIT_PURCHASE',
+            idempotencyKey: `topup:${providerPaymentId}`,
+            reason: `${TOP_UP_250.displayName} top-up purchase`,
+            sourceType: 'purchased_topup',
+            expiresAt: topUpExpiresAt(purchasedAt),
+            referenceId: providerPaymentId,
+            metadata: { provider: 'razorpay', providerEventId: eventId, topUpSkuId },
+          });
+        }
+        await this.options.payments.savePayment({
+          paymentId: eventId,
+          userId,
+          providerPaymentId,
+          providerOrderId: typeof data.providerOrderId === 'string' ? data.providerOrderId : null,
+          amountInr: String(data.amountInr),
+          status: 'CAPTURED',
+          createdAt: new Date().toISOString(),
+        });
+      } else if (event === 'payment.failed') {
+        const userId = String(data.userId);
+        const providerPaymentId = String(data.providerPaymentId ?? eventId);
+        await this.options.payments.savePayment({
+          paymentId: eventId,
+          userId,
+          providerPaymentId,
+          providerOrderId: null,
+          amountInr: String(data.amountInr ?? '0'),
+          status: 'FAILED',
+          createdAt: new Date().toISOString(),
+        });
+        // NOTE: payment.failed does NOT cancel subscription — Razorpay retries
+        if (this.options.onPaymentFailed) await this.options.onPaymentFailed(userId, eventId);
+      } else if (event === 'refund.created') {
+        const userId = String(data.userId);
+        const providerRefundId = String(data.providerRefundId ?? eventId);
+        const providerPaymentId = String(data.providerPaymentId ?? '');
+        await this.options.payments.saveRefund({
+          refundId: randomUUID(),
+          userId,
+          providerPaymentId,
+          providerRefundId,
+          amountInr: String(data.amountInr ?? '0'),
+          status: 'PROCESSED',
+          createdAt: new Date().toISOString(),
+        });
+        // Wallet adjustment on refund is an explicit admin action, not automatic
+      } else if (event === 'payment.dispute.created') {
+        // Disputes flagged for admin review — no automatic wallet changes
+        const userId = String(data.userId);
+        const providerPaymentId = String(data.providerPaymentId ?? '');
+        await this.options.payments.saveRefund({
+          refundId: randomUUID(),
+          userId,
+          providerPaymentId,
+          providerRefundId: eventId,
+          amountInr: String(data.amountInr ?? '0'),
+          status: 'DISPUTED',
+          createdAt: new Date().toISOString(),
+        });
       }
+
       return { processed: true, eventId };
     } catch (error) {
       await this.options.payments.releaseWebhookEvent(eventId);

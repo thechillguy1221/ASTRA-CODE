@@ -101,7 +101,7 @@ function metadata(
   return {
     id,
     name,
-    publisher: 'Lyntar',
+    publisher: 'Astra AI',
     description,
     version: '1.0.0',
     source: 'built-in',

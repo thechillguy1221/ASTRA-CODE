@@ -1,7 +1,16 @@
 export const NO_LIVE_DATA = 'NO_LIVE_DATA';
 
 export const adminPermissions = {
-  SUPER_ADMIN: ['read_usage', 'adjust_wallet', 'change_model', 'refund_payment', 'revoke_sessions'],
+  ADMIN: ['read_usage', 'revoke_sessions', 'manage_email'],
+  SUPER_ADMIN: [
+    'read_usage',
+    'adjust_wallet',
+    'change_model',
+    'refund_payment',
+    'revoke_sessions',
+    'manage_email',
+    'send_campaign',
+  ],
   FINANCE: ['read_usage', 'adjust_wallet', 'refund_payment'],
   SUPPORT: ['read_usage', 'revoke_sessions'],
 } as const;

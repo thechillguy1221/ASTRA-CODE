@@ -13,8 +13,15 @@ import {
 import type { AgentEventStore, ModelCatalogStore, UsageReceiptStore } from './repositories.js';
 import { PostgresAuthStore } from './postgres-auth.js';
 import { PostgresBillingStore } from './postgres-billing.js';
+import { PostgresAdminAnalytics, PostgresEmailPreferenceStore } from './postgres-analytics.js';
+import { PostgresEmailCampaignStore, PostgresEmailDeliveryStore } from './postgres-email.js';
+import { PostgresOAuthTransactionStore } from './postgres-oauth.js';
+import { PostgresAdminAuditStore } from './postgres-admin.js';
 import type { AuthStore } from '@lyntar/auth';
 import type { BillingStore } from '@lyntar/billing';
+import { PostgresRateLimitStore } from './postgres-rate-limit.js';
+import { PostgresRemoteAccessService } from './postgres-remote.js';
+import type { RemoteAccessPort } from '@lyntar/remote-protocol';
 
 export interface PostgresStores {
   pool: Pool;
@@ -23,6 +30,14 @@ export interface PostgresStores {
   events: AgentEventStore;
   auth: AuthStore;
   billing: BillingStore;
+  emailPreferences: PostgresEmailPreferenceStore;
+  emailDeliveries: PostgresEmailDeliveryStore;
+  emailCampaigns: PostgresEmailCampaignStore;
+  oauth: PostgresOAuthTransactionStore;
+  audit: PostgresAdminAuditStore;
+  analytics: PostgresAdminAnalytics;
+  rateLimiter: PostgresRateLimitStore;
+  remote: RemoteAccessPort;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -205,6 +220,14 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     events: new PostgresAgentEventStore(pool),
     auth: new PostgresAuthStore(pool),
     billing: new PostgresBillingStore(pool),
+    emailPreferences: new PostgresEmailPreferenceStore(pool),
+    emailDeliveries: new PostgresEmailDeliveryStore(pool),
+    emailCampaigns: new PostgresEmailCampaignStore(pool),
+    oauth: new PostgresOAuthTransactionStore(pool),
+    audit: new PostgresAdminAuditStore(pool),
+    analytics: new PostgresAdminAnalytics(pool),
+    rateLimiter: new PostgresRateLimitStore(pool),
+    remote: new PostgresRemoteAccessService(pool),
   };
 }
 
@@ -212,6 +235,12 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
   const migrations = [
     { version: '0001_agent_foundation', file: '0001_agent_foundation.sql' },
     { version: '0002_v1_commercial', file: '0002_v1_commercial.sql' },
+    { version: '0003_sessions', file: '0003_sessions.sql' },
+    { version: '0006_plan_v1_rename', file: '0006_plan_v1_rename.sql' },
+    { version: '0007_remote_devices', file: '0007_remote_devices.sql' },
+    { version: '0008_astra_identity_email', file: '0008_astra_identity_email.sql' },
+    { version: '0009_oauth_transactions', file: '0009_oauth_transactions.sql' },
+    { version: '0010_astra_commercial_matrix', file: '0010_astra_commercial_matrix.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS lyntar_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
