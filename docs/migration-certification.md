@@ -8,28 +8,30 @@ This report records the implementation and certification state after the Room/pr
 
 # NOT PRODUCTION READY
 
-The repository now contains the Room primary-project binding, explicit Room-scoped membership, Room Files and intent contracts, controlled import preview/approval, ZIP quarantine/inspection, host handoff path, deterministic security events/severity, authoritative Room billing-context resolution, and fresh runtime authorization checks. The deterministic suite has passed with 87 test files and 278 tests. The official pinned Windows Codex app-server is acquired, digest-verified, packaged, and proven through initialize and thread/start.
+The repository now contains the Room primary-project binding, explicit Room-scoped membership, Room Files and intent contracts, controlled import preview/approval, ZIP quarantine/inspection, host handoff path, deterministic security events/severity, authoritative Room billing-context resolution, fresh runtime authorization checks, and a fail-closed production configuration guard. The deterministic suite has passed with 87 test files and 280 tests. The official pinned Windows Codex app-server is acquired, digest-verified, packaged, and proven through initialize and thread/start.
 
 The release is not production ready because live Astra Gateway/model-driven Codex turns and tools, live PostgreSQL, payment, mail, OAuth, relay/two-device execution, clean-machine certification, and trusted Windows signing remain unavailable or un-certified. These are launch-critical for a public release.
 
 ## B. Release identity
 
-| Field                                 | Evidence                                                                                                                                      |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Branch                                | main                                                                                                                                          |
-| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                                                      |
-| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                                                      |
-| Implementation/release source SHA     | `13e489f4f27ee6cce192133e26940dce627e3315` (`Stabilize Windows golden path timeout`); the installer was built from this implementation state. |
-| Release candidate                     | astra-code-v0.1.0-rc2                                                                                                                         |
-| Version                               | 0.1.0                                                                                                                                         |
-| Working tree at report drafting       | Clean at the implementation commit; this certification metadata update is a docs-only follow-up.                                              |
-| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                                           |
-| Installer size                        | 166,058,419 bytes                                                                                                                             |
-| Installer SHA-256                     | D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E                                                                              |
-| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                                               |
-| Bundled Codex size                    | 245,798,704 bytes                                                                                                                             |
-| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                                              |
-| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                                           |
+| Field                                 | Evidence                                                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Branch                                | main                                                                                                                   |
+| Source base before this run           | `b70b8f9fd0c33455e9c3c3ca3a5822c79d4311fe` (repository HEAD at task start)                                             |
+| Prior migration baseline SHA          | b679597d3fe03efab9a6622de8f8c46468496131                                                                               |
+| Previous certified implementation SHA | `13e489f4f27ee6cce192133e26940dce627e3315` (`Stabilize Windows golden path timeout`).                                  |
+| Current build source SHA              | `e01c71ee786726373e3a407144dcfc103bacc432` (`Harden production configuration validation`).                             |
+| Release candidate                     | astra-code-v0.1.0-rc2                                                                                                  |
+| Version                               | 0.1.0                                                                                                                  |
+| Working tree at report drafting       | Source commit is frozen; this report update records a new metadata commit after finalization.                          |
+| Current-source installer              | BLOCKED — fresh package from `e01c71e` failed on host allocation/resource-copy errors.                                 |
+| Historical installer                  | `apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe` from `13e489f4`.                                 |
+| Historical installer size             | 166,058,419 bytes                                                                                                      |
+| Historical installer SHA-256          | D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E — not valid for current source.                       |
+| Bundled Codex executable              | `apps/desktop/resources/codex/codex-app-server.exe` (source resource; current installer/unpacked package not produced) |
+| Bundled Codex size                    | 245,798,704 bytes                                                                                                      |
+| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                       |
+| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                    |
 
 ## C. Architecture and production path
 
@@ -42,6 +44,8 @@ Astra renderer -> typed Workspace Bridge/preload -> Astra main process -> bundle
 Local project work remains host-local and is confined by Astra workspace policy. Room work resolves the Room, project, host, membership, permission, and organization wallet on the server. The client never chooses an arbitrary wallet as authority.
 
 The legacy Astra runner remains available only for explicit legacy-test compatibility tests. It is not the default production runner and there is no silent fallback when the Codex runtime is unavailable.
+
+Production startup now fails closed when required database, Gateway, runtime-token, payment, email, OAuth, public-origin, or relay configuration is absent; development/test adapters remain available only outside the production runtime.
 
 ## D. Upstream source provenance
 
@@ -66,7 +70,7 @@ The legacy Astra runner remains available only for explicit legacy-test compatib
 - Runtime boundary: upstream app-server/app-server-client/app-server-protocol behavior through the bundled official Windows x64 artifact.
 - Astra adapter: packages/codex-runtime/src/index.ts.
 - Desktop adapter: apps/desktop/electron/codex-task-runner.ts.
-- Runtime artifact: apps/desktop/resources/codex/codex-app-server.exe, digest verified and included in the unpacked package.
+- Runtime artifact: `apps/desktop/resources/codex/codex-app-server.exe`, digest verified. The current-source installer/unpacked package was not produced, so no current packaged-copy claim is made.
 - Local Cargo rebuild: BLOCKED by the previously observed host allocation failure; it is not required for the selected official pinned release artifact.
 
 Machine-verifiable provenance: npm.cmd run verify:source-provenance — PASS.
@@ -81,7 +85,7 @@ PASS evidence:
 - Manifest, source SHA, release metadata, LICENSE, and NOTICE verified.
 - Astra supervisor resolves the bundled resource, not an arbitrary executable from PATH.
 - The supervisor uses an Astra-owned isolated runtime home and strips inherited provider credentials.
-- Real process initialize and thread/start passed through the supervisor, including the unpacked packaged layout.
+- Real process initialize and thread/start passed through the supervisor using the pinned source resource and Astra-managed runtime layout.
 - Protocol mismatch and artifact identity checks fail closed.
 
 Not yet certified:
@@ -234,48 +238,49 @@ The following matrix contains every feature row. PASS means implementation and d
 
 ## N. Deterministic verification
 
-| Command                                                | Result                                                                                                              |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| npm.cmd test                                           | PASS — 87 files, 278 tests                                                                                          |
-| npm.cmd run typecheck                                  | PASS                                                                                                                |
-| npm.cmd run lint                                       | PASS                                                                                                                |
-| npm.cmd run format:check                               | PASS                                                                                                                |
-| npm.cmd run verify:source-provenance                   | PASS                                                                                                                |
-| npm.cmd run build:packages                             | PASS                                                                                                                |
-| npm.cmd run build                                      | PASS — API, Electron, web prerender (54 routes), and admin                                                          |
-| npm.cmd run build:renderer --workspace @lyntar/desktop | PASS during renderer/package build — 23 renderer modules                                                            |
-| npm.cmd audit --omit=dev                               | PASS — 0 vulnerabilities                                                                                            |
-| git diff --check                                       | PASS — only normal Windows line-ending warnings                                                                     |
-| node scripts/verify-codex-runtime-artifact.mjs         | PASS — executable, manifest, LICENSE, NOTICE, and hashes                                                            |
-| npm.cmd run certify:codex-runtime                      | PASS — real initialize and thread/start against pinned executable                                                   |
-| npm.cmd run package:win:unsigned                       | PASS — final installer, 166,058,419 bytes, SHA-256 D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E |
-| Focused Room/project/billing/security suites           | PASS — 7 files, 27 tests                                                                                            |
-| Local Cargo build of vendored Codex                    | BLOCKED — host allocation failure; official artifact is used and verified                                           |
+| Command                                                | Result                                                                                                                                                                              |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| npm.cmd test                                           | PASS — 87 files, 280 tests                                                                                                                                                          |
+| npm.cmd run typecheck                                  | PASS                                                                                                                                                                                |
+| npm.cmd run lint                                       | PASS                                                                                                                                                                                |
+| npm.cmd run format:check                               | PASS                                                                                                                                                                                |
+| npm.cmd run verify:source-provenance                   | PASS                                                                                                                                                                                |
+| npm.cmd run build:packages                             | PASS                                                                                                                                                                                |
+| npm.cmd run build                                      | PASS — API, Electron, web prerender (54 routes), and admin                                                                                                                          |
+| npm.cmd run build:renderer --workspace @lyntar/desktop | PASS during renderer/package build — 23 renderer modules                                                                                                                            |
+| npm.cmd audit --omit=dev                               | PASS — 0 vulnerabilities                                                                                                                                                            |
+| git diff --check                                       | PASS — only normal Windows line-ending warnings                                                                                                                                     |
+| node scripts/verify-codex-runtime-artifact.mjs         | PASS — executable, manifest, LICENSE, NOTICE, and hashes                                                                                                                            |
+| npm.cmd run certify:codex-runtime                      | PASS — real initialize and thread/start against pinned executable                                                                                                                   |
+| npm.cmd run package:win:unsigned                       | BLOCKED for current source — host `Array buffer allocation failed`, retry `0xC00000FD`, direct packager Codex copy `UNKNOWN`; historical artifact is not reused as current evidence |
+| Production configuration guard                         | PASS — focused guard tests pass; production cannot silently start with missing launch services                                                                                      |
+| Focused Room/project/billing/security suites           | PASS — 7 files, 27 tests                                                                                                                                                            |
+| Local Cargo build of vendored Codex                    | BLOCKED — host allocation failure; official artifact is used and verified                                                                                                           |
 
 ## O. Live/external certification
 
-| Capability                               | Status  | Environment/evidence                                        |
-| ---------------------------------------- | ------- | ----------------------------------------------------------- |
-| Codex runtime launch/session             | PASS    | Real pinned Windows executable; initialize and thread/start |
-| Codex live model completion              | BLOCKED | No configured live Astra Gateway/model environment          |
-| Codex local tools/approvals/cancellation | BLOCKED | Requires live model-driven Codex turn                       |
-| Codex Room execution                     | BLOCKED | Requires live model plus host/relay environment             |
-| Astra Gateway/provider                   | BLOCKED | No production/staging credentials/configuration supplied    |
-| Web Search deterministic integration     | PASS    | Full deterministic suite                                    |
-| Web Search live provider                 | BLOCKED | No endpoint/key configured                                  |
-| PostgreSQL live                          | BLOCKED | No disposable PostgreSQL environment supplied               |
-| Razorpay sandbox                         | BLOCKED | No sandbox credentials supplied                             |
-| Resend delivery                          | BLOCKED | No verified sender/provider configuration supplied          |
-| Google OAuth                             | BLOCKED | No live OAuth client/redirect certification supplied        |
-| Remote relay                             | BLOCKED | No staging relay/two-device environment supplied            |
-| Two-device remote                        | BLOCKED | Requires two authorized live devices                        |
-| Personal wallet deterministic            | PASS    | Billing integration tests                                   |
-| Team wallet deterministic                | PASS    | Room-only reservation and spoof tests                       |
-| Business wallet deterministic            | PASS    | Room-only reservation and spoof tests                       |
-| Windows unsigned package                 | PASS    | Real NSIS installer produced                                |
-| Windows code signing                     | BLOCKED | No legitimate certificate/private key                       |
-| Auto-update                              | BLOCKED | Signed update artifact and update endpoint unavailable      |
-| Clean Windows install                    | BLOCKED | No isolated clean Windows certification environment         |
+| Capability                               | Status  | Environment/evidence                                                                     |
+| ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| Codex runtime launch/session             | PASS    | Real pinned Windows executable; initialize and thread/start                              |
+| Codex live model completion              | BLOCKED | No configured live Astra Gateway/model environment                                       |
+| Codex local tools/approvals/cancellation | BLOCKED | Requires live model-driven Codex turn                                                    |
+| Codex Room execution                     | BLOCKED | Requires live model plus host/relay environment                                          |
+| Astra Gateway/provider                   | BLOCKED | No production/staging credentials/configuration supplied                                 |
+| Web Search deterministic integration     | PASS    | Full deterministic suite                                                                 |
+| Web Search live provider                 | BLOCKED | No endpoint/key configured                                                               |
+| PostgreSQL live                          | BLOCKED | No disposable PostgreSQL environment supplied                                            |
+| Razorpay sandbox                         | BLOCKED | No sandbox credentials supplied                                                          |
+| Resend delivery                          | BLOCKED | No verified sender/provider configuration supplied                                       |
+| Google OAuth                             | BLOCKED | No live OAuth client/redirect certification supplied                                     |
+| Remote relay                             | BLOCKED | No staging relay/two-device environment supplied                                         |
+| Two-device remote                        | BLOCKED | Requires two authorized live devices                                                     |
+| Personal wallet deterministic            | PASS    | Billing integration tests                                                                |
+| Team wallet deterministic                | PASS    | Room-only reservation and spoof tests                                                    |
+| Business wallet deterministic            | PASS    | Room-only reservation and spoof tests                                                    |
+| Windows unsigned package                 | BLOCKED | Current-source package failed in the constrained host; prior artifact is historical only |
+| Windows code signing                     | BLOCKED | No legitimate certificate/private key                                                    |
+| Auto-update                              | BLOCKED | Signed update artifact and update endpoint unavailable                                   |
+| Clean Windows install                    | BLOCKED | No isolated clean Windows certification environment                                      |
 
 ## P. Security and financial integrity
 
@@ -297,17 +302,17 @@ The principal surviving objection is not a hidden fallback: the model-driven Cod
 
 3. Live PostgreSQL certification
    Type: EXTERNAL INFRASTRUCTURE
-   Evidence: migrations and Postgres adapters are present; no disposable database run was available.
+   Evidence: migrations and Postgres adapters are present; `psql`/`pg_dump`/`pg_restore` are unavailable, Docker Desktop's Linux engine pipe is unavailable, and the certification harness safely refused to mutate an unspecified database.
    Required action: run migrations and restart/concurrency/FK/uniqueness tests against disposable PostgreSQL with representative data.
 
 4. Payments, mail, and OAuth
    Type: CREDENTIAL / EXTERNAL INFRASTRUCTURE
-   Evidence: deterministic application tests pass; Razorpay, Resend, and Google OAuth live credentials/configuration were not supplied.
-   Required action: run sandbox/payment/webhook, delivery, and OAuth callback certification.
+   Evidence: deterministic application tests pass; no Razorpay, Resend, or Google OAuth credentials/configuration are present in the current environment.
+   Required action: configure the real sandbox/provider credentials and run payment/webhook, delivery, and OAuth callback certification.
 
 5. Trusted Windows signing and clean install
    Type: CREDENTIAL / EXTERNAL INFRASTRUCTURE
-   Evidence: unsigned installer builds and includes the pinned runtime; no trusted signing key or isolated clean Windows environment is available.
+   Evidence: `signtool` is unavailable, no trusted signing certificate/private key is present, and no isolated clean Windows environment is available. The historical unsigned installer is not valid for the current source.
    Required action: sign final binaries, verify Authenticode, install on a clean Windows 10/11 x64 environment, and test launch/auth/restart/uninstall.
 
 6. Auto-update certification
@@ -315,8 +320,13 @@ The principal surviving objection is not a hidden fallback: the model-driven Cod
    Evidence: no signed update artifact/endpoint was supplied.
    Required action: certify only if updater is in the V1 shipping scope.
 
+7. Current-source Windows installer
+   Type: EXTERNAL INFRASTRUCTURE
+   Evidence: packaging from `e01c71ee786726373e3a407144dcfc103bacc432` failed with host allocation/stack-overflow/resource-copy errors; the only existing installer is from the previous source commit.
+   Required action: rebuild on a Windows host with sufficient virtual memory and verify the resulting artifact hash before any signing or clean-machine test.
+
 ## R. Final release decision
 
 # NOT PRODUCTION READY
 
-The implementation gaps previously marked MISSING in the Room/project, Room Files, import, ZIP-security, host-handoff, and security-event areas have been implemented and deterministically tested. The exact unsigned installer was rebuilt. The release remains blocked by the live model/Gateway path and other launch-critical infrastructure/certificate gates listed above; no live PASS has been manufactured.
+The implementation gaps previously marked MISSING in the Room/project, Room Files, import, ZIP-security, host-handoff, and security-event areas have been implemented and deterministically tested. Production configuration now fails closed. A current-source installer was not produced because the Windows host failed during packaging; the prior unsigned installer is explicitly historical and is not certified for this source. The release remains blocked by the live model/Gateway path and other launch-critical infrastructure/certificate gates listed above; no live PASS has been manufactured.

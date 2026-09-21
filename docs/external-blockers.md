@@ -18,3 +18,5 @@ These are external certification blockers, not substitutes for implementation wo
    Needed for signed public installer, Authenticode verification, install/auth/restart/uninstall certification.
 
 6. Signed update endpoint/artifacts, if auto-update remains in V1 scope.
+
+7. A host with sufficient Windows virtual-memory/allocation capacity to build the current-source installer. The previous unsigned installer is retained only as historical evidence because it was built from the preceding source commit; it must not be released as the current build.
