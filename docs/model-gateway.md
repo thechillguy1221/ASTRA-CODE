@@ -42,4 +42,4 @@ The PostgreSQL migration enforces unique request IDs. In-memory stores are used 
 
 ## Live smoke policy
 
-`npm run test:live` is opt-in and requires `ASTRA_LIVE_TEST=1`, `ASTRA_MODEL_GATEWAY_URL`, `ASTRA_MODEL_GATEWAY_API_KEY`, and `ASTRA_MODEL_ID`. Missing configuration is reported as `BLOCKED`. A failed request or missing provider usage is `UNVERIFIED`; it is never reported as a successful live certification.
+`npm run test:live` is opt-in and requires `ASTRA_LIVE_TEST=1`, `ASTRA_MODEL_GATEWAY_URL`, `ASTRA_MODEL_GATEWAY_API_KEY`, and the certification-only `ASTRA_LIVE_TEST_MODEL_ID`. The model must be an enabled server-catalog model identifier; it is never a production default. Missing configuration is reported as `BLOCKED`. A failed request or missing provider usage is `UNVERIFIED`; it is never reported as a successful live certification.

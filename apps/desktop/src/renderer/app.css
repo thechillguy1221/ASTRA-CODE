@@ -725,6 +725,53 @@ pre {
   color: #c0d0df;
   font-size: 12px;
 }
+.model-identity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.model-identity small {
+  display: block;
+  margin-top: 3px;
+  color: #7f95ad;
+  font-size: 11px;
+}
+.provider-mark {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid #38516d;
+  border-radius: 8px;
+  color: #d9e9fb;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.provider-mark-openai {
+  background: #173f36;
+}
+.provider-mark-anthropic {
+  background: #4a2e40;
+}
+.provider-mark-google {
+  background: #263d62;
+}
+.provider-mark-xai {
+  background: #30343c;
+}
+.provider-mark-mistral {
+  background: #583b24;
+}
+.provider-mark-deepseek {
+  background: #203f59;
+}
+.provider-mark-cohere {
+  background: #3d3157;
+}
+.provider-mark-generic {
+  background: #263444;
+}
 .safe-chip {
   display: inline-block;
   margin-top: 9px;

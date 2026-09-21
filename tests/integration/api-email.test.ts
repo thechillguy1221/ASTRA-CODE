@@ -6,6 +6,7 @@ import {
   EmailService,
   InMemoryEmailCampaignStore,
   InMemoryEmailProvider,
+  InMemoryEmailSenderStore,
 } from '@astra/email';
 
 describe('email administration API', () => {
@@ -107,5 +108,73 @@ describe('email administration API', () => {
     });
     expect(retry.json()).toEqual({ sent: 0, suppressed: 1 });
     expect(provider.messages).toHaveLength(2);
+  });
+
+  it('lets an authorized admin manage approved sender identities', async () => {
+    const authStore = new InMemoryAuthStore();
+    const auth = new AuthService({ store: authStore });
+    const registration = await auth.register({
+      email: 'sender-admin@example.test',
+      password: 'correct horse battery staple',
+      device: {
+        label: 'Astra web admin',
+        platform: 'web',
+        architecture: 'browser',
+        appVersion: 'web',
+      },
+    });
+    await auth.verifyEmail(registration.verificationToken);
+    await authStore.updateUser({
+      ...(await authStore.getUser(registration.user.id))!,
+      role: 'SUPER_ADMIN',
+    });
+    const login = await auth.login({
+      email: 'sender-admin@example.test',
+      password: 'correct horse battery staple',
+      device: {
+        label: 'Astra web admin',
+        platform: 'web',
+        architecture: 'browser',
+        appVersion: 'web',
+      },
+    });
+    const email = new EmailService({
+      provider: new InMemoryEmailProvider(),
+      senderStore: new InMemoryEmailSenderStore(),
+    });
+    const app = buildApi({ auth, email });
+
+    const invalid = await app.inject({
+      method: 'PUT',
+      url: '/v1/admin/email/senders/SECURITY',
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      payload: { fromAddress: 'Astra\r\nBcc: attacker@example.test' },
+    });
+    expect(invalid.statusCode).toBe(400);
+
+    const update = await app.inject({
+      method: 'PUT',
+      url: '/v1/admin/email/senders/SECURITY',
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      payload: {
+        fromAddress: 'Astra Security <security@example.test>',
+        replyTo: 'security@example.test',
+      },
+    });
+    expect(update.statusCode).toBe(200);
+    expect(update.json().sender.fromAddress).toBe('Astra Security <security@example.test>');
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/email/senders',
+      headers: { authorization: `Bearer ${login.accessToken}` },
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().senders).toContainEqual(
+      expect.objectContaining({
+        kind: 'SECURITY',
+        fromAddress: 'Astra Security <security@example.test>',
+      }),
+    );
   });
 });

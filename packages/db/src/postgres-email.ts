@@ -8,6 +8,9 @@ import type {
   EmailDelivery,
   EmailDeliveryStore,
   EmailKind,
+  EmailSenderIdentity,
+  EmailSenderKind,
+  EmailSenderStore,
 } from '@astra/email';
 
 function mapCampaign(row: Record<string, unknown>): EmailCampaign {
@@ -65,6 +68,52 @@ export class PostgresEmailDeliveryStore implements EmailDeliveryStore {
         delivery.errorCode ?? null,
         delivery.createdAt,
       ],
+    );
+  }
+}
+
+export class PostgresEmailSenderStore implements EmailSenderStore {
+  constructor(private readonly pool: Pool) {}
+
+  async list(): Promise<EmailSenderIdentity[]> {
+    const result = await this.pool.query(
+      'SELECT kind, from_address, reply_to, updated_by, updated_at FROM email_sender_identities ORDER BY kind',
+    );
+    return result.rows.map((row) => ({
+      kind: String(row.kind) as EmailSenderKind,
+      fromAddress: String(row.from_address),
+      ...(row.reply_to ? { replyTo: String(row.reply_to) } : {}),
+      ...(row.updated_by ? { updatedBy: String(row.updated_by) } : {}),
+      updatedAt: new Date(String(row.updated_at)).toISOString(),
+    }));
+  }
+
+  async get(kind: EmailSenderKind): Promise<EmailSenderIdentity | undefined> {
+    const result = await this.pool.query(
+      'SELECT kind, from_address, reply_to, updated_by, updated_at FROM email_sender_identities WHERE kind = $1',
+      [kind],
+    );
+    const row = result.rows[0] as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    return {
+      kind: String(row.kind) as EmailSenderKind,
+      fromAddress: String(row.from_address),
+      ...(row.reply_to ? { replyTo: String(row.reply_to) } : {}),
+      ...(row.updated_by ? { updatedBy: String(row.updated_by) } : {}),
+      updatedAt: new Date(String(row.updated_at)).toISOString(),
+    };
+  }
+
+  async upsert(identity: EmailSenderIdentity): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO email_sender_identities(kind, from_address, reply_to, updated_by, updated_at)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT (kind) DO UPDATE SET
+         from_address = EXCLUDED.from_address,
+         reply_to = EXCLUDED.reply_to,
+         updated_by = EXCLUDED.updated_by,
+         updated_at = now()`,
+      [identity.kind, identity.fromAddress, identity.replyTo ?? null, identity.updatedBy ?? null],
     );
   }
 }

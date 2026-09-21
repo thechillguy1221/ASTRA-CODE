@@ -32,6 +32,12 @@ runtime evidence.
 - `CLINE_RUNTIME_AUTHORITY`: `NONE`
 - `CLINE_PROVIDER_AUTHORITY`: `NONE`
 - `CLINE_BILLING_AUTHORITY`: `NONE`
+- `CLINE_NATIVE_WEB_SEARCH_AUDIT`: `PRESENT_IN_PINNED_SDK_BUT_EXCLUDED_FROM_ASTRA_RUNTIME`
+- `CLINE_NATIVE_WEB_SEARCH_PATHS`:
+  - `sdk/packages/llms/src/providers/vendors/cline.ts`
+  - `sdk/packages/core/src/extensions/tools/definitions.ts`
+  - `sdk/packages/core/src/extensions/tools/runtime.ts`
+- `CLINE_NATIVE_WEB_SEARCH_EXCLUSION_REASON`: `The pinned Cline implementation calls Cline/provider-owned transport. Astra keeps its server-authoritative web_search/web_fetch boundary for Room permissions, SSRF policy, billing, budgets, and provenance.`
 - `CLINE_EXCLUDED_RUNTIME_PATHS`:
   - `sdk/packages/core/`
   - `sdk/packages/agents/`

@@ -20,6 +20,7 @@ import type {
 } from '@astra/contracts';
 import { addCredits } from '@astra/billing/math';
 import { AstraClineApprovalCard, AstraClineSessionStatus } from './cline-workspace.js';
+import { modelPresentation, providerMark } from './model-presentation.js';
 import { deriveProgressRows } from './view-model.js';
 
 type PendingPermission = {
@@ -662,7 +663,7 @@ function BuildView(props: {
                 <option value="AUTO">Auto · Astra chooses an eligible model</option>
                 {props.models.map((model) => (
                   <option key={model.modelId} value={model.modelId}>
-                    {model.displayName}
+                    {modelPresentation(model).providerLabel} · {model.displayName}
                   </option>
                 ))}
               </select>
@@ -1349,7 +1350,18 @@ function SettingsView({
           </p>
           {models.map((model) => (
             <div className="model-row" key={model.modelId}>
-              <span>{model.displayName}</span>
+              <span className="model-identity">
+                <span
+                  className={`provider-mark provider-mark-${modelPresentation(model).providerIcon}`}
+                  aria-hidden="true"
+                >
+                  {providerMark(modelPresentation(model).providerIcon)}
+                </span>
+                <span>
+                  <strong>{model.displayName}</strong>
+                  <small>{modelPresentation(model).providerLabel}</small>
+                </span>
+              </span>
               <span className="muted">
                 {model.capabilities.supportsStreaming ? 'Streaming' : 'Non-streaming'}
               </span>

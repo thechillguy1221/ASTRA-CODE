@@ -2,7 +2,7 @@ const LIVE_REQUIRED_KEYS = [
   'ASTRA_LIVE_TEST',
   'ASTRA_MODEL_GATEWAY_URL',
   'ASTRA_MODEL_GATEWAY_API_KEY',
-  'ASTRA_MODEL_ID',
+  'ASTRA_LIVE_TEST_MODEL_ID',
 ];
 
 export function resolveLiveConfiguration(environment = process.env) {
@@ -18,7 +18,7 @@ export function resolveLiveConfiguration(environment = process.env) {
     credentials: {
       baseUrl: environment.ASTRA_MODEL_GATEWAY_URL,
       apiKey: environment.ASTRA_MODEL_GATEWAY_API_KEY,
-      modelId: environment.ASTRA_MODEL_ID,
+      modelId: environment.ASTRA_LIVE_TEST_MODEL_ID,
     },
   };
 }

@@ -69,6 +69,8 @@ const email =
           apiKey: config.resendApiKey,
           fromAddress: config.emailFrom,
         }),
+        ...(postgres ? { senderStore: postgres.emailSenders } : {}),
+        ...(config.emailFrom ? { fallbackSender: { fromAddress: config.emailFrom } } : {}),
         preferences: postgres?.emailPreferences ?? new InMemoryEmailPreferenceStore(),
         ...(postgres ? { deliveries: postgres.emailDeliveries } : {}),
       })

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EmailService,
+  InMemoryEmailSenderStore,
   InMemoryEmailPreferenceStore,
   InMemoryEmailProvider,
   renderTemplate,
@@ -70,5 +71,45 @@ describe('Astra email infrastructure', () => {
       'https://astra.example/reset-password?token=opaque',
     );
     expect(provider.messages).toHaveLength(1);
+  });
+
+  it('resolves an approved sender identity server-side before delivery', async () => {
+    const provider = new InMemoryEmailProvider();
+    const senders = new InMemoryEmailSenderStore();
+    await senders.upsert({
+      kind: 'SECURITY',
+      fromAddress: 'Astra Security <security@example.test>',
+      replyTo: 'security@example.test',
+      updatedBy: 'super-admin',
+    });
+    const email = new EmailService({ provider, senderStore: senders });
+
+    await email.send({
+      kind: 'transactional',
+      senderKind: 'SECURITY',
+      to: 'user@example.test',
+      verified: true,
+      unsubscribed: false,
+      subject: 'Security notice',
+      html: '<p>Notice</p>',
+      templateId: 'security.notice',
+      idempotencyKey: 'security:notice:1',
+    });
+
+    expect(provider.messages[0]).toMatchObject({
+      fromAddress: 'Astra Security <security@example.test>',
+      replyTo: 'security@example.test',
+    });
+  });
+
+  it('rejects header injection in approved sender identities', async () => {
+    const senders = new InMemoryEmailSenderStore();
+    await expect(
+      senders.upsert({
+        kind: 'DEFAULT',
+        fromAddress: 'Astra\r\nBcc: attacker@example.test',
+        updatedBy: 'super-admin',
+      }),
+    ).rejects.toThrow(/sender address/i);
   });
 });

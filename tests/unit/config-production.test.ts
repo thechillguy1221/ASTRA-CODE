@@ -14,6 +14,15 @@ describe('production configuration guard', () => {
     expect(() => assertProductionConfiguration(config, { NODE_ENV: 'development' })).not.toThrow();
   });
 
+  it('does not expose a global model selector in the runtime configuration', () => {
+    const config = loadConfig({
+      NODE_ENV: 'development',
+      ASTRA_MODEL_ID: 'legacy-global-model',
+    });
+
+    expect(config).not.toHaveProperty('modelId');
+  });
+
   it('rejects production when a shipped external service would silently downgrade', () => {
     const environment = {
       NODE_ENV: 'production',

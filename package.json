@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "vitest run --maxWorkers=1",
+    "test": "vitest run --pool=threads --no-file-parallelism --no-isolate --maxWorkers=1",
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",
     "typecheck": "tsc -b",

@@ -1,6 +1,21 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 export type EmailKind = 'transactional' | 'marketing';
+export type EmailSenderKind = 'DEFAULT' | 'NOREPLY' | 'SUPPORT' | 'BILLING' | 'SECURITY';
+
+export interface EmailSenderIdentity {
+  kind: EmailSenderKind;
+  fromAddress: string;
+  replyTo?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface EmailSenderStore {
+  list(): Promise<EmailSenderIdentity[]>;
+  get(kind: EmailSenderKind): Promise<EmailSenderIdentity | undefined>;
+  upsert(identity: EmailSenderIdentity): Promise<void>;
+}
 
 export interface EmailRecipientState {
   verified: boolean;
@@ -16,6 +31,9 @@ export interface SmtpConfig {
 
 export interface EmailMessage {
   kind: EmailKind;
+  senderKind?: EmailSenderKind;
+  fromAddress?: string;
+  replyTo?: string;
   to: string;
   subject: string;
   html: string;
@@ -100,6 +118,45 @@ export class InMemoryEmailProvider implements EmailProvider {
   }
 }
 
+function validateSenderAddress(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!normalized || /[\r\n]/.test(normalized))
+    throw new Error(`Invalid sender address in ${field}`);
+  const mailbox = normalized.match(/<([^<>\s@]+@[^<>\s@]+)>$/)?.[1] ?? normalized;
+  if (!/^[^@\s]+@[^@\s]+$/.test(mailbox)) throw new Error(`Invalid sender address in ${field}`);
+  return normalized;
+}
+
+function validateSenderIdentity(identity: EmailSenderIdentity): EmailSenderIdentity {
+  return {
+    ...identity,
+    fromAddress: validateSenderAddress(identity.fromAddress, 'fromAddress'),
+    ...(identity.replyTo ? { replyTo: validateSenderAddress(identity.replyTo, 'replyTo') } : {}),
+  };
+}
+
+export class InMemoryEmailSenderStore implements EmailSenderStore {
+  private readonly values = new Map<EmailSenderKind, EmailSenderIdentity>();
+
+  constructor(initial: EmailSenderIdentity[] = []) {
+    for (const identity of initial)
+      this.values.set(identity.kind, validateSenderIdentity(identity));
+  }
+
+  async list(): Promise<EmailSenderIdentity[]> {
+    return [...this.values.values()].map((identity) => ({ ...identity }));
+  }
+
+  async get(kind: EmailSenderKind): Promise<EmailSenderIdentity | undefined> {
+    const identity = this.values.get(kind);
+    return identity ? { ...identity } : undefined;
+  }
+
+  async upsert(identity: EmailSenderIdentity): Promise<void> {
+    this.values.set(identity.kind, validateSenderIdentity(identity));
+  }
+}
+
 export class InMemoryEmailDeliveryStore implements EmailDeliveryStore {
   private readonly values = new Map<string, EmailDelivery>();
 
@@ -134,10 +191,11 @@ export class ResendEmailProvider implements EmailProvider {
         'Idempotency-Key': message.idempotencyKey,
       },
       body: JSON.stringify({
-        from: this.options.fromAddress,
+        from: message.fromAddress ?? this.options.fromAddress,
         to: [message.to],
         subject: message.subject,
         html: message.html,
+        ...(message.replyTo ? { reply_to: message.replyTo } : {}),
         ...(message.text ? { text: message.text } : {}),
       }),
     });
@@ -182,11 +240,24 @@ export class EmailService {
   constructor(
     private readonly options: {
       provider: EmailProvider;
+      senderStore?: EmailSenderStore;
+      fallbackSender?: Omit<EmailSenderIdentity, 'kind'>;
       preferences?: EmailPreferenceStore;
       deliveries?: EmailDeliveryStore;
       now?: () => Date;
     },
   ) {}
+
+  async listSenderIdentities(): Promise<EmailSenderIdentity[]> {
+    return (await this.options.senderStore?.list()) ?? [];
+  }
+
+  async upsertSenderIdentity(input: EmailSenderIdentity): Promise<EmailSenderIdentity> {
+    if (!this.options.senderStore) throw new Error('Email sender settings are not configured');
+    const identity = validateSenderIdentity(input);
+    await this.options.senderStore.upsert(identity);
+    return identity;
+  }
 
   async send(input: EmailMessage & EmailRecipientState): Promise<EmailDelivery> {
     const existing =
@@ -203,18 +274,23 @@ export class EmailService {
       await this.saveDelivery(input, delivery);
       return delivery;
     }
+    const sender = await this.resolveSender(input.senderKind ?? 'DEFAULT');
+    const message: EmailMessage = {
+      kind: input.kind,
+      ...(input.senderKind ? { senderKind: input.senderKind } : {}),
+      ...(sender ? { fromAddress: sender.fromAddress } : {}),
+      ...(sender?.replyTo ? { replyTo: sender.replyTo } : {}),
+      to: input.to,
+      subject: input.subject,
+      html: sanitizeEmailHtml(input.html),
+      ...(input.text ? { text: input.text } : {}),
+      templateId: input.templateId,
+      idempotencyKey: input.idempotencyKey,
+      ...(input.userId ? { userId: input.userId } : {}),
+    };
     let result: { providerMessageId: string | null };
     try {
-      result = await this.options.provider.send({
-        kind: input.kind,
-        to: input.to,
-        subject: input.subject,
-        html: sanitizeEmailHtml(input.html),
-        ...(input.text ? { text: input.text } : {}),
-        templateId: input.templateId,
-        idempotencyKey: input.idempotencyKey,
-        ...(input.userId ? { userId: input.userId } : {}),
-      });
+      result = await this.options.provider.send(message);
     } catch {
       const delivery: EmailDelivery = {
         provider: this.options.provider.name,
@@ -243,6 +319,7 @@ export class EmailService {
   }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'SECURITY',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -257,6 +334,7 @@ export class EmailService {
   async sendWelcome(input: { userId: string; email: string }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'DEFAULT',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -275,6 +353,7 @@ export class EmailService {
   }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'SECURITY',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -294,6 +373,7 @@ export class EmailService {
   }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'BILLING',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -312,6 +392,7 @@ export class EmailService {
   }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'BILLING',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -334,6 +415,7 @@ export class EmailService {
       : '';
     return this.send({
       kind: 'transactional',
+      senderKind: 'BILLING',
       userId: input.userId,
       to: input.email,
       verified: true,
@@ -353,6 +435,7 @@ export class EmailService {
   }): Promise<EmailDelivery> {
     return this.send({
       kind: 'transactional',
+      senderKind: 'DEFAULT',
       to: input.email,
       verified: true,
       unsubscribed: false,
@@ -387,6 +470,15 @@ export class EmailService {
 
   private now(): Date {
     return this.options.now?.() ?? new Date();
+  }
+
+  private async resolveSender(kind: EmailSenderKind): Promise<EmailSenderIdentity | undefined> {
+    const configured = await this.options.senderStore?.get(kind);
+    if (configured) return configured;
+    if (this.options.fallbackSender)
+      return validateSenderIdentity({ kind, ...this.options.fallbackSender });
+    if (this.options.senderStore) throw new Error(`No approved sender configured for ${kind}`);
+    return undefined;
   }
 
   private async saveDelivery(input: EmailMessage, delivery: EmailDelivery): Promise<void> {

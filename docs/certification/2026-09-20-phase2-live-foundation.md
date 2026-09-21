@@ -48,7 +48,7 @@ The live suite requires all of the following and none were configured:
 - `ASTRA_LIVE_TEST=1`
 - `ASTRA_MODEL_GATEWAY_URL`
 - `ASTRA_MODEL_GATEWAY_API_KEY`
-- `ASTRA_MODEL_ID`
+- `ASTRA_LIVE_TEST_MODEL_ID` (certification-only catalog selection)
 
 Therefore this run has no real model, provider route, gateway request ID,
 usage receipt, or actual provider cost to report. The suite does not fall back to

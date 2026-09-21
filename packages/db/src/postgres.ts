@@ -15,7 +15,11 @@ import { PostgresAuthStore } from './postgres-auth.js';
 import { PostgresBillingStore } from './postgres-billing.js';
 import { PostgresOrganizationBillingStore } from './postgres-organization-billing.js';
 import { PostgresAdminAnalytics, PostgresEmailPreferenceStore } from './postgres-analytics.js';
-import { PostgresEmailCampaignStore, PostgresEmailDeliveryStore } from './postgres-email.js';
+import {
+  PostgresEmailCampaignStore,
+  PostgresEmailDeliveryStore,
+  PostgresEmailSenderStore,
+} from './postgres-email.js';
 import { PostgresOAuthTransactionStore } from './postgres-oauth.js';
 import { PostgresAdminAuditStore } from './postgres-admin.js';
 import type { AuthStore } from '@astra/auth';
@@ -36,6 +40,7 @@ export interface PostgresStores {
   emailPreferences: PostgresEmailPreferenceStore;
   emailDeliveries: PostgresEmailDeliveryStore;
   emailCampaigns: PostgresEmailCampaignStore;
+  emailSenders: PostgresEmailSenderStore;
   oauth: PostgresOAuthTransactionStore;
   audit: PostgresAdminAuditStore;
   analytics: PostgresAdminAnalytics;
@@ -227,6 +232,7 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     emailPreferences: new PostgresEmailPreferenceStore(pool),
     emailDeliveries: new PostgresEmailDeliveryStore(pool),
     emailCampaigns: new PostgresEmailCampaignStore(pool),
+    emailSenders: new PostgresEmailSenderStore(pool),
     oauth: new PostgresOAuthTransactionStore(pool),
     audit: new PostgresAdminAuditStore(pool),
     analytics: new PostgresAdminAnalytics(pool),
@@ -249,6 +255,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0012_astra_code_regional_pricing', file: '0012_astra_code_regional_pricing.sql' },
     { version: '0013_room_projects_files_security', file: '0013_room_projects_files_security.sql' },
     { version: '0014_room_memberships', file: '0014_room_memberships.sql' },
+    { version: '0015_email_sender_identities', file: '0015_email_sender_identities.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

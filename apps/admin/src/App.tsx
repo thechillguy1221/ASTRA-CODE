@@ -44,6 +44,14 @@ interface AdminUser {
   createdAt: string;
 }
 
+type SenderKind = 'DEFAULT' | 'NOREPLY' | 'SUPPORT' | 'BILLING' | 'SECURITY';
+interface SenderIdentity {
+  kind: SenderKind;
+  fromAddress: string;
+  replyTo?: string;
+  updatedAt?: string;
+}
+
 function display(value: number | string | null | undefined): string {
   return value === null || value === undefined ? NO_LIVE_DATA : String(value);
 }
@@ -67,6 +75,10 @@ export function App(): React.JSX.Element {
     suppressedRecipients: number;
   } | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [senders, setSenders] = useState<SenderIdentity[]>([]);
+  const [senderKind, setSenderKind] = useState<SenderKind>('DEFAULT');
+  const [senderFrom, setSenderFrom] = useState('');
+  const [senderReplyTo, setSenderReplyTo] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -98,6 +110,21 @@ export function App(): React.JSX.Element {
         });
         if (!usersResponse.ok) throw new Error('User data is unavailable.');
         setUsers(((await usersResponse.json()) as { users: AdminUser[] }).users);
+      }
+      if (section === 'Email') {
+        const sendersResponse = await fetch('/v1/admin/email/senders', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!sendersResponse.ok) throw new Error('Email sender settings are unavailable.');
+        const nextSenders = ((await sendersResponse.json()) as { senders: SenderIdentity[] })
+          .senders;
+        setSenders(nextSenders);
+        const selected = nextSenders.find((sender) => sender.kind === senderKind);
+        if (selected) {
+          setSenderFrom(selected.fromAddress);
+          setSenderReplyTo(selected.replyTo ?? '');
+        }
       }
     };
     void load().catch((error: unknown) =>
@@ -236,6 +263,33 @@ export function App(): React.JSX.Element {
         ? `Campaign delivery attempted: ${body.sent ?? 0} sent, ${body.suppressed ?? 0} suppressed.`
         : (body.error ?? 'Campaign send failed.'),
     );
+  }
+
+  async function saveSender(): Promise<void> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== 'cookie-session') headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`/v1/admin/email/senders/${senderKind}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        fromAddress: senderFrom,
+        ...(senderReplyTo ? { replyTo: senderReplyTo } : {}),
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      sender?: SenderIdentity;
+      error?: string;
+    };
+    if (!response.ok || !body.sender) {
+      setMessage(body.error ?? 'Sender identity could not be saved.');
+      return;
+    }
+    setSenders((current) => [
+      ...current.filter((sender) => sender.kind !== body.sender!.kind),
+      body.sender!,
+    ]);
+    setMessage(`${senderKind} sender identity saved.`);
   }
 
   if (!token || !role) {
@@ -402,6 +456,54 @@ export function App(): React.JSX.Element {
         ) : null}
         {section === 'Email' && canAdmin(role, 'manage_email') ? (
           <section className="admin-form">
+            <div className="table-heading">
+              <h2>Approved sender identities</h2>
+              <span>Server-authorized From and Reply-To</span>
+            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveSender();
+              }}
+            >
+              <label>
+                Sender kind
+                <select
+                  value={senderKind}
+                  onChange={(event) => {
+                    const nextKind = event.target.value as SenderKind;
+                    setSenderKind(nextKind);
+                    const selected = senders.find((sender) => sender.kind === nextKind);
+                    setSenderFrom(selected?.fromAddress ?? '');
+                    setSenderReplyTo(selected?.replyTo ?? '');
+                  }}
+                >
+                  <option value="DEFAULT">Default</option>
+                  <option value="NOREPLY">No-reply</option>
+                  <option value="SUPPORT">Support</option>
+                  <option value="BILLING">Billing</option>
+                  <option value="SECURITY">Security</option>
+                </select>
+              </label>
+              <label>
+                From address
+                <input
+                  value={senderFrom}
+                  onChange={(event) => setSenderFrom(event.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Reply-To (optional)
+                <input
+                  value={senderReplyTo}
+                  onChange={(event) => setSenderReplyTo(event.target.value)}
+                />
+              </label>
+              <button className="primary-button" type="submit">
+                Save sender identity
+              </button>
+            </form>
             <div className="table-heading">
               <h2>Campaign draft</h2>
               <span>Server-sanitized and idempotent</span>

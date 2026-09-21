@@ -756,7 +756,7 @@ git commit -m "feat: add typed electron desktop adapter"
 
 **Interfaces:**
 
-- Produces `npm run test:live` as an opt-in test that requires `ASTRA_LIVE_TEST=1`, `ASTRA_MODEL_GATEWAY_URL`, `ASTRA_MODEL_GATEWAY_API_KEY`, and `ASTRA_MODEL_ID`.
+- Produces `npm run test:live` as an opt-in test that requires `ASTRA_LIVE_TEST=1`, `ASTRA_MODEL_GATEWAY_URL`, `ASTRA_MODEL_GATEWAY_API_KEY`, and certification-only `ASTRA_LIVE_TEST_MODEL_ID`.
 - Produces a golden-path command that exits nonzero on failure and prints task state, changed-file categories, verification result, receipts, and blocked/unverified conditions without secrets or source dumps.
 - Produces a certification report that distinguishes implemented, verified, blocked, unverified, and deferred requirements.
 

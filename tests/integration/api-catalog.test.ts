@@ -10,6 +10,7 @@ describe('model catalog API', () => {
           displayName: 'Configured model',
           gatewayModelId: 'provider/model',
           providerSlug: 'provider',
+          provider: 'Configured Provider',
           enabled: true,
           capabilities: {
             supportsTools: true,
@@ -24,6 +25,7 @@ describe('model catalog API', () => {
     const response = await app.inject({ method: 'GET', url: '/v1/models' });
     expect(response.statusCode).toBe(200);
     expect(response.json().models[0].gatewayModelId).toBe('provider/model');
+    expect(response.json().models[0].provider).toBe('Configured Provider');
   });
 
   it('does not expose enabled but hidden catalog entries to the desktop', async () => {

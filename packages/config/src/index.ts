@@ -8,7 +8,6 @@ const EnvironmentSchema = z.object({
   ASTRA_MODEL_GATEWAY_API_KEY: z.string().min(1).optional(),
   ASTRA_RUNTIME_TOKEN_SECRET: z.string().min(32).optional(),
   ASTRA_LIVE_TEST: z.enum(['0', '1']).default('0'),
-  ASTRA_MODEL_ID: z.string().min(1).optional(),
   ASTRA_RAZORPAY_KEY_ID: z.string().min(1).optional(),
   ASTRA_RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   ASTRA_RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
@@ -38,7 +37,6 @@ export interface AstraConfig {
   modelGatewayApiKey?: string;
   runtimeTokenSecret?: string;
   liveTestsEnabled: boolean;
-  modelId?: string;
   razorpayKeyId?: string;
   razorpayKeySecret?: string;
   razorpayWebhookSecret?: string;
@@ -105,7 +103,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AstraC
       ? {}
       : { runtimeTokenSecret: parsed.ASTRA_RUNTIME_TOKEN_SECRET }),
     liveTestsEnabled: parsed.ASTRA_LIVE_TEST === '1',
-    ...(parsed.ASTRA_MODEL_ID === undefined ? {} : { modelId: parsed.ASTRA_MODEL_ID }),
     ...(parsed.ASTRA_RAZORPAY_KEY_ID === undefined
       ? {}
       : { razorpayKeyId: parsed.ASTRA_RAZORPAY_KEY_ID }),

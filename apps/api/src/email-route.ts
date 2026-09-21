@@ -5,6 +5,7 @@ import {
   EmailService,
   type CampaignAudience,
   type CampaignUser,
+  type EmailSenderKind,
 } from '@astra/email';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -22,6 +23,11 @@ const CampaignSchema = z.object({
 const EmailTestSchema = z.object({
   subject: z.string().min(1).max(200),
   html: z.string().min(1).max(500_000),
+});
+const SenderKindSchema = z.enum(['DEFAULT', 'NOREPLY', 'SUPPORT', 'BILLING', 'SECURITY']);
+const SenderSchema = z.object({
+  fromAddress: z.string().min(3).max(320),
+  replyTo: z.string().min(3).max(320).optional(),
 });
 
 function bearer(request: FastifyRequest): string | null {
@@ -88,6 +94,55 @@ export async function registerEmailRoutes(
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     await dependencies.email.setMarketingPreference(who.user.id, parsed.data.marketingAllowed);
     return reply.code(204).send();
+  });
+
+  app.get('/v1/admin/email/senders', async (request, reply) => {
+    const who = await identity(dependencies.auth, request, reply);
+    if (!who || !dependencies.email || !dependencies.admin)
+      return reply.code(503).send({ error: 'email_admin_not_configured' });
+    try {
+      dependencies.admin.assertCan(who.user.role as AdminRole, 'manage_email');
+      return reply.send({ senders: await dependencies.email.listSenderIdentities() });
+    } catch (error) {
+      return reply
+        .code(403)
+        .send({ error: error instanceof Error ? error.message : 'ADMIN_FORBIDDEN' });
+    }
+  });
+
+  app.put<{ Params: { kind: string } }>('/v1/admin/email/senders/:kind', async (request, reply) => {
+    const who = await identity(dependencies.auth, request, reply);
+    if (!who || !dependencies.email || !dependencies.admin)
+      return reply.code(503).send({ error: 'email_admin_not_configured' });
+    const kind = SenderKindSchema.safeParse(request.params.kind.toUpperCase());
+    const parsed = SenderSchema.safeParse(request.body);
+    if (!kind.success || !parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    try {
+      dependencies.admin.assertCan(who.user.role as AdminRole, 'manage_email');
+      const sender = await dependencies.email.upsertSenderIdentity({
+        kind: kind.data as EmailSenderKind,
+        fromAddress: parsed.data.fromAddress,
+        ...(parsed.data.replyTo ? { replyTo: parsed.data.replyTo } : {}),
+        updatedBy: who.user.id,
+      });
+      if (dependencies.audit)
+        await dependencies.admin.recordMutation({
+          actor: { userId: who.user.id, role: who.user.role as AdminRole },
+          action: 'manage_email',
+          targetType: 'email_sender',
+          targetId: sender.kind,
+          before: null,
+          after: { kind: sender.kind, fromAddress: sender.fromAddress, replyTo: sender.replyTo },
+          reason: 'Updated approved sender identity',
+          requestId: request.id,
+        });
+      return reply.send({ sender });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ADMIN_FORBIDDEN';
+      if (/invalid sender address/i.test(message)) return reply.code(400).send({ error: message });
+      if (/not configured/i.test(message)) return reply.code(503).send({ error: message });
+      return reply.code(403).send({ error: message });
+    }
   });
 
   app.post('/v1/admin/email/campaigns', async (request, reply) => {
