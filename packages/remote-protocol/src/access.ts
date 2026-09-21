@@ -170,6 +170,7 @@ export interface RoomInvitationResult {
 /** Adapter boundary used by the API so production can use PostgreSQL instead of Maps. */
 export interface RemoteAccessPort {
   listDevices(userId: string): RemoteDeviceRecord[] | Promise<RemoteDeviceRecord[]>;
+  listAllDevices(): RemoteDeviceRecord[] | Promise<RemoteDeviceRecord[]>;
   registerDevice(input: {
     userId: string;
     label: string;
@@ -189,6 +190,8 @@ export interface RemoteAccessPort {
     displayName: string;
     plan: OrganizationPlanInput;
   }): RemoteOrganization | Promise<RemoteOrganization>;
+  getOrganization(organizationId: string): RemoteOrganization | Promise<RemoteOrganization>;
+  listOrganizations(): RemoteOrganization[] | Promise<RemoteOrganization[]>;
   setOrganizationEntitlement(input: {
     organizationId: string;
     actorUserId: string;
@@ -205,6 +208,7 @@ export interface RemoteAccessPort {
   }): RemoteRoom | Promise<RemoteRoom>;
   getRoom(roomId: string): RemoteRoom | Promise<RemoteRoom>;
   listRooms(actorUserId: string): RemoteRoom[] | Promise<RemoteRoom[]>;
+  listAllRooms(): RemoteRoom[] | Promise<RemoteRoom[]>;
   handoffRoom(input: {
     actorUserId: string;
     roomId: string;
@@ -530,6 +534,12 @@ export class RemoteAccessService {
       .map((device) => ({ ...device }));
   }
 
+  listAllDevices(): RemoteDeviceRecord[] {
+    return [...this.devices.values()]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((device) => ({ ...device }));
+  }
+
   heartbeat(userId: string, deviceId: string): RemoteDeviceRecord {
     const device = this.requireDevice(deviceId);
     this.assertDeviceOwner(device, userId);
@@ -602,6 +612,16 @@ export class RemoteAccessService {
       organization.id,
     );
     return { ...organization };
+  }
+
+  getOrganization(organizationId: string): RemoteOrganization {
+    return { ...this.requireOrganization(organizationId) };
+  }
+
+  listOrganizations(): RemoteOrganization[] {
+    return [...this.organizations.values()]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((organization) => ({ ...organization }));
   }
 
   setOrganizationEntitlement(input: {
@@ -1261,6 +1281,12 @@ export class RemoteAccessService {
           return false;
         }
       })
+      .map((room) => this.getRoom(room.id));
+  }
+
+  listAllRooms(): RemoteRoom[] {
+    return [...this.rooms.values()]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .map((room) => this.getRoom(room.id));
   }
 

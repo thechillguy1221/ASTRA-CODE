@@ -216,6 +216,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     audit,
     ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
     ...(dependencies.commercial ? { commercial: dependencies.commercial } : {}),
+    remote,
     ...(dependencies.analytics ? { analytics: dependencies.analytics } : {}),
   });
   void registerEmailRoutes(app, {

@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@astra/control-plane": "0.1.0",
+    "@astra/remote-protocol": "0.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

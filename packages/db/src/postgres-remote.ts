@@ -234,6 +234,11 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     return result.rows.map((row) => mapDevice(row as Record<string, unknown>));
   }
 
+  async listAllDevices(): Promise<RemoteDeviceRecord[]> {
+    const result = await this.pool.query('SELECT * FROM remote_devices ORDER BY created_at DESC');
+    return result.rows.map((row) => mapDevice(row as Record<string, unknown>));
+  }
+
   async registerDevice(input: {
     userId: string;
     label: string;
@@ -364,6 +369,15 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     } finally {
       client.release();
     }
+  }
+
+  async getOrganization(organizationId: string): Promise<RemoteOrganization> {
+    return this.requireOrganization(organizationId);
+  }
+
+  async listOrganizations(): Promise<RemoteOrganization[]> {
+    const result = await this.pool.query('SELECT * FROM organizations ORDER BY created_at DESC');
+    return result.rows.map((row) => mapOrganization(row as Record<string, unknown>));
   }
 
   async setOrganizationEntitlement(input: {
@@ -520,6 +534,32 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     return Promise.all(
       result.rows.map((row) => this.getRoom(String((row as Record<string, unknown>).id))),
     );
+  }
+
+  async listAllRooms(): Promise<RemoteRoom[]> {
+    const result = await this.pool.query(
+      `SELECT r.*, d.last_seen_at AS host_last_seen_at, d.revoked_at AS host_revoked_at
+         FROM rooms r
+         LEFT JOIN remote_devices d ON d.id = r.host_device_id
+        ORDER BY r.created_at DESC`,
+    );
+    return result.rows.map((row) => {
+      const record = row as Record<string, unknown>;
+      return mapRoom({
+        ...record,
+        host_availability: roomHostAvailability(
+          {
+            lastSeenAt: record.host_last_seen_at
+              ? new Date(String(record.host_last_seen_at)).toISOString()
+              : null,
+            revokedAt: record.host_revoked_at
+              ? new Date(String(record.host_revoked_at)).toISOString()
+              : null,
+          },
+          this.now(),
+        ),
+      });
+    });
   }
 
   async handoffRoom(input: {

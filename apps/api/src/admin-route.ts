@@ -21,6 +21,7 @@ import {
   type AdminAuditStore,
   type AdminRole,
 } from '@astra/billing';
+import type { RemoteAccessPort } from '@astra/remote-protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -98,6 +99,7 @@ export interface AdminRouteDependencies {
   analytics?: AdminAnalyticsPort;
   controlPlane?: ControlPlaneService;
   commercial?: CommercialPolicyService;
+  remote?: RemoteAccessPort;
 }
 
 function sendControlPlaneError(reply: FastifyReply, error: unknown) {
@@ -439,9 +441,70 @@ export async function registerAdminRoutes(
     async (request, reply) => {
       const access = await requireControlPlaneActor(request, reply, dependencies);
       if (!access) return;
-      return reply.code(503).send({ error: 'ORGANIZATION_ENTITLEMENTS_UNAVAILABLE' });
+      if (!dependencies.remote || !dependencies.controlPlane)
+        return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+      try {
+        const organization = await dependencies.remote.getOrganization(
+          request.params.organizationId,
+        );
+        if (
+          organization.ownerUserId !== access.identity.user.id &&
+          !hasAdminPermission(access.actor.permissions, 'admin.organizations')
+        )
+          return reply.code(403).send({ error: 'CONTROL_PLANE_FORBIDDEN' });
+        const plan = await dependencies.controlPlane.getPlan(organization.planId);
+        if (!plan) return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+        return reply.send({
+          organizationId: organization.id,
+          planId: plan.id,
+          planVersion: plan.version,
+          status: organization.status,
+          entitlements: plan.entitlements,
+          limits: plan.limits,
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
     },
   );
+
+  app.get('/v1/admin/organizations', async (request, reply) => {
+    const access = await requireControlPlaneActor(
+      request,
+      reply,
+      dependencies,
+      'admin.organizations',
+    );
+    if (!access) return;
+    if (!dependencies.remote) return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+    try {
+      return reply.send({ organizations: await dependencies.remote.listOrganizations() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/rooms', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.rooms');
+    if (!access) return;
+    if (!dependencies.remote) return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+    try {
+      return reply.send({ rooms: await dependencies.remote.listAllRooms() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/devices', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.system');
+    if (!access) return;
+    if (!dependencies.remote) return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+    try {
+      return reply.send({ devices: await dependencies.remote.listAllDevices() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
 
   app.get('/v1/admin/control-plane/plans', async (request, reply) => {
     const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');

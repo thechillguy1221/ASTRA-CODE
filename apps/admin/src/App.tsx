@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ControlPlaneModelSnapshot, ControlPlanePlanSnapshot } from '@astra/control-plane';
+import type { RemoteDeviceRecord, RemoteOrganization, RemoteRoom } from '@astra/remote-protocol';
 import { adminPermissions, canAdmin, NO_LIVE_DATA, type AdminRole } from './access.js';
 import './app.css';
 
@@ -117,6 +118,9 @@ export function App(): React.JSX.Element {
   const [controlModels, setControlModels] = useState<ControlPlaneModel[]>([]);
   const [controlAudit, setControlAudit] = useState<ControlPlaneAudit[]>([]);
   const [pricing, setPricing] = useState<PricingResponse | null>(null);
+  const [organizations, setOrganizations] = useState<RemoteOrganization[]>([]);
+  const [rooms, setRooms] = useState<RemoteRoom[]>([]);
+  const [devices, setDevices] = useState<RemoteDeviceRecord[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [planName, setPlanName] = useState('');
   const [changeReason, setChangeReason] = useState('');
@@ -153,6 +157,33 @@ export function App(): React.JSX.Element {
         });
         if (!usersResponse.ok) throw new Error('User data is unavailable.');
         setUsers(((await usersResponse.json()) as { users: AdminUser[] }).users);
+      }
+      if (section === 'Organizations') {
+        const organizationsResponse = await fetch('/v1/admin/organizations', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!organizationsResponse.ok) throw new Error('Organization data is unavailable.');
+        setOrganizations(
+          ((await organizationsResponse.json()) as { organizations: RemoteOrganization[] })
+            .organizations,
+        );
+      }
+      if (section === 'Rooms') {
+        const roomsResponse = await fetch('/v1/admin/rooms', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!roomsResponse.ok) throw new Error('Room data is unavailable.');
+        setRooms(((await roomsResponse.json()) as { rooms: RemoteRoom[] }).rooms);
+      }
+      if (section === 'Devices') {
+        const devicesResponse = await fetch('/v1/admin/devices', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!devicesResponse.ok) throw new Error('Device data is unavailable.');
+        setDevices(((await devicesResponse.json()) as { devices: RemoteDeviceRecord[] }).devices);
       }
       if (section === 'Email') {
         const sendersResponse = await fetch('/v1/admin/email/senders', {
@@ -786,6 +817,77 @@ export function App(): React.JSX.Element {
             ) : null}
           </section>
         ) : null}
+        {section === 'Organizations' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Organizations</h2>
+              <span>{organizations.length} loaded</span>
+            </div>
+            {organizations.length === 0 ? (
+              <p className="form-note">{NO_LIVE_DATA}</p>
+            ) : (
+              organizations.map((organization) => (
+                <div className="action-row" key={organization.id}>
+                  <span>
+                    <strong>{organization.displayName}</strong> · {organization.planId}
+                    <small>{organization.id}</small>
+                  </span>
+                  <span>
+                    {organization.status} · {organization.seatLimit} seats ·{' '}
+                    {organization.pooledCredits} pooled credits
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
+        {section === 'Rooms' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Rooms</h2>
+              <span>{rooms.length} loaded</span>
+            </div>
+            {rooms.length === 0 ? (
+              <p className="form-note">{NO_LIVE_DATA}</p>
+            ) : (
+              rooms.map((room) => (
+                <div className="action-row" key={room.id}>
+                  <span>
+                    <strong>{room.name}</strong> · {room.organizationId}
+                    <small>{room.id}</small>
+                  </span>
+                  <span>
+                    {room.status} · host {room.hostAvailability.toLowerCase()}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
+        {section === 'Devices' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Devices</h2>
+              <span>{devices.length} loaded</span>
+            </div>
+            {devices.length === 0 ? (
+              <p className="form-note">{NO_LIVE_DATA}</p>
+            ) : (
+              devices.map((device) => (
+                <div className="action-row" key={device.id}>
+                  <span>
+                    <strong>{device.label}</strong> · {device.platform}/{device.architecture}
+                    <small>{device.id}</small>
+                  </span>
+                  <span>
+                    {device.revokedAt ? 'REVOKED' : device.lastSeenAt ? 'SEEN' : 'NOT SEEN'} ·{' '}
+                    {device.userId}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
         {section === 'Audit' || section === 'Security' ? (
           <section className="admin-table control-surface">
             <div className="table-heading">
@@ -806,9 +908,6 @@ export function App(): React.JSX.Element {
           </section>
         ) : null}
         {[
-          'Organizations',
-          'Rooms',
-          'Devices',
           'Web Search',
           'MCP',
           'Plugins',

@@ -9,6 +9,7 @@ import {
 } from '@astra/control-plane';
 import { createDefaultPlanCatalog } from '@astra/plans';
 import { buildApi } from '@astra/api';
+import { RemoteAccessService } from '@astra/remote-protocol';
 
 const now = '2026-01-01T00:00:00.000Z';
 
@@ -101,6 +102,18 @@ function controlPlane() {
   return { repository, service };
 }
 
+function controlPlaneWithTeam() {
+  const repository = new InMemoryControlPlaneRepository({
+    plans: [planSnapshot(), planSnapshot('TEAM')],
+    models: [modelSnapshot()],
+  });
+  const service = new ControlPlaneService({
+    repository,
+    invalidationBus: new InMemoryInvalidationBus(),
+  });
+  return { repository, service };
+}
+
 describe('control-plane API boundary', () => {
   it('rejects ordinary users while allowing authenticated entitlement reads', async () => {
     const identity = await authenticated('USER');
@@ -143,7 +156,10 @@ describe('control-plane API boundary', () => {
 
     const user = await identity.auth.getUserByEmail((await identity.auth.listUsers())[0]!.email);
     expect(user).toBeDefined();
-    await identity.store.updateUser({ ...(await identity.store.getUser(user!.id))!, role: 'SUPER_ADMIN' });
+    await identity.store.updateUser({
+      ...(await identity.store.getUser(user!.id))!,
+      role: 'SUPER_ADMIN',
+    });
 
     const plan = await service.getPlan('FREE');
     const planUpdate = await app.inject({
@@ -197,5 +213,45 @@ describe('control-plane API boundary', () => {
     });
     expect(response.statusCode).toBe(503);
     expect(response.json().error).toBe('CONTROL_PLANE_UNAVAILABLE');
+  });
+
+  it('serves server-authorized organization operations and organization entitlements', async () => {
+    const identity = await authenticated('SUPER_ADMIN');
+    const { service } = controlPlaneWithTeam();
+    const remote = new RemoteAccessService();
+    const user = (await identity.auth.listUsers())[0]!;
+    const team = createDefaultPlanCatalog().get('TEAM');
+    const organization = remote.createOrganization({
+      ownerUserId: user.id,
+      displayName: 'Control Plane Test Org',
+      plan: {
+        id: team.id,
+        seats: team.seats,
+        monthlyCredits: team.monthlyCredits,
+        pooledCredits: team.pooledCredits,
+        crossPersonRooms: team.crossPersonRooms,
+      },
+    });
+    const app = buildApi({ auth: identity.auth, controlPlane: service, remote });
+
+    const organizations = await app.inject({
+      method: 'GET',
+      url: '/v1/admin/organizations',
+      headers: { authorization: `Bearer ${identity.token}` },
+    });
+    expect(organizations.statusCode).toBe(200);
+    expect(organizations.json().organizations).toHaveLength(1);
+
+    const entitlements = await app.inject({
+      method: 'GET',
+      url: `/v1/organizations/${organization.id}/entitlements`,
+      headers: { authorization: `Bearer ${identity.token}` },
+    });
+    expect(entitlements.statusCode).toBe(200);
+    expect(entitlements.json()).toMatchObject({
+      organizationId: organization.id,
+      planId: 'TEAM',
+      planVersion: 1,
+    });
   });
 });
