@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, realpath, rm } from 'node:fs/promises';
+import { mkdir, realpath } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { WorktreeRecordSchema, type WorktreeRecord } from './contracts.js';
@@ -37,9 +37,10 @@ export class SafeGitWorktreeManager implements WorktreeManager {
     const repositoryRoot = await realpath(input.repositoryRoot);
     const worktreeRoot = resolve(input.worktreeRoot);
     await mkdir(worktreeRoot, { recursive: true });
+    const canonicalWorktreeRoot = await realpath(worktreeRoot);
     const branch = `astra/task/${input.taskId}`;
-    const path = resolve(worktreeRoot, input.taskId);
-    assertWithin(worktreeRoot, path);
+    const path = resolve(canonicalWorktreeRoot, input.taskId);
+    assertWithin(canonicalWorktreeRoot, path);
     if (await git(repositoryRoot, ['status', '--porcelain']))
       throw new Error('Repository is dirty; refusing to create an isolated task worktree');
     await git(repositoryRoot, ['worktree', 'add', '-b', branch, path, input.baseRevision]);
@@ -48,6 +49,7 @@ export class SafeGitWorktreeManager implements WorktreeManager {
       id: `wt_${input.taskId}`,
       taskId: input.taskId,
       repositoryRoot,
+      worktreeRoot: canonicalWorktreeRoot,
       path,
       branch,
       baseRevision: input.baseRevision,
@@ -57,7 +59,7 @@ export class SafeGitWorktreeManager implements WorktreeManager {
     });
   }
   async inspect(record: WorktreeRecord): Promise<{ status: string; diff: string }> {
-    const root = await realpath(record.repositoryRoot);
+    const root = await realpath(record.worktreeRoot);
     const path = await realpath(record.path);
     assertWithin(root, path);
     return {
@@ -66,12 +68,12 @@ export class SafeGitWorktreeManager implements WorktreeManager {
     };
   }
   async discard(record: WorktreeRecord): Promise<void> {
-    const root = await realpath(record.repositoryRoot);
+    const repositoryRoot = await realpath(record.repositoryRoot);
+    const root = await realpath(record.worktreeRoot);
     const path = await realpath(record.path);
     assertWithin(root, path);
     if (await git(path, ['status', '--porcelain']))
       throw new Error('Refusing to discard a dirty task worktree');
-    await git(root, ['worktree', 'remove', path]);
-    await rm(path, { recursive: true, force: false });
+    await git(repositoryRoot, ['worktree', 'remove', path]);
   }
 }

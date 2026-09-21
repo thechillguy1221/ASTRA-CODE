@@ -150,6 +150,7 @@ export const WorktreeRecordSchema = z.object({
   id: Id,
   taskId: Id,
   repositoryRoot: z.string().min(1),
+  worktreeRoot: z.string().min(1),
   path: z.string().min(1),
   branch: z.string().regex(/^astra\/task\/[a-z0-9][a-z0-9/_-]{0,80}$/),
   baseRevision: z.string().min(1),
