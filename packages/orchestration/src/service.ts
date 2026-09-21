@@ -11,6 +11,7 @@ import {
   ReviewFindingSchema,
   SkillManifestSchema,
   SpecSchema,
+  SpecStatusSchema,
   SpecTaskSchema,
   SteeringDocumentSchema,
   VerificationEvidenceSchema,
@@ -27,6 +28,7 @@ import {
   type ReviewFinding,
   type SkillManifest,
   type Spec,
+  type SpecStatus,
   type SpecDesign,
   type SpecRequirements,
   type SpecTask,
@@ -105,6 +107,31 @@ function assertAcyclic(tasks: SpecTask[]): void {
   tasks.forEach((task) => visit(task.id));
 }
 
+const specTransitions: Record<SpecStatus, SpecStatus[]> = {
+  DRAFT: ['REQUIREMENTS_READY', 'BLOCKED', 'CANCELLED'],
+  REQUIREMENTS_READY: ['DRAFT', 'DESIGN_READY', 'BLOCKED', 'CANCELLED'],
+  DESIGN_READY: ['REQUIREMENTS_READY', 'TASKS_READY', 'BLOCKED', 'CANCELLED'],
+  TASKS_READY: ['DESIGN_READY', 'APPROVED', 'BLOCKED', 'CANCELLED'],
+  APPROVED: ['TASKS_READY', 'RUNNING', 'BLOCKED', 'CANCELLED'],
+  RUNNING: ['PAUSED', 'REVIEW', 'VERIFYING', 'FAILED', 'BLOCKED', 'CANCELLED'],
+  PAUSED: ['RUNNING', 'CANCELLED', 'BLOCKED'],
+  VERIFYING: ['COMPLETED', 'REVIEW', 'FAILED', 'BLOCKED'],
+  COMPLETED: [],
+  FAILED: ['RUNNING', 'CANCELLED', 'BLOCKED'],
+  READY: ['EXECUTING', 'CANCELLED', 'BLOCKED'],
+  EXECUTING: ['REVIEW', 'VERIFYING', 'FAILED', 'CANCELLED', 'BLOCKED'],
+  REVIEW: ['VERIFYING', 'EXECUTING', 'FAILED', 'BLOCKED'],
+  VERIFIED: [],
+  BLOCKED: ['DRAFT', 'REQUIREMENTS_READY', 'DESIGN_READY', 'TASKS_READY', 'RUNNING', 'CANCELLED'],
+  CANCELLED: [],
+};
+
+function assertSpecTransition(from: SpecStatus, to: SpecStatus): void {
+  if (from === to) return;
+  if (!specTransitions[from].includes(to))
+    throw new Error(`Invalid Spec transition: ${from} -> ${to}`);
+}
+
 export class PlatformOrchestrationService {
   private readonly store: PlatformRecordStore;
   private readonly now: () => string;
@@ -152,6 +179,49 @@ export class PlatformOrchestrationService {
     return payload(await this.require('SPEC', specId), SpecSchema);
   }
 
+  async listSpecs(ownerId: string): Promise<Spec[]> {
+    return (await this.store.list('SPEC', ownerId)).map((record) => payload(record, SpecSchema));
+  }
+
+  async transitionSpec(input: {
+    specId: string;
+    actorId: string;
+    to: SpecStatus;
+    correlationId?: string;
+  }): Promise<Spec> {
+    const record = await this.require('SPEC', input.specId);
+    const current = await this.requireOwnedSpec(input.specId, input.actorId);
+    const to = SpecStatusSchema.parse(input.to);
+    assertSpecTransition(current.status, to);
+    const now = this.now();
+    const next = SpecSchema.parse({
+      ...current,
+      status: to,
+      executionState:
+        to === 'RUNNING'
+          ? 'RUNNING'
+          : to === 'PAUSED'
+            ? 'PAUSED'
+            : to === 'COMPLETED'
+              ? 'COMPLETED'
+              : to === 'FAILED'
+                ? 'FAILED'
+                : current.executionState,
+      verificationState: to === 'VERIFYING' ? 'RUNNING' : current.verificationState,
+      version: current.version + 1,
+      updatedAt: now,
+    });
+    await this.store.put(
+      { ...record, version: record.version + 1, payload: next, updatedAt: now },
+      record.version,
+    );
+    await this.emit('spec.transitioned', next.id, input.actorId, input.correlationId, {
+      from: current.status,
+      to,
+    });
+    return next;
+  }
+
   async updateSpec(input: {
     specId: string;
     actorId: string;
@@ -163,6 +233,7 @@ export class PlatformOrchestrationService {
   }): Promise<Spec> {
     const record = await this.require('SPEC', input.specId);
     const current = await this.requireOwnedSpec(input.specId, input.actorId);
+    if (input.status) assertSpecTransition(current.status, input.status);
     const next = SpecSchema.parse({
       ...current,
       ...(input.requirements ? { requirements: input.requirements } : {}),
@@ -541,6 +612,36 @@ export class PlatformOrchestrationService {
       current?.version ?? null,
     );
     return parsed;
+  }
+
+  async listAutomations(ownerId: string): Promise<Automation[]> {
+    return (await this.store.list('AUTOMATION', ownerId)).map((record) =>
+      payload(record, AutomationSchema),
+    );
+  }
+
+  async setAutomationEnabled(input: {
+    automationId: string;
+    actorId: string;
+    enabled: boolean;
+  }): Promise<Automation> {
+    const record = await this.require('AUTOMATION', input.automationId);
+    if (record.ownerId !== input.actorId)
+      throw new Error('Automation owner authorization required');
+    const current = payload(record, AutomationSchema);
+    const updated = AutomationSchema.parse({
+      ...current,
+      enabled: input.enabled,
+      updatedAt: this.now(),
+    });
+    await this.store.put(
+      { ...record, version: record.version + 1, payload: updated, updatedAt: updated.updatedAt },
+      record.version,
+    );
+    await this.emit('automation.updated', updated.id, input.actorId, undefined, {
+      enabled: updated.enabled,
+    });
+    return updated;
   }
   async saveAgent(agent: AgentDefinition): Promise<AgentDefinition> {
     const parsed = AgentDefinitionSchema.parse(agent);

@@ -4,7 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { applyFoundationMigration, createPostgresStores } from '@astra/db';
+import {
+  applyFoundationMigration,
+  CONTROL_PLANE_NOTIFY_CHANNEL,
+  createPostgresStores,
+} from '@astra/db';
+import {
+  AutomationScheduler,
+  PlatformOrchestrationService,
+  WorkerJobService,
+} from '@astra/orchestration';
 
 const execFileAsync = promisify(execFile);
 const databaseUrl = process.env.ASTRA_DATABASE_URL;
@@ -65,10 +74,12 @@ async function certify() {
   const stores = createPostgresStores(databaseUrl);
   const ids = {
     model: `cert-model-${randomUUID()}`,
-    task: `cert-task-${randomUUID()}`,
     request: `cert-request-${randomUUID()}`,
     rollbackRequest: `cert-rollback-${randomUUID()}`,
     event: `cert-event-${randomUUID()}`,
+    owner: `cert-owner-${randomUUID()}`,
+    spec: `cert-spec-${randomUUID()}`,
+    task: `cert-task-${randomUUID()}`,
   };
   const results = {};
   try {
@@ -227,6 +238,121 @@ async function certify() {
       const persisted = await reopened.receipts.listForTask(ids.task);
       results.persistence = { status: persisted.length === 1 ? 'PASS' : 'FAILED' };
     } finally {
+      const orchestration = new PlatformOrchestrationService({ store: reopened.orchestration });
+      const workerJobs = new WorkerJobService({ store: reopened.orchestration });
+      const spec = await orchestration.createSpec({
+        ownerId: ids.owner,
+        title: 'PostgreSQL worker certification',
+        slug: ids.spec,
+        objective: 'Exercise durable worker and automation state',
+      });
+      await orchestration.addTasks({
+        specId: spec.id,
+        actorId: ids.owner,
+        tasks: [
+          {
+            id: ids.task,
+            title: 'Certification task',
+            description: 'Lease and recover this durable task',
+            ownerAgentRole: 'BACKEND',
+            dependencies: [],
+            affectedAreas: ['certification'],
+            complexity: 'LOW',
+            budget: {
+              maxCredits: '1',
+              maxModelCalls: 1,
+              maxParallelAgents: 1,
+              maxWallTimeMs: 30_000,
+            },
+          },
+        ],
+      });
+      const workerJob = await workerJobs.enqueue({
+        ownerId: ids.owner,
+        specId: spec.id,
+        taskId: ids.task,
+        agentId: `agent_${ids.task}`,
+        executionTarget: 'ASTRA_CLOUD',
+        maxAttempts: 2,
+      });
+      const claims = await Promise.allSettled([
+        workerJobs.claim(workerJob.id, 'cert-worker-a', 25),
+        workerJobs.claim(workerJob.id, 'cert-worker-b', 25),
+      ]);
+      const claimSuccesses = claims.filter((claim) => claim.status === 'fulfilled').length;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const recovered = await workerJobs.recoverExpired();
+      results.workerLeases = {
+        status:
+          claimSuccesses === 1 && recovered.some((job) => job.id === workerJob.id)
+            ? 'PASS'
+            : 'FAILED',
+        competingClaims: claimSuccesses,
+        recovered: recovered.some((job) => job.id === workerJob.id),
+      };
+
+      const automationNow = new Date().toISOString();
+      await orchestration.saveAutomation({
+        id: `cert-automation-${randomUUID()}`,
+        ownerId: ids.owner,
+        projectId: null,
+        name: 'PostgreSQL scheduler certification',
+        trigger: { kind: 'CRON', expression: '@daily' },
+        enabled: true,
+        maxParallelRuns: 1,
+        lastRunAt: null,
+        nextRunAt: automationNow,
+        lastResult: null,
+        createdAt: automationNow,
+        updatedAt: automationNow,
+      });
+      const schedulerA = new AutomationScheduler({ store: reopened.orchestration });
+      const schedulerB = new AutomationScheduler({ store: reopened.orchestration });
+      const [runsA, runsB] = await Promise.all([
+        schedulerA.tick(async () => undefined),
+        schedulerB.tick(async () => undefined),
+      ]);
+      const runCount = runsA.length + runsB.length;
+      const storedRunCount = await reopened.pool.query(
+        "SELECT count(*)::int AS count FROM astra_platform_records WHERE kind = 'AUTOMATION_RUN' AND owner_id = $1",
+        [ids.owner],
+      );
+      results.automationClaims = {
+        status: runCount === 1 && storedRunCount.rows[0].count === 1 ? 'PASS' : 'FAILED',
+        claimed: runCount,
+        persisted: storedRunCount.rows[0].count,
+      };
+
+      const busA = reopened.controlPlaneInvalidation;
+      const notificationStores = createPostgresStores(databaseUrl);
+      const busB = notificationStores.controlPlaneInvalidation;
+      let notification;
+      await busA.start();
+      await busB.start();
+      const unsubscribe = busB.subscribe((message) => {
+        notification = message;
+      });
+      await busA.publish({ domain: 'capabilities', resourceId: ids.spec, version: 7 });
+      for (let attempt = 0; attempt < 20 && !notification; attempt += 1)
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      unsubscribe();
+      await busA.close();
+      await busB.close();
+      await notificationStores.pool.end();
+      results.notifyInvalidation = {
+        status:
+          notification?.domain === 'capabilities' && notification?.resourceId === ids.spec
+            ? 'PASS'
+            : 'FAILED',
+        channel: CONTROL_PLANE_NOTIFY_CHANNEL,
+      };
+
+      await reopened.pool.query('DELETE FROM astra_platform_events WHERE entity_id LIKE $1', [
+        `${ids.spec}%`,
+      ]);
+      await reopened.pool.query('DELETE FROM astra_platform_records WHERE owner_id = $1', [
+        ids.owner,
+      ]);
       await reopened.pool.query('DELETE FROM agent_events WHERE event_id = $1', [ids.event]);
       await reopened.pool.query('DELETE FROM usage_receipts WHERE request_id = $1', [ids.request]);
       await reopened.pool.query('DELETE FROM model_catalog WHERE model_id = $1', [ids.model]);
@@ -241,6 +367,9 @@ async function certify() {
       'transactionRollback',
       'persistence',
       'ledgerImmutability',
+      'workerLeases',
+      'automationClaims',
+      'notifyInvalidation',
     ];
     const status = required.every((key) => results[key]?.status === 'PASS') ? 'PASS' : 'FAILED';
     return { status, results };

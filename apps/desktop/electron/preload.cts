@@ -26,6 +26,22 @@ const api: AstraIpcApi = {
       ipcRenderer.invoke('agent.rejectAction', taskId, requestId),
   },
   models: { list: () => ipcRenderer.invoke('models.list') },
+  specs: {
+    list: () => ipcRenderer.invoke('specs.list'),
+    get: (specId: string) => ipcRenderer.invoke('specs.get', specId),
+    create: (input: {
+      title: string;
+      slug: string;
+      objective: string;
+      repositoryId?: string | null;
+    }) => ipcRenderer.invoke('specs.create', input),
+    update: (
+      specId: string,
+      expectedVersion: number,
+      input: { requirements?: unknown; design?: unknown },
+    ) => ipcRenderer.invoke('specs.update', specId, expectedVersion, input),
+    transition: (specId: string, to: string) => ipcRenderer.invoke('specs.transition', specId, to),
+  },
   auth: {
     login: (input: {
       email: string;

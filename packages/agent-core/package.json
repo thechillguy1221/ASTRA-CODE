@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@astra/contracts": "0.1.0",
-    "@astra/billing": "0.1.0"
+    "@astra/billing": "0.1.0",
+    "@astra/model-gateway": "0.1.0"
   }
 }

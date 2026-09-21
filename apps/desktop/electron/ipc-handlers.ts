@@ -41,6 +41,23 @@ export function buildCapabilityApiForTest(): AstraIpcApi {
         return [];
       },
     },
+    specs: {
+      async list() {
+        return [];
+      },
+      async get() {
+        throw new Error('No test API configured');
+      },
+      async create() {
+        throw new Error('No test API configured');
+      },
+      async update() {
+        throw new Error('No test API configured');
+      },
+      async transition() {
+        throw new Error('No test API configured');
+      },
+    },
     auth: {
       async login() {
         throw new Error('No test API configured');
@@ -153,6 +170,51 @@ export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void
   ipcMain.handle('models.list', () => {
     parseCommand('models.list');
     return runtime.listModels();
+  });
+  ipcMain.handle('specs.list', () => runtime.listSpecs());
+  ipcMain.handle('specs.get', (_event, specId: unknown) => {
+    if (typeof specId !== 'string' || !specId) throw new Error('Spec ID is invalid');
+    return runtime.getSpec(specId);
+  });
+  ipcMain.handle('specs.create', (_event, input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Spec input is invalid');
+    const value = input as Record<string, unknown>;
+    if (
+      typeof value.title !== 'string' ||
+      typeof value.slug !== 'string' ||
+      typeof value.objective !== 'string'
+    )
+      throw new Error('Spec input is invalid');
+    return runtime.createSpec({
+      title: value.title,
+      slug: value.slug,
+      objective: value.objective,
+      ...(value.repositoryId === null || typeof value.repositoryId === 'string'
+        ? { repositoryId: value.repositoryId }
+        : {}),
+    });
+  });
+  ipcMain.handle(
+    'specs.update',
+    (_event, specId: unknown, expectedVersion: unknown, input: unknown) => {
+      if (
+        typeof specId !== 'string' ||
+        typeof expectedVersion !== 'number' ||
+        !input ||
+        typeof input !== 'object'
+      )
+        throw new Error('Spec update is invalid');
+      return runtime.updateSpec(
+        specId,
+        expectedVersion,
+        input as { requirements?: never; design?: never },
+      );
+    },
+  );
+  ipcMain.handle('specs.transition', (_event, specId: unknown, to: unknown) => {
+    if (typeof specId !== 'string' || typeof to !== 'string' || !specId || !to)
+      throw new Error('Spec transition is invalid');
+    return runtime.transitionSpec(specId, to);
   });
   ipcMain.handle('auth.login', (_event, input: unknown) => {
     const command = parseCommand(

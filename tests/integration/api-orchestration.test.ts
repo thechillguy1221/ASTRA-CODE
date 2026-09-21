@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { AuthService, InMemoryAuthStore } from '@astra/auth';
 import { buildApi } from '@astra/api';
-import { InMemoryPlatformRecordStore, PlatformOrchestrationService } from '@astra/orchestration';
+import {
+  InMemoryPlatformRecordStore,
+  PlatformOrchestrationService,
+  WorkerJobService,
+} from '@astra/orchestration';
 
 async function createSession(auth: AuthService, email: string) {
   const registration = await auth.register({
@@ -43,10 +47,15 @@ describe('orchestration API boundary', () => {
     const auth = new AuthService({ store: new InMemoryAuthStore() });
     const owner = await createSession(auth, 'owner-orchestration@example.test');
     const other = await createSession(auth, 'other-orchestration@example.test');
-    const orchestration = new PlatformOrchestrationService({
-      store: new InMemoryPlatformRecordStore(),
+    const orchestrationStore = new InMemoryPlatformRecordStore();
+    const orchestration = new PlatformOrchestrationService({ store: orchestrationStore });
+    const jobs = new WorkerJobService({ store: orchestrationStore });
+    const app = buildApi({
+      auth,
+      orchestration,
+      workerJobs: jobs,
+      authorizeWorkerJob: async () => undefined,
     });
-    const app = buildApi({ auth, orchestration });
 
     const created = await app.inject({
       method: 'POST',
@@ -60,6 +69,52 @@ describe('orchestration API boundary', () => {
     });
     expect(created.statusCode).toBe(201);
     const specId = created.json().spec.id as string;
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/specs',
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().specs.map((item: { id: string }) => item.id)).toContain(specId);
+
+    const transitioned = await app.inject({
+      method: 'POST',
+      url: `/v1/specs/${specId}/transition`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: { to: 'REQUIREMENTS_READY' },
+    });
+    expect(transitioned.statusCode).toBe(200);
+    expect(transitioned.json().spec.status).toBe('REQUIREMENTS_READY');
+
+    const automation = await app.inject({
+      method: 'POST',
+      url: '/v1/automations',
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: {
+        name: 'Metadata-only audit',
+        expression: '@daily',
+        nextRunAt: '2026-01-02T00:00:00.000Z',
+      },
+    });
+    expect(automation.statusCode).toBe(201);
+    const executableAutomation = await app.inject({
+      method: 'POST',
+      url: '/v1/automations',
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: {
+        name: 'Bound task',
+        expression: '@daily',
+        nextRunAt: '2026-01-02T00:00:00.000Z',
+        job: {
+          specId,
+          taskId: 'backend',
+          agentId: 'agent_backend',
+          executionTarget: 'ASTRA_CLOUD',
+        },
+      },
+    });
+    expect(executableAutomation.statusCode).toBe(503);
 
     const tasks = await app.inject({
       method: 'POST',
@@ -128,6 +183,35 @@ describe('orchestration API boundary', () => {
     });
     expect(completed.statusCode).toBe(200);
     expect(completed.json().task.status).toBe('SUCCEEDED');
+
+    const queued = await app.inject({
+      method: 'POST',
+      url: `/v1/specs/${specId}/jobs`,
+      headers: { authorization: `Bearer ${owner.token}` },
+      payload: {
+        taskId: backendTaskId,
+        agentId: 'agent-backend',
+        executionTarget: 'ASTRA_CLOUD',
+      },
+    });
+    expect(queued.statusCode).toBe(201);
+    expect(queued.json().job.state).toBe('QUEUED');
+
+    const jobsResponse = await app.inject({
+      method: 'GET',
+      url: `/v1/specs/${specId}/jobs`,
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+    expect(jobsResponse.statusCode).toBe(200);
+    expect(jobsResponse.json().jobs).toHaveLength(1);
+
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/specs/${specId}/jobs/${queued.json().job.id}/cancel`,
+      headers: { authorization: `Bearer ${owner.token}` },
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json().job.cancelRequested).toBe(true);
 
     const nextReady = await app.inject({
       method: 'GET',

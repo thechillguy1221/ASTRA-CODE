@@ -11,6 +11,7 @@ import {
   CommercialPolicyService,
   ControlPlaneService,
   PlatformPolicyService,
+  type CapabilityPolicyKey,
 } from '@astra/control-plane';
 import { VercelGatewayClient, VercelResponsesGatewayClient } from '@astra/model-gateway';
 import {
@@ -35,7 +36,11 @@ import {
   RemoteRelayBroker,
   WebSocketRelayServer,
 } from '@astra/remote-protocol';
-import { InMemoryPlatformRecordStore, PlatformOrchestrationService } from '@astra/orchestration';
+import {
+  InMemoryPlatformRecordStore,
+  PlatformOrchestrationService,
+  WorkerJobService,
+} from '@astra/orchestration';
 import { buildApi } from './app.js';
 import {
   EmailCampaignService,
@@ -121,9 +126,9 @@ const policy = postgres
       invalidationBus: postgres.controlPlaneInvalidation,
     })
   : undefined;
-const orchestration = new PlatformOrchestrationService({
-  store: postgres?.orchestration ?? new InMemoryPlatformRecordStore(),
-});
+const orchestrationStore = postgres?.orchestration ?? new InMemoryPlatformRecordStore();
+const orchestration = new PlatformOrchestrationService({ store: orchestrationStore });
+const workerJobs = new WorkerJobService({ store: orchestrationStore });
 const billing = new BillingService({
   store: postgres?.billing ?? new InMemoryBillingStore(),
   plans,
@@ -222,6 +227,40 @@ const responsesGateway =
         apiKey: config.modelGatewayApiKey,
       })
     : undefined;
+const makeAuthorizeCloudJob = (capability: CapabilityPolicyKey) =>
+  controlPlane
+    ? async (input: {
+        ownerId: string;
+        planId: string;
+        specId: string;
+        taskId: string;
+        agentId: string;
+        executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+        requestedCredits: string;
+      }) => {
+        if (input.executionTarget !== 'ASTRA_CLOUD')
+          throw new Error('Cloud execution requires the isolated Astra Cloud target');
+        if (input.agentId !== `agent_${input.taskId}`)
+          throw new Error('Cloud execution agent binding is invalid');
+        const plan = await controlPlane.getPlan(input.planId);
+        if (!plan || !plan.enabled || plan.status !== 'ACTIVE')
+          throw new Error('Cloud execution plan is not active');
+        if (policy) await policy.assertCapabilityAllowed(capability, { planId: input.planId });
+        const parseCredits = (value: string): bigint => {
+          const [whole, fraction = ''] = value.split('.');
+          return BigInt(whole ?? '0') * 1_000_000n + BigInt((fraction + '000000').slice(0, 6));
+        };
+        if (parseCredits(input.requestedCredits) > parseCredits(plan.maxTaskBudgetCredits))
+          throw new Error('Cloud execution exceeds the plan credit budget');
+        const activeJobs = (await workerJobs.list(input.ownerId)).filter((job) =>
+          ['QUEUED', 'CLAIMED', 'PREPARING', 'RUNNING', 'VERIFYING'].includes(job.state),
+        ).length;
+        if (activeJobs >= plan.maxConcurrentJobs)
+          throw new Error('Cloud execution concurrency limit reached');
+      }
+    : undefined;
+const authorizeAutomation = makeAuthorizeCloudJob('AUTOMATIONS');
+const authorizeWorkerJob = makeAuthorizeCloudJob('ASTRA_CODE');
 const app = buildApi({
   ...(postgres
     ? { catalog: postgres.catalog, receipts: postgres.receipts, events: postgres.events }
@@ -237,6 +276,9 @@ const app = buildApi({
   ...(commercial ? { commercial } : {}),
   ...(policy ? { policy } : {}),
   orchestration,
+  workerJobs,
+  ...(authorizeAutomation ? { authorizeAutomation } : {}),
+  ...(authorizeWorkerJob ? { authorizeWorkerJob } : {}),
   readiness: async () => {
     if (!postgres) return { database: 'unconfigured' as const };
     await postgres.pool.query('SELECT 1');

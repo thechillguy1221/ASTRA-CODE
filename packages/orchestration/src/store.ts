@@ -21,6 +21,7 @@ function clone<T>(value: T): T {
 export class InMemoryPlatformRecordStore implements PlatformRecordStore {
   private readonly records = new Map<string, PlatformRecord>();
   private readonly events: PlatformEvent[] = [];
+  private transactionTail: Promise<void> = Promise.resolve();
   async get(kind: PlatformEntityKind, id: string): Promise<PlatformRecord | undefined> {
     const record = this.records.get(`${kind}:${id}`);
     return record ? clone(record) : undefined;
@@ -51,6 +52,13 @@ export class InMemoryPlatformRecordStore implements PlatformRecordStore {
       .map(clone);
   }
   async transaction<T>(operation: (store: PlatformRecordStore) => Promise<T>): Promise<T> {
+    let release!: () => void;
+    const turn = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const previous = this.transactionTail;
+    this.transactionTail = previous.then(() => turn);
+    await previous;
     const records = clone([...this.records.entries()]);
     const events = clone(this.events);
     try {
@@ -60,6 +68,8 @@ export class InMemoryPlatformRecordStore implements PlatformRecordStore {
       for (const [key, record] of records) this.records.set(key, record);
       this.events.splice(0, this.events.length, ...events);
       throw error;
+    } finally {
+      release();
     }
   }
 }

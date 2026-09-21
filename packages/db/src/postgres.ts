@@ -286,6 +286,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
       file: '0019_pricing_snapshot_reservations.sql',
     },
     { version: '0020_orchestration_platform', file: '0020_orchestration_platform.sql' },
+    { version: '0021_automation_capability_policy', file: '0021_automation_capability_policy.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

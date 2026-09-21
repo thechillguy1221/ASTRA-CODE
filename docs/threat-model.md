@@ -19,6 +19,11 @@ This document covers the Windows-local vertical slice: the React renderer, Elect
 3. `packages/workspace` is the local capability boundary. It authorizes paths and commands before touching the repository or starting a child process.
 4. The API is the server-side model boundary. Gateway credentials are not read by the renderer or packaged desktop UI.
 5. The model is an untrusted proposer. Its structured decisions are data and must pass agent permissions and workspace policy.
+6. The API/control plane and the private worker coordinator are separate
+   processes. PostgreSQL is the durable handoff boundary; worker leases and
+   optimistic versions prevent duplicate claims. Repository execution must be
+   delegated to a separately isolated executor and is never performed inside
+   the API process.
 
 ## Threats and controls
 
@@ -34,6 +39,7 @@ This document covers the Windows-local vertical slice: the React renderer, Elect
 | User cannot stop a long task                                                                                           | One `AbortSignal` propagates through agent core, model fetch, command child process, verification, and pending permission waits                                                     |
 | Hidden model reasoning leaks into the UI or event log                                                                  | Model contract accepts concise structured decisions; events contain summaries, paths, risk/action labels, and bounded results only                                                  |
 | Provider returns no usage metadata but the system invents a cost                                                       | Receipt parser returns `null` unless provider-supplied usage/cost fields exist; no fake credit ledger entries are created                                                           |
+| A scheduled or queued job is reported successful without an executor                                                   | Worker claims are durable, but the coordinator fails closed with an explicit executor-unavailable result until an isolated executor is configured                                   |
 
 ## Residual risks
 

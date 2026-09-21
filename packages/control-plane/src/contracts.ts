@@ -268,6 +268,7 @@ export const FeatureFlagEvaluationContextSchema = z.object({
 export type FeatureFlagEvaluationContext = z.infer<typeof FeatureFlagEvaluationContextSchema>;
 
 export const MaintenanceKeySchema = z.enum([
+  'ASTRA_CODE',
   'GLOBAL',
   'MODELS',
   'PAYMENTS',
@@ -277,6 +278,7 @@ export const MaintenanceKeySchema = z.enum([
   'PLUGINS',
   'SKILLS',
   'REMOTE_ACCESS',
+  'AUTOMATIONS',
   'ROOMS',
   'EMAIL',
 ]);
@@ -297,12 +299,14 @@ export const MaintenancePolicySnapshotSchema = z.object({
 export type MaintenancePolicySnapshot = z.infer<typeof MaintenancePolicySnapshotSchema>;
 
 export const CapabilityPolicyKeySchema = z.enum([
+  'ASTRA_CODE',
   'WEB_SEARCH',
   'WEB_FETCH',
   'MCP',
   'PLUGINS',
   'SKILLS',
   'REMOTE_ACCESS',
+  'AUTOMATIONS',
 ]);
 export type CapabilityPolicyKey = z.infer<typeof CapabilityPolicyKeySchema>;
 

@@ -7,6 +7,9 @@ import {
   CreditBudgetService,
   evaluateToolPermission,
   type ModelRoute,
+  AutomationScheduler,
+  WorkerJobService,
+  AstraWorkerRuntime,
 } from '@astra/orchestration';
 
 const budget = { maxCredits: '10', maxModelCalls: 3, maxParallelAgents: 2, maxWallTimeMs: 30_000 };
@@ -22,6 +25,99 @@ function service() {
 }
 
 describe('Astra orchestration platform', () => {
+  it('enforces the persisted Spec lifecycle and rejects illegal transitions', async () => {
+    const platform = service();
+    const spec = await platform.createSpec({
+      ownerId: 'owner-1',
+      title: 'Lifecycle',
+      slug: 'lifecycle',
+      objective: 'Exercise lifecycle',
+    });
+    await expect(
+      platform.transitionSpec({ specId: spec.id, actorId: 'owner-1', to: 'COMPLETED' }),
+    ).rejects.toThrow('transition');
+    const requirements = await platform.transitionSpec({
+      specId: spec.id,
+      actorId: 'owner-1',
+      to: 'REQUIREMENTS_READY',
+    });
+    expect(requirements.status).toBe('REQUIREMENTS_READY');
+    await expect(
+      platform.transitionSpec({ specId: spec.id, actorId: 'owner-1', to: 'RUNNING' }),
+    ).rejects.toThrow('transition');
+  });
+
+  it('claims durable worker jobs once and recovers an expired lease', async () => {
+    let now = Date.parse('2026-01-01T00:00:00.000Z');
+    const store = new InMemoryPlatformRecordStore();
+    const jobs = new WorkerJobService({ store, now: () => new Date(now).toISOString() });
+    const queued = await jobs.enqueue({
+      ownerId: 'owner-1',
+      specId: 'spec-1',
+      taskId: 'task-1',
+      agentId: 'agent-1',
+      executionTarget: 'ASTRA_CLOUD',
+    });
+    expect((await jobs.claim(queued.id, 'worker-a', 1_000)).state).toBe('CLAIMED');
+    await expect(jobs.claim(queued.id, 'worker-b', 1_000)).rejects.toThrow('claim');
+    now += 2_000;
+    expect((await jobs.recoverExpired()).map((job) => job.id)).toEqual([queued.id]);
+    expect((await jobs.claim(queued.id, 'worker-b', 1_000)).workerId).toBe('worker-b');
+  });
+
+  it('executes a claimed job through an injected bounded worker executor', async () => {
+    const store = new InMemoryPlatformRecordStore();
+    const jobs = new WorkerJobService({ store });
+    const queued = await jobs.enqueue({
+      ownerId: 'owner-1',
+      specId: 'spec-1',
+      taskId: 'task-1',
+      agentId: 'agent-1',
+      executionTarget: 'ASTRA_CLOUD',
+    });
+    const runtime = new AstraWorkerRuntime({ jobs, workerId: 'worker-1' });
+    const executed: string[] = [];
+    await runtime.runOnce(async (job, signal) => {
+      expect(signal.aborted).toBe(false);
+      executed.push(job.id);
+    });
+    expect(executed).toEqual([queued.id]);
+    expect((await jobs.list())[0].state).toBe('COMPLETED');
+  });
+
+  it('creates one automation run per scheduled occurrence across scheduler instances', async () => {
+    let now = Date.parse('2026-01-01T00:00:00.000Z');
+    const store = new InMemoryPlatformRecordStore();
+    const platform = new PlatformOrchestrationService({
+      store,
+      now: () => new Date(now).toISOString(),
+    });
+    const automation = await platform.saveAutomation({
+      id: 'automation-daily',
+      ownerId: 'owner-1',
+      projectId: null,
+      name: 'Daily check',
+      trigger: { kind: 'CRON', expression: '@daily' },
+      enabled: true,
+      maxParallelRuns: 1,
+      lastRunAt: null,
+      nextRunAt: new Date(now).toISOString(),
+      lastResult: null,
+      createdAt: new Date(now).toISOString(),
+      updatedAt: new Date(now).toISOString(),
+    });
+    const first = new AutomationScheduler({ store, now: () => new Date(now).toISOString() });
+    const second = new AutomationScheduler({ store, now: () => new Date(now).toISOString() });
+    const [left, right] = await Promise.all([
+      first.tick(async () => undefined),
+      second.tick(async () => undefined),
+    ]);
+    expect(left.length + right.length).toBe(1);
+    expect((await store.list('AUTOMATION_RUN')).length).toBe(1);
+    expect(automation.id).toBe('automation-daily');
+    now += 86_400_000;
+  });
+
   it('persists a spec and rejects dependency cycles', async () => {
     const platform = service();
     const spec = await platform.createSpec({

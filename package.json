@@ -11,15 +11,16 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "vitest run --pool=threads --no-file-parallelism --no-isolate --maxWorkers=1",
+    "test": "vitest run --pool=forks --no-file-parallelism --maxWorkers=1",
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",
     "typecheck": "tsc -b",
-    "build:packages": "npm run build --workspace @astra/contracts && npm run build --workspace @astra/config && npm run build --workspace @astra/auth && npm run build --workspace @astra/plans && npm run build --workspace @astra/billing && npm run build --workspace @astra/skills && npm run build --workspace @astra/mcp && npm run build --workspace @astra/plugins && npm run build --workspace @astra/integrations && npm run build --workspace @astra/modes && npm run build --workspace @astra/releases && npm run build --workspace @astra/email && npm run build --workspace @astra/observability && npm run build --workspace @astra/marketplace && npm run build --workspace @astra/remote-protocol && npm run build --workspace @astra/agent-core && npm run build --workspace @astra/orchestration && npm run build --workspace @astra/control-plane && npm run build --workspace @astra/db && npm run build --workspace @astra/model-gateway && npm run build --workspace @astra/workspace && npm run build --workspace @astra/codex-runtime && npm run build --workspace @astra/web-research && npm run build --workspace @astra/test-utils",
+    "build:packages": "npm run build --workspace @astra/contracts && npm run build --workspace @astra/config && npm run build --workspace @astra/auth && npm run build --workspace @astra/plans && npm run build --workspace @astra/control-plane && npm run build --workspace @astra/billing && npm run build --workspace @astra/skills && npm run build --workspace @astra/mcp && npm run build --workspace @astra/plugins && npm run build --workspace @astra/integrations && npm run build --workspace @astra/modes && npm run build --workspace @astra/releases && npm run build --workspace @astra/email && npm run build --workspace @astra/observability && npm run build --workspace @astra/marketplace && npm run build --workspace @astra/remote-protocol && npm run build --workspace @astra/model-gateway && npm run build --workspace @astra/agent-core && npm run build --workspace @astra/orchestration && npm run build --workspace @astra/db && npm run build --workspace @astra/workspace && npm run build --workspace @astra/codex-runtime && npm run build --workspace @astra/web-research && npm run build --workspace @astra/test-utils",
     "build": "npm run build:packages && npm run build --workspace @astra/api && npm run build --workspace @astra/desktop && npm run build --workspace @astra/web && node --import tsx scripts/prerender-web.mjs && npm run build --workspace @astra/admin",
     "package:win": "npm run package:win --workspace @astra/desktop",
     "package:win:unsigned": "npm run package:win:unsigned --workspace @astra/desktop",
     "build:codex-runtime": "node scripts/build-codex-runtime.mjs",
+    "start": "node apps/api/dist/server.js",
     "certify:codex-runtime": "npm run build --workspace @astra/codex-runtime && node scripts/verify-codex-runtime-artifact.mjs && node scripts/certify-codex-runtime.mjs",
     "verify:source-provenance": "node scripts/verify-source-provenance.mjs",
     "lint": "eslint .",
@@ -28,6 +29,7 @@
     "golden-path": "node --import tsx scripts/run-golden-path.mjs",
     "certify:postgres": "npm run build:packages && node --import tsx scripts/postgres-certification.mjs",
     "dev:api": "npm run build:packages && tsx apps/api/src/server.ts",
+    "start:worker": "node apps/api/dist/worker.js",
     "dev:desktop": "npm run dev --workspace @astra/desktop"
   },
   "devDependencies": {

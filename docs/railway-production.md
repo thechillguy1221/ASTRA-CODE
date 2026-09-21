@@ -9,11 +9,22 @@ process liveness only.
 
 - `astra-api`: the server-side API, control plane, billing, Room and
   orchestration boundary.
+- `astra-worker`: a private worker service using `node apps/api/dist/worker.js`.
+  It claims durable PostgreSQL jobs and scheduled automation occurrences with
+  leases, renewal, stale-lease recovery, cancellation and retry bounds. It
+  must not receive provider keys or renderer credentials.
 - Railway PostgreSQL: referenced through `DATABASE_URL` (the application also
   accepts `ASTRA_DATABASE_URL` for existing deployments).
 - The web and admin bundles are built by the monorepo release pipeline. They
   are not silently advertised as live services until their Railway services
   and public domains are actually linked and smoke-tested.
+
+The worker is an execution-plane coordinator, separate from the API process.
+Its executor integration is deliberately fail-closed: a deployment without a
+trusted isolated executor records a durable failure rather than marking user
+work successful. A future executor must be a private service with an explicit
+allow-list, scoped credentials, bounded filesystem/network access and no access
+to API, admin or billing secrets.
 
 ## Required production variables
 

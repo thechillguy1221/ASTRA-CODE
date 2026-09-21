@@ -20,6 +20,11 @@ describe('desktop IPC boundary', () => {
     expect(api.rooms.deleteFile).toBeTypeOf('function');
     expect(api.rooms.previewImport).toBeTypeOf('function');
     expect(api.rooms.importFile).toBeTypeOf('function');
+    expect(api.specs.list).toBeTypeOf('function');
+    expect(api.specs.get).toBeTypeOf('function');
+    expect(api.specs.create).toBeTypeOf('function');
+    expect(api.specs.update).toBeTypeOf('function');
+    expect(api.specs.transition).toBeTypeOf('function');
     expect((api as Record<string, unknown>).fs).toBeUndefined();
     expect((api as Record<string, unknown>).shell).toBeUndefined();
   });

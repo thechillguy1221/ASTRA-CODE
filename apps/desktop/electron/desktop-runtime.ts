@@ -26,12 +26,16 @@ import {
   ModelDecisionResponseSchema,
   ModelStreamEventSchema,
   CreditReservationSchema,
+  DesktopSpecDetailsSchema,
+  DesktopSpecSchema,
   WalletSchema,
   type AgentEvent,
   type DesktopDevice,
   type DesktopRoom,
   type DesktopRoomFile,
   type DesktopRoomFileImport,
+  type DesktopSpec,
+  type DesktopSpecDetails,
   type PublicUser,
   type Wallet,
   type IpcTaskResult,
@@ -437,6 +441,90 @@ export class DesktopRuntime {
     if (!response.ok) throw new Error(`Astra Code model catalog failed with ${response.status}`);
     const body = ModelCatalogResponseSchema.parse(await response.json());
     return body.models.map((model) => ModelCatalogEntrySchema.parse(model));
+  }
+
+  async listSpecs(): Promise<DesktopSpec[]> {
+    const session = await this.authenticatedSession();
+    const response = await fetch(`${this.apiBaseUrl}/v1/specs`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) throw new Error(`Spec list failed with ${response.status}`);
+    const body = (await response.json()) as { specs?: unknown };
+    if (!Array.isArray(body.specs)) throw new Error('Spec list response is invalid');
+    return body.specs.map((spec) => DesktopSpecSchema.parse(spec));
+  }
+
+  async getSpec(specId: string): Promise<DesktopSpecDetails> {
+    const session = await this.authenticatedSession();
+    const response = await fetch(`${this.apiBaseUrl}/v1/specs/${encodeURIComponent(specId)}`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) throw new Error(`Spec read failed with ${response.status}`);
+    return DesktopSpecDetailsSchema.parse(await response.json());
+  }
+
+  async createSpec(input: {
+    title: string;
+    slug: string;
+    objective: string;
+    repositoryId?: string | null;
+  }): Promise<DesktopSpec> {
+    const session = await this.authenticatedSession();
+    const response = await fetch(`${this.apiBaseUrl}/v1/specs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) throw new Error(`Spec creation failed with ${response.status}`);
+    const body = (await response.json()) as { spec: unknown };
+    return DesktopSpecSchema.parse(body.spec);
+  }
+
+  async updateSpec(
+    specId: string,
+    expectedVersion: number,
+    input: { requirements?: DesktopSpec['requirements']; design?: DesktopSpec['design'] },
+  ): Promise<DesktopSpec> {
+    const session = await this.authenticatedSession();
+    const response = await fetch(`${this.apiBaseUrl}/v1/specs/${encodeURIComponent(specId)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ expectedVersion, ...input }),
+    });
+    if (!response.ok) throw new Error(`Spec update failed with ${response.status}`);
+    const body = (await response.json()) as { spec: unknown };
+    return DesktopSpecSchema.parse(body.spec);
+  }
+
+  async transitionSpec(specId: string, to: string): Promise<DesktopSpec> {
+    const session = await this.authenticatedSession();
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/specs/${encodeURIComponent(specId)}/transition`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify({ to }),
+      },
+    );
+    if (!response.ok) throw new Error(`Spec transition failed with ${response.status}`);
+    const body = (await response.json()) as { spec: unknown };
+    return DesktopSpecSchema.parse(body.spec);
+  }
+
+  private async authenticatedSession(): Promise<ReturnType<typeof AuthSessionResultSchema.parse>> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) throw new Error('Authentication is required for Specs');
+    this.authSession = session;
+    return session;
   }
 
   async authLogin(input: {

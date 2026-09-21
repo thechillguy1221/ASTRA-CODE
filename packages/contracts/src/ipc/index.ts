@@ -62,6 +62,77 @@ export const DesktopRoomSchema = z.object({
 });
 export type DesktopRoom = z.infer<typeof DesktopRoomSchema>;
 
+const DesktopSpecRequirementsSchema = z.object({
+  objective: z.string(),
+  userStories: z.array(z.string()),
+  functional: z.array(z.string()),
+  nonFunctional: z.array(z.string()),
+  security: z.array(z.string()),
+  compatibility: z.array(z.string()),
+  acceptanceCriteria: z.array(z.string()),
+  nonGoals: z.array(z.string()),
+});
+const DesktopSpecDesignSchema = z.object({
+  architecture: z.string(),
+  components: z.array(z.string()),
+  dataModel: z.array(z.string()),
+  apiChanges: z.array(z.string()),
+  flows: z.array(z.string()),
+  authorization: z.array(z.string()),
+  security: z.array(z.string()),
+  failureModes: z.array(z.string()),
+  migrations: z.array(z.string()),
+  observability: z.array(z.string()),
+  testing: z.array(z.string()),
+  rollback: z.array(z.string()),
+});
+export const DesktopSpecSchema = z.object({
+  id: z.string().min(1),
+  slug: z.string().min(1),
+  title: z.string().min(1),
+  ownerId: z.string().min(1),
+  repositoryId: z.string().nullable(),
+  status: z.string().min(1),
+  version: z.number().int().positive(),
+  requirements: DesktopSpecRequirementsSchema,
+  design: DesktopSpecDesignSchema,
+  taskIds: z.array(z.string()),
+  dependencyIds: z.array(z.string()),
+  executionState: z.string().min(1),
+  verificationState: z.string().min(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type DesktopSpec = z.infer<typeof DesktopSpecSchema>;
+export const DesktopSpecTaskSchema = z.object({
+  id: z.string().min(1),
+  specId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string(),
+  ownerAgentRole: z.string().min(1),
+  dependencies: z.array(z.string()),
+  affectedAreas: z.array(z.string()),
+  complexity: z.string().min(1),
+  status: z.string().min(1),
+  verificationStatus: z.string().min(1),
+  assignedAgentId: z.string().nullable(),
+  worktreeId: z.string().nullable(),
+  budget: z.object({
+    maxCredits: z.string(),
+    maxModelCalls: z.number(),
+    maxParallelAgents: z.number(),
+    maxWallTimeMs: z.number(),
+  }),
+});
+export type DesktopSpecTask = z.infer<typeof DesktopSpecTaskSchema>;
+export const DesktopSpecDetailsSchema = z.object({
+  spec: DesktopSpecSchema,
+  tasks: z.array(DesktopSpecTaskSchema),
+  events: z.array(z.record(z.unknown())),
+  verified: z.boolean(),
+});
+export type DesktopSpecDetails = z.infer<typeof DesktopSpecDetailsSchema>;
+
 export const DesktopRoomFileSchema = z.object({
   id: z.string().uuid(),
   organizationId: z.string().uuid(),
@@ -243,6 +314,22 @@ export interface AstraIpcApi {
     rejectAction(taskId: string, requestId: string): Promise<void>;
   };
   models: { list(): Promise<ModelCatalogEntry[]> };
+  specs: {
+    list(): Promise<DesktopSpec[]>;
+    get(specId: string): Promise<DesktopSpecDetails>;
+    create(input: {
+      title: string;
+      slug: string;
+      objective: string;
+      repositoryId?: string | null;
+    }): Promise<DesktopSpec>;
+    update(
+      specId: string,
+      expectedVersion: number,
+      input: { requirements?: DesktopSpec['requirements']; design?: DesktopSpec['design'] },
+    ): Promise<DesktopSpec>;
+    transition(specId: string, to: string): Promise<DesktopSpec>;
+  };
   modes: {
     learnFile(input: { path: string; depth: LearnDepth; question?: string }): Promise<LearnResult>;
     generateViva(input: {

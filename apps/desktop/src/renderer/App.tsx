@@ -5,6 +5,8 @@ import type {
   DesktopRoom,
   DesktopRoomFile,
   DesktopRoomFileImport,
+  DesktopSpec,
+  DesktopSpecDetails,
   HackathonPlan,
   IpcTaskResult,
   LearnDepth,
@@ -22,6 +24,7 @@ import { addCredits } from '@astra/billing/math';
 import { AstraClineApprovalCard, AstraClineSessionStatus } from './cline-workspace.js';
 import { modelPresentation, providerMark } from './model-presentation.js';
 import { deriveProgressRows } from './view-model.js';
+import { SpecsWorkspace } from './specs-workspace.js';
 
 type PendingPermission = {
   requestId: string;
@@ -32,7 +35,8 @@ type PendingPermission = {
   risk?: 'sensitive' | 'destructive' | undefined;
 };
 
-type ViewId = 'build' | 'learn' | 'viva' | 'hackathon' | 'projects' | 'extensions' | 'settings';
+type ViewId =
+  'build' | 'specs' | 'learn' | 'viva' | 'hackathon' | 'projects' | 'extensions' | 'settings';
 
 const defaultBudget: TaskBudget = {
   maxModelCalls: 8,
@@ -49,6 +53,7 @@ const defaultBudget: TaskBudget = {
 
 const navItems: Array<{ id: ViewId; label: string; hint: string }> = [
   { id: 'build', label: 'Build', hint: 'Make changes safely' },
+  { id: 'specs', label: 'Specs', hint: 'Structure work and evidence' },
   { id: 'learn', label: 'Learn', hint: 'Understand your project' },
   { id: 'viva', label: 'Viva', hint: 'Practice with your code' },
   { id: 'hackathon', label: 'Hackathon', hint: 'Shape a credible MVP' },
@@ -98,6 +103,8 @@ export function App(): ReactElement {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [devices, setDevices] = useState<DesktopDevice[]>([]);
   const [rooms, setRooms] = useState<DesktopRoom[]>([]);
+  const [specs, setSpecs] = useState<DesktopSpec[]>([]);
+  const [selectedSpec, setSelectedSpec] = useState<DesktopSpecDetails | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [roomFiles, setRoomFiles] = useState<DesktopRoomFile[]>([]);
   const [roomImport, setRoomImport] = useState<DesktopRoomFileImport | null>(null);
@@ -118,6 +125,73 @@ export function App(): ReactElement {
       .then(setRoomFiles)
       .catch((fileError: unknown) => setError(errorMessage(fileError)));
   }, [selectedRoomId]);
+
+  async function refreshSpecs(): Promise<void> {
+    if (!authUser) {
+      setSpecs([]);
+      setSelectedSpec(null);
+      return;
+    }
+    try {
+      const nextSpecs = await window.astra.specs.list();
+      setSpecs(nextSpecs);
+      if (selectedSpec && nextSpecs.some((spec) => spec.id === selectedSpec.spec.id))
+        setSelectedSpec(await window.astra.specs.get(selectedSpec.spec.id));
+      else if (nextSpecs[0]) setSelectedSpec(await window.astra.specs.get(nextSpecs[0].id));
+    } catch (specError) {
+      setError(errorMessage(specError));
+    }
+  }
+
+  useEffect(() => {
+    void refreshSpecs();
+  }, [authUser]);
+
+  async function createSpec(input: {
+    title: string;
+    slug: string;
+    objective: string;
+  }): Promise<void> {
+    try {
+      setError(null);
+      const created = await window.astra.specs.create(input);
+      setSpecs((current) => [created, ...current]);
+      setSelectedSpec(await window.astra.specs.get(created.id));
+    } catch (specError) {
+      setError(errorMessage(specError));
+    }
+  }
+
+  async function transitionSpec(to: string): Promise<void> {
+    if (!selectedSpec) return;
+    try {
+      setError(null);
+      const changed = await window.astra.specs.transition(selectedSpec.spec.id, to);
+      setSpecs((current) => current.map((spec) => (spec.id === changed.id ? changed : spec)));
+      setSelectedSpec(await window.astra.specs.get(changed.id));
+    } catch (specError) {
+      setError(errorMessage(specError));
+    }
+  }
+
+  async function updateSpec(input: {
+    requirements?: DesktopSpec['requirements'];
+    design?: DesktopSpec['design'];
+  }): Promise<void> {
+    if (!selectedSpec) return;
+    try {
+      setError(null);
+      const updated = await window.astra.specs.update(
+        selectedSpec.spec.id,
+        selectedSpec.spec.version,
+        input,
+      );
+      setSpecs((current) => current.map((spec) => (spec.id === updated.id ? updated : spec)));
+      setSelectedSpec(await window.astra.specs.get(updated.id));
+    } catch (specError) {
+      setError(errorMessage(specError));
+    }
+  }
 
   useEffect(() => {
     void window.astra.models
@@ -210,6 +284,8 @@ export function App(): ReactElement {
     setSelectedRoomId('');
     setRoomFiles([]);
     setRoomImport(null);
+    setSpecs([]);
+    setSelectedSpec(null);
   }
 
   async function signInGoogle(): Promise<void> {
@@ -422,17 +498,19 @@ export function App(): ReactElement {
               <span className="nav-glyph" aria-hidden="true">
                 {item.id === 'build'
                   ? '⌁'
-                  : item.id === 'learn'
-                    ? '◌'
-                    : item.id === 'viva'
-                      ? '?'
-                      : item.id === 'hackathon'
-                        ? '↗'
-                        : item.id === 'projects'
-                          ? '□'
-                          : item.id === 'extensions'
-                            ? '✦'
-                            : '⋯'}
+                  : item.id === 'specs'
+                    ? '◇'
+                    : item.id === 'learn'
+                      ? '◌'
+                      : item.id === 'viva'
+                        ? '?'
+                        : item.id === 'hackathon'
+                          ? '↗'
+                          : item.id === 'projects'
+                            ? '□'
+                            : item.id === 'extensions'
+                              ? '✦'
+                              : '⋯'}
               </span>
               <span>{item.label}</span>
             </button>
@@ -517,6 +595,23 @@ export function App(): ReactElement {
             roomImport={roomImport}
             previewRoomImport={(fileId, destination) => void previewRoomImport(fileId, destination)}
             importRoomFile={() => void importRoomFile()}
+          />
+        )}
+        {view === 'specs' && (
+          <SpecsWorkspace
+            authenticated={Boolean(authUser)}
+            specs={specs}
+            selected={selectedSpec}
+            error={null}
+            onSelect={(specId) =>
+              void window.astra.specs
+                .get(specId)
+                .then(setSelectedSpec)
+                .catch((specError: unknown) => setError(errorMessage(specError)))
+            }
+            onCreate={(input) => void createSpec(input)}
+            onUpdate={(input) => void updateSpec(input)}
+            onTransition={(to) => void transitionSpec(to)}
           />
         )}
         {view === 'learn' && (

@@ -1,5 +1,7 @@
 import type { AuthService } from '@astra/auth';
+import { randomUUID } from 'node:crypto';
 import {
+  AutomationSchema,
   type PlatformOrchestrationService,
   type Spec,
   type SpecDesign,
@@ -7,6 +9,7 @@ import {
   SpecDesignSchema,
   SpecRequirementsSchema,
   SpecTaskSchema,
+  type WorkerJobService,
 } from '@astra/orchestration';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -69,6 +72,23 @@ const TaskInputSchema = z.object({
   }),
 });
 
+const AutomationInputSchema = z.object({
+  name: z.string().min(1).max(200),
+  projectId: z.string().min(1).nullable().optional(),
+  expression: z.string().min(1).max(100),
+  nextRunAt: z.string().datetime().nullable().optional(),
+  maxParallelRuns: z.number().int().positive().max(10).default(1),
+  job: z
+    .object({
+      specId: z.string().min(1),
+      taskId: z.string().min(1),
+      agentId: z.string().min(1),
+      executionTarget: z.enum(['LOCAL_DEVICE', 'REMOTE_DEVICE', 'ROOM_HOST', 'ASTRA_CLOUD']),
+    })
+    .nullable()
+    .optional(),
+});
+
 function errorStatus(error: unknown): number {
   if (error instanceof Error && /version|already exists|cycle|claimable|lease/i.test(error.message))
     return 409;
@@ -119,9 +139,121 @@ async function requireTaskForSpec(
   return true;
 }
 
+async function authorizeAutomationJob(
+  orchestration: PlatformOrchestrationService,
+  authorizeAutomation: NonNullable<
+    Parameters<typeof registerOrchestrationRoutes>[1]['authorizeAutomation']
+  >,
+  job: {
+    specId: string;
+    taskId: string;
+    agentId: string;
+    executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+  },
+  ownerId: string,
+  planId: string,
+  reply: FastifyReply,
+): Promise<boolean> {
+  if (
+    !(await requireOwnedSpec(orchestration, job.specId, ownerId, reply)) ||
+    !(await requireTaskForSpec(orchestration, job.specId, job.taskId, reply))
+  )
+    return false;
+  const taskRecord = await orchestration.get('TASK', job.taskId);
+  if (!taskRecord) {
+    await reply.code(404).send({ error: 'TASK_NOT_FOUND' });
+    return false;
+  }
+  const task = SpecTaskSchema.parse(taskRecord.payload);
+  try {
+    await authorizeAutomation({
+      ownerId,
+      planId,
+      specId: task.specId,
+      taskId: task.id,
+      agentId: job.agentId,
+      executionTarget: job.executionTarget,
+      requestedCredits: task.budget.maxCredits,
+    });
+    return true;
+  } catch (error) {
+    await reply.code(errorStatus(error)).send({ error: 'AUTOMATION_POLICY_DENIED' });
+    return false;
+  }
+}
+
+async function authorizeWorkerJob(
+  orchestration: PlatformOrchestrationService,
+  authorizeExecution: NonNullable<
+    Parameters<typeof registerOrchestrationRoutes>[1]['authorizeWorkerJob']
+  >,
+  job: {
+    specId: string;
+    taskId: string;
+    agentId: string;
+    executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+  },
+  ownerId: string,
+  planId: string,
+  reply: FastifyReply,
+): Promise<boolean> {
+  if (
+    !(await requireOwnedSpec(orchestration, job.specId, ownerId, reply)) ||
+    !(await requireTaskForSpec(orchestration, job.specId, job.taskId, reply))
+  )
+    return false;
+  const taskRecord = await orchestration.get('TASK', job.taskId);
+  if (!taskRecord) {
+    await reply.code(404).send({ error: 'TASK_NOT_FOUND' });
+    return false;
+  }
+  const task = SpecTaskSchema.parse(taskRecord.payload);
+  try {
+    await authorizeExecution({
+      ownerId,
+      planId,
+      specId: task.specId,
+      taskId: task.id,
+      agentId: job.agentId,
+      executionTarget: job.executionTarget,
+      requestedCredits: task.budget.maxCredits,
+    });
+    return true;
+  } catch (error) {
+    await reply.code(errorStatus(error)).send({ error: 'WORKER_POLICY_DENIED' });
+    return false;
+  }
+}
+
 export async function registerOrchestrationRoutes(
   app: FastifyInstance,
-  dependencies: { auth?: AuthService; orchestration: PlatformOrchestrationService },
+  dependencies: {
+    auth?: AuthService;
+    orchestration: PlatformOrchestrationService;
+    workerJobs?: WorkerJobService;
+    authorizeWorkerJob?: {
+      (input: {
+        ownerId: string;
+        planId: string;
+        specId: string;
+        taskId: string;
+        agentId: string;
+        executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+        requestedCredits: string;
+      }): Promise<void>;
+    };
+    authorizeAutomation?: {
+      (input: {
+        ownerId: string;
+        planId: string;
+        specId: string;
+        taskId: string;
+        agentId: string;
+        executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+        requestedCredits: string;
+      }): Promise<void>;
+    };
+  },
 ): Promise<void> {
   app.post('/v1/specs', async (request, reply) => {
     const identity = await requireUser(dependencies.auth, request, reply);
@@ -152,6 +284,112 @@ export async function registerOrchestrationRoutes(
     }
   });
 
+  app.get('/v1/specs', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    try {
+      return reply.send({ specs: await dependencies.orchestration.listSpecs(identity.user.id) });
+    } catch (error) {
+      return reply.code(errorStatus(error)).send({ error: 'SPEC_LIST_FAILED' });
+    }
+  });
+
+  app.post('/v1/automations', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    const parsed = AutomationInputSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    if (parsed.data.job) {
+      if (!dependencies.authorizeAutomation)
+        return reply.code(503).send({ error: 'AUTOMATION_POLICY_UNAVAILABLE' });
+      if (
+        !(await authorizeAutomationJob(
+          dependencies.orchestration,
+          dependencies.authorizeAutomation,
+          parsed.data.job,
+          identity.user.id,
+          identity.user.planId,
+          reply,
+        ))
+      )
+        return;
+    }
+    try {
+      const now = new Date().toISOString();
+      const automation = AutomationSchema.parse({
+        id: `automation_${randomUUID()}`,
+        ownerId: identity.user.id,
+        projectId: parsed.data.projectId ?? null,
+        name: parsed.data.name,
+        trigger: { kind: 'CRON', expression: parsed.data.expression },
+        enabled: true,
+        maxParallelRuns: parsed.data.maxParallelRuns,
+        lastRunAt: null,
+        nextRunAt: parsed.data.nextRunAt ?? null,
+        lastResult: null,
+        ...(parsed.data.job === undefined ? {} : { job: parsed.data.job }),
+        createdAt: now,
+        updatedAt: now,
+      });
+      return reply.code(201).send({
+        automation: await dependencies.orchestration.saveAutomation(automation),
+      });
+    } catch (error) {
+      return reply.code(errorStatus(error)).send({ error: 'AUTOMATION_CREATE_FAILED' });
+    }
+  });
+
+  app.get('/v1/automations', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    return reply.send({
+      automations: await dependencies.orchestration.listAutomations(identity.user.id),
+    });
+  });
+
+  app.post<{ Params: { automationId: string } }>(
+    '/v1/automations/:automationId/enabled',
+    async (request, reply) => {
+      const identity = await requireUser(dependencies.auth, request, reply);
+      if (!identity) return;
+      const parsed = z.object({ enabled: z.boolean() }).safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+      const record = await dependencies.orchestration.get(
+        'AUTOMATION',
+        request.params.automationId,
+      );
+      if (!record || record.ownerId !== identity.user.id)
+        return reply.code(404).send({ error: 'AUTOMATION_NOT_FOUND' });
+      if (parsed.data.enabled) {
+        const automation = AutomationSchema.parse(record.payload);
+        if (!automation.job || !dependencies.authorizeAutomation)
+          return reply.code(503).send({ error: 'AUTOMATION_POLICY_UNAVAILABLE' });
+        if (
+          !(await authorizeAutomationJob(
+            dependencies.orchestration,
+            dependencies.authorizeAutomation,
+            automation.job,
+            identity.user.id,
+            identity.user.planId,
+            reply,
+          ))
+        )
+          return;
+      }
+      try {
+        return reply.send({
+          automation: await dependencies.orchestration.setAutomationEnabled({
+            automationId: request.params.automationId,
+            actorId: identity.user.id,
+            enabled: parsed.data.enabled,
+          }),
+        });
+      } catch (error) {
+        return reply.code(errorStatus(error)).send({ error: 'AUTOMATION_UPDATE_FAILED' });
+      }
+    },
+  );
+
   app.get<{ Params: { specId: string } }>('/v1/specs/:specId', async (request, reply) => {
     const identity = await requireUser(dependencies.auth, request, reply);
     if (!identity) return;
@@ -167,6 +405,43 @@ export async function registerOrchestrationRoutes(
       return reply.send({ spec, tasks, events, verified });
     } catch (error) {
       return reply.code(errorStatus(error)).send({ error: 'SPEC_READ_FAILED' });
+    }
+  });
+
+  app.patch<{ Params: { specId: string } }>('/v1/specs/:specId', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    const parsed = z
+      .object({
+        expectedVersion: z.number().int().positive(),
+        requirements: SpecRequirementsSchema.optional(),
+        design: SpecDesignSchema.optional(),
+      })
+      .refine((value) => value.requirements !== undefined || value.design !== undefined)
+      .safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    if (
+      !(await requireOwnedSpec(
+        dependencies.orchestration,
+        request.params.specId,
+        identity.user.id,
+        reply,
+      ))
+    )
+      return;
+    try {
+      return reply.send({
+        spec: await dependencies.orchestration.updateSpec({
+          specId: request.params.specId,
+          actorId: identity.user.id,
+          expectedVersion: parsed.data.expectedVersion,
+          ...(parsed.data.requirements ? { requirements: parsed.data.requirements } : {}),
+          ...(parsed.data.design ? { design: parsed.data.design } : {}),
+          correlationId: request.id,
+        }),
+      });
+    } catch (error) {
+      return reply.code(errorStatus(error)).send({ error: 'SPEC_UPDATE_FAILED' });
     }
   });
 
@@ -212,6 +487,151 @@ export async function registerOrchestrationRoutes(
       return reply.code(errorStatus(error)).send({ error: 'TASK_GRAPH_READ_FAILED' });
     }
   });
+
+  app.post<{ Params: { specId: string } }>(
+    '/v1/specs/:specId/transition',
+    async (request, reply) => {
+      const identity = await requireUser(dependencies.auth, request, reply);
+      if (!identity) return;
+      const parsed = z.object({ to: z.string().min(1) }).safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+      if (
+        !(await requireOwnedSpec(
+          dependencies.orchestration,
+          request.params.specId,
+          identity.user.id,
+          reply,
+        ))
+      )
+        return;
+      try {
+        return reply.send({
+          spec: await dependencies.orchestration.transitionSpec({
+            specId: request.params.specId,
+            actorId: identity.user.id,
+            to: parsed.data.to as Spec['status'],
+            correlationId: request.id,
+          }),
+        });
+      } catch (error) {
+        return reply.code(errorStatus(error)).send({ error: 'SPEC_TRANSITION_FAILED' });
+      }
+    },
+  );
+
+  app.post<{ Params: { specId: string } }>('/v1/specs/:specId/jobs', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    if (!dependencies.workerJobs)
+      return reply.code(503).send({ error: 'WORKER_RUNTIME_UNAVAILABLE' });
+    const parsed = z
+      .object({
+        taskId: z.string().min(1),
+        agentId: z.string().min(1),
+        executionTarget: z.enum(['LOCAL_DEVICE', 'REMOTE_DEVICE', 'ROOM_HOST', 'ASTRA_CLOUD']),
+        maxAttempts: z.number().int().min(1).max(10).optional(),
+      })
+      .safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    if (
+      !(await requireOwnedSpec(
+        dependencies.orchestration,
+        request.params.specId,
+        identity.user.id,
+        reply,
+      ))
+    )
+      return;
+    if (
+      !(await requireTaskForSpec(
+        dependencies.orchestration,
+        request.params.specId,
+        parsed.data.taskId,
+        reply,
+      ))
+    )
+      return;
+    if (!dependencies.authorizeWorkerJob)
+      return reply.code(503).send({ error: 'WORKER_POLICY_UNAVAILABLE' });
+    if (
+      !(await authorizeWorkerJob(
+        dependencies.orchestration,
+        dependencies.authorizeWorkerJob,
+        {
+          specId: request.params.specId,
+          taskId: parsed.data.taskId,
+          agentId: parsed.data.agentId,
+          executionTarget: parsed.data.executionTarget,
+        },
+        identity.user.id,
+        identity.user.planId,
+        reply,
+      ))
+    )
+      return;
+    try {
+      return reply.code(201).send({
+        job: await dependencies.workerJobs.enqueue({
+          ownerId: identity.user.id,
+          specId: request.params.specId,
+          taskId: parsed.data.taskId,
+          agentId: parsed.data.agentId,
+          executionTarget: parsed.data.executionTarget,
+          ...(parsed.data.maxAttempts === undefined
+            ? {}
+            : { maxAttempts: parsed.data.maxAttempts }),
+        }),
+      });
+    } catch (error) {
+      return reply.code(errorStatus(error)).send({ error: 'WORKER_JOB_QUEUE_FAILED' });
+    }
+  });
+
+  app.get<{ Params: { specId: string } }>('/v1/specs/:specId/jobs', async (request, reply) => {
+    const identity = await requireUser(dependencies.auth, request, reply);
+    if (!identity) return;
+    if (!dependencies.workerJobs)
+      return reply.code(503).send({ error: 'WORKER_RUNTIME_UNAVAILABLE' });
+    if (
+      !(await requireOwnedSpec(
+        dependencies.orchestration,
+        request.params.specId,
+        identity.user.id,
+        reply,
+      ))
+    )
+      return;
+    return reply.send({
+      jobs: (await dependencies.workerJobs.list(identity.user.id)).filter(
+        (job) => job.specId === request.params.specId,
+      ),
+    });
+  });
+
+  app.post<{ Params: { specId: string; jobId: string } }>(
+    '/v1/specs/:specId/jobs/:jobId/cancel',
+    async (request, reply) => {
+      const identity = await requireUser(dependencies.auth, request, reply);
+      if (!identity) return;
+      if (!dependencies.workerJobs)
+        return reply.code(503).send({ error: 'WORKER_RUNTIME_UNAVAILABLE' });
+      const spec = await requireOwnedSpec(
+        dependencies.orchestration,
+        request.params.specId,
+        identity.user.id,
+        reply,
+      );
+      if (!spec) return;
+      try {
+        const job = await dependencies.workerJobs.get(request.params.jobId);
+        if (job.ownerId !== identity.user.id || job.specId !== spec.id)
+          return reply.code(404).send({ error: 'WORKER_JOB_NOT_FOUND' });
+        return reply.send({ job: await dependencies.workerJobs.cancel(job.id) });
+      } catch (error) {
+        return reply.code(errorStatus(error)).send({ error: 'WORKER_JOB_CANCEL_FAILED' });
+      }
+    },
+  );
 
   app.post<{ Params: { specId: string; taskId: string } }>(
     '/v1/specs/:specId/tasks/:taskId/claim',

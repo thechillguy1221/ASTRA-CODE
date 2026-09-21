@@ -5,6 +5,15 @@ const IsoDate = z.string().datetime({ offset: true });
 
 export const SpecStatusSchema = z.enum([
   'DRAFT',
+  'REQUIREMENTS_READY',
+  'DESIGN_READY',
+  'TASKS_READY',
+  'APPROVED',
+  'RUNNING',
+  'PAUSED',
+  'VERIFYING',
+  'COMPLETED',
+  'FAILED',
   'READY',
   'EXECUTING',
   'REVIEW',
@@ -273,10 +282,75 @@ export const AutomationSchema = z.object({
   lastRunAt: IsoDate.nullable(),
   nextRunAt: IsoDate.nullable(),
   lastResult: z.enum(['SUCCEEDED', 'FAILED', 'BLOCKED']).nullable(),
+  job: z
+    .object({
+      specId: Id,
+      taskId: Id,
+      agentId: Id,
+      executionTarget: z.enum(['LOCAL_DEVICE', 'REMOTE_DEVICE', 'ROOM_HOST', 'ASTRA_CLOUD']),
+    })
+    .nullable()
+    .optional(),
   createdAt: IsoDate,
   updatedAt: IsoDate,
 });
 export type Automation = z.infer<typeof AutomationSchema>;
+export const WorkerJobStateSchema = z.enum([
+  'QUEUED',
+  'CLAIMED',
+  'PREPARING',
+  'RUNNING',
+  'VERIFYING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+  'EXPIRED',
+]);
+export type WorkerJobState = z.infer<typeof WorkerJobStateSchema>;
+export const WorkerJobSchema = z.object({
+  id: Id,
+  ownerId: Id,
+  specId: Id,
+  taskId: Id,
+  agentId: Id,
+  executionTarget: z.enum(['LOCAL_DEVICE', 'REMOTE_DEVICE', 'ROOM_HOST', 'ASTRA_CLOUD']),
+  state: WorkerJobStateSchema,
+  workerId: Id.nullable(),
+  leaseId: Id.nullable(),
+  leaseExpiresAt: IsoDate.nullable(),
+  attempt: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+  cancelRequested: z.boolean(),
+  failureReason: z.string().nullable(),
+  creditsSpent: z.string().regex(/^\d+(?:\.\d+)?$/),
+  createdAt: IsoDate,
+  updatedAt: IsoDate,
+});
+export type WorkerJob = z.infer<typeof WorkerJobSchema>;
+export const AutomationRunStateSchema = z.enum([
+  'QUEUED',
+  'CLAIMED',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+]);
+export const AutomationRunSchema = z.object({
+  id: Id,
+  automationId: Id,
+  ownerId: Id,
+  scheduledFor: IsoDate,
+  state: AutomationRunStateSchema,
+  workerId: Id.nullable(),
+  leaseId: Id.nullable(),
+  leaseExpiresAt: IsoDate.nullable(),
+  attempt: z.number().int().nonnegative(),
+  failureReason: z.string().nullable(),
+  creditsSpent: z.string().regex(/^\d+(?:\.\d+)?$/),
+  createdAt: IsoDate,
+  updatedAt: IsoDate,
+});
+export type AutomationRun = z.infer<typeof AutomationRunSchema>;
 export const PluginManifestSchema = z.object({
   id: Id,
   name: z.string().min(1),
@@ -360,6 +434,8 @@ export const PlatformEntityKindSchema = z.enum([
   'MCP_SERVER',
   'PERMISSION',
   'MODEL_ROUTE',
+  'WORKER_JOB',
+  'AUTOMATION_RUN',
 ]);
 export type PlatformEntityKind = z.infer<typeof PlatformEntityKindSchema>;
 export interface PlatformRecord {
@@ -388,4 +464,6 @@ export type PlatformEntity =
   | SkillManifest
   | McpServerPolicy
   | ToolPermission
-  | ModelRoute;
+  | ModelRoute
+  | WorkerJob
+  | AutomationRun;

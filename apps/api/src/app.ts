@@ -56,7 +56,7 @@ import { registerWebResearchRoutes } from './web-research-route.js';
 import { CodexRuntimeTokenService } from './codex-runtime-auth.js';
 import { registerCodexRuntimeRoutes } from './codex-runtime-route.js';
 import { registerOrchestrationRoutes } from './orchestration-route.js';
-import type { PlatformOrchestrationService } from '@astra/orchestration';
+import type { PlatformOrchestrationService, WorkerJobService } from '@astra/orchestration';
 
 export interface ApiDependencies {
   catalog?: ModelCatalogStore;
@@ -92,6 +92,25 @@ export interface ApiDependencies {
   relayBroker?: RemoteRelayBroker;
   webResearch?: WebResearchServiceType;
   orchestration?: PlatformOrchestrationService;
+  workerJobs?: WorkerJobService;
+  authorizeWorkerJob?: (input: {
+    ownerId: string;
+    planId: string;
+    specId: string;
+    taskId: string;
+    agentId: string;
+    executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+    requestedCredits: string;
+  }) => Promise<void>;
+  authorizeAutomation?: (input: {
+    ownerId: string;
+    planId: string;
+    specId: string;
+    taskId: string;
+    agentId: string;
+    executionTarget: 'LOCAL_DEVICE' | 'REMOTE_DEVICE' | 'ROOM_HOST' | 'ASTRA_CLOUD';
+    requestedCredits: string;
+  }) => Promise<void>;
   readiness?: () => Promise<{ database: 'ready' | 'unconfigured' | 'failed' }>;
 }
 
@@ -208,7 +227,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       process.env.ASTRA_RUNTIME_TOKEN_SECRET ??
       randomBytes(32).toString('hex'),
   );
-  app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/health', async () => ({ status: 'ok', service: 'astra-api' }));
   app.get('/ready', async (_request, reply) => {
     if (!dependencies.readiness) return reply.send({ status: 'ready', database: 'unconfigured' });
     try {
@@ -313,6 +332,13 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       void registerOrchestrationRoutes(app, {
         auth: dependencies.auth,
         orchestration: dependencies.orchestration,
+        ...(dependencies.workerJobs ? { workerJobs: dependencies.workerJobs } : {}),
+        ...(dependencies.authorizeWorkerJob
+          ? { authorizeWorkerJob: dependencies.authorizeWorkerJob }
+          : {}),
+        ...(dependencies.authorizeAutomation
+          ? { authorizeAutomation: dependencies.authorizeAutomation }
+          : {}),
       });
   }
   return app;
