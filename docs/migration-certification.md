@@ -14,22 +14,22 @@ The release is not production ready because live Astra Gateway/model-driven Code
 
 ## B. Release identity
 
-| Field                                 | Evidence                                                                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Branch                                | main                                                                                                                      |
-| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                                  |
-| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                                  |
-| Implementation/release source SHA     | `f5a6f9c` (`Complete Astra Code Room and release certification`); the installer was built from this implementation state. |
-| Release candidate                     | astra-code-v0.1.0-rc2                                                                                                     |
-| Version                               | 0.1.0                                                                                                                     |
-| Working tree at report drafting       | Clean at the implementation commit; this certification metadata update is a docs-only follow-up.                          |
-| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                       |
-| Installer size                        | 166,058,420 bytes                                                                                                         |
-| Installer SHA-256                     | F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169                                                          |
-| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                           |
-| Bundled Codex size                    | 245,798,704 bytes                                                                                                         |
-| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                          |
-| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                       |
+| Field                                 | Evidence                                                                                                                                      |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Branch                                | main                                                                                                                                          |
+| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                                                      |
+| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                                                      |
+| Implementation/release source SHA     | `13e489f4f27ee6cce192133e26940dce627e3315` (`Stabilize Windows golden path timeout`); the installer was built from this implementation state. |
+| Release candidate                     | astra-code-v0.1.0-rc2                                                                                                                         |
+| Version                               | 0.1.0                                                                                                                                         |
+| Working tree at report drafting       | Clean at the implementation commit; this certification metadata update is a docs-only follow-up.                                              |
+| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                                           |
+| Installer size                        | 166,058,419 bytes                                                                                                                             |
+| Installer SHA-256                     | D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E                                                                              |
+| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                                               |
+| Bundled Codex size                    | 245,798,704 bytes                                                                                                                             |
+| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                                              |
+| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                                           |
 
 ## C. Architecture and production path
 
@@ -234,23 +234,23 @@ The following matrix contains every feature row. PASS means implementation and d
 
 ## N. Deterministic verification
 
-| Command                                                | Result                                                                                                            |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| npm.cmd test                                           | PASS — 87 files, 278 tests                                                                                        |
-| npm.cmd run typecheck                                  | PASS                                                                                                              |
-| npm.cmd run lint                                       | PASS                                                                                                              |
-| npm.cmd run format:check                               | PASS                                                                                                              |
-| npm.cmd run verify:source-provenance                   | PASS                                                                                                              |
-| npm.cmd run build:packages                             | PASS                                                                                                              |
-| npm.cmd run build                                      | PASS — API, Electron, web prerender (54 routes), and admin                                                        |
-| npm.cmd run build:renderer --workspace @lyntar/desktop | PASS during renderer/package build — 23 renderer modules                                                          |
-| npm.cmd audit --omit=dev                               | PASS — 0 vulnerabilities                                                                                          |
-| git diff --check                                       | PASS — only normal Windows line-ending warnings                                                                   |
-| node scripts/verify-codex-runtime-artifact.mjs         | PASS — executable, manifest, LICENSE, NOTICE, and hashes                                                          |
-| npm.cmd run certify:codex-runtime                      | PASS — real initialize and thread/start against pinned executable                                                 |
-| npm.cmd run package:win:unsigned                       | PASS — new installer, 166,058,420 bytes, SHA-256 F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169 |
-| Focused Room/project/billing/security suites           | PASS — 7 files, 27 tests                                                                                          |
-| Local Cargo build of vendored Codex                    | BLOCKED — host allocation failure; official artifact is used and verified                                         |
+| Command                                                | Result                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| npm.cmd test                                           | PASS — 87 files, 278 tests                                                                                          |
+| npm.cmd run typecheck                                  | PASS                                                                                                                |
+| npm.cmd run lint                                       | PASS                                                                                                                |
+| npm.cmd run format:check                               | PASS                                                                                                                |
+| npm.cmd run verify:source-provenance                   | PASS                                                                                                                |
+| npm.cmd run build:packages                             | PASS                                                                                                                |
+| npm.cmd run build                                      | PASS — API, Electron, web prerender (54 routes), and admin                                                          |
+| npm.cmd run build:renderer --workspace @lyntar/desktop | PASS during renderer/package build — 23 renderer modules                                                            |
+| npm.cmd audit --omit=dev                               | PASS — 0 vulnerabilities                                                                                            |
+| git diff --check                                       | PASS — only normal Windows line-ending warnings                                                                     |
+| node scripts/verify-codex-runtime-artifact.mjs         | PASS — executable, manifest, LICENSE, NOTICE, and hashes                                                            |
+| npm.cmd run certify:codex-runtime                      | PASS — real initialize and thread/start against pinned executable                                                   |
+| npm.cmd run package:win:unsigned                       | PASS — final installer, 166,058,419 bytes, SHA-256 D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E |
+| Focused Room/project/billing/security suites           | PASS — 7 files, 27 tests                                                                                            |
+| Local Cargo build of vendored Codex                    | BLOCKED — host allocation failure; official artifact is used and verified                                           |
 
 ## O. Live/external certification
 

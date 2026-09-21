@@ -2,8 +2,8 @@
   "product": "Astra Code",
   "version": "0.1.0",
   "release_candidate": "astra-code-v0.1.0-rc2",
-  "source_commit": "f5a6f9c",
-  "artifact_source_commit": "f5a6f9c",
+  "source_commit": "13e489f4f27ee6cce192133e26940dce627e3315",
+  "artifact_source_commit": "13e489f4f27ee6cce192133e26940dce627e3315",
   "cline": {
     "repository": "https://github.com/cline/cline",
     "commit": "9a2512bb9835869d74774da99708a7f9d80b0fe8",
@@ -22,8 +22,8 @@
   "installer": {
     "filename": "Astra-Code-0.1.0-win-x64-unsigned.exe",
     "path": "apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe",
-    "bytes": 166058420,
-    "sha256": "F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169",
+    "bytes": 166058419,
+    "sha256": "D7D10ECACA66B9AC8B3D651B745777F8CA3AA7E13A3C504579F9C3E554233D0E",
     "signed": false
   },
   "tests": {
