@@ -1,7 +1,7 @@
 # Astra Code Release Candidate Test Summary
 
 Release candidate: astra-code-v0.1.0-rc2
-Source commit: recorded after the implementation commit
+Source commit: f5a6f9c (implementation/artifact source state)
 Installer SHA-256: F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169
 
 ## Deterministic gates

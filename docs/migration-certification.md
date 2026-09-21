@@ -14,22 +14,22 @@ The release is not production ready because live Astra Gateway/model-driven Code
 
 ## B. Release identity
 
-| Field                                 | Evidence                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Branch                                | main                                                                                                                |
-| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                            |
-| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                            |
-| Final implementation SHA              | Recorded in the release manifest after the implementation commit; artifact source SHA is recorded separately there. |
-| Release candidate                     | astra-code-v0.1.0-rc2                                                                                               |
-| Version                               | 0.1.0                                                                                                               |
-| Working tree at report drafting       | Dirty from implementation and certification changes; clean state is a release gate.                                 |
-| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                 |
-| Installer size                        | 166,058,420 bytes                                                                                                   |
-| Installer SHA-256                     | F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169                                                    |
-| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                     |
-| Bundled Codex size                    | 245,798,704 bytes                                                                                                   |
-| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                    |
-| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                 |
+| Field                                 | Evidence                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Branch                                | main                                                                                                                      |
+| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                                  |
+| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                                  |
+| Implementation/release source SHA     | `f5a6f9c` (`Complete Astra Code Room and release certification`); the installer was built from this implementation state. |
+| Release candidate                     | astra-code-v0.1.0-rc2                                                                                                     |
+| Version                               | 0.1.0                                                                                                                     |
+| Working tree at report drafting       | Clean at the implementation commit; this certification metadata update is a docs-only follow-up.                          |
+| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                       |
+| Installer size                        | 166,058,420 bytes                                                                                                         |
+| Installer SHA-256                     | F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169                                                          |
+| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                           |
+| Bundled Codex size                    | 245,798,704 bytes                                                                                                         |
+| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                          |
+| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                       |
 
 ## C. Architecture and production path
 
