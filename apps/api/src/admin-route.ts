@@ -3,17 +3,23 @@ import {
   ControlPlaneError,
   CommercialPlanPriceSnapshotSchema,
   CommercialPolicyService,
+  CapabilityPolicySnapshotSchema,
   ControlPlaneModelSnapshotSchema,
   ControlPlanePlanSnapshotSchema,
+  FeatureFlagSnapshotSchema,
+  MaintenancePolicySnapshotSchema,
   ModelConsumptionPricingSnapshotSchema,
   MutationMetadataSchema,
   PromotionSnapshotSchema,
+  RazorpayMappingSnapshotSchema,
+  ReleasePolicySnapshotSchema,
   TopUpPackageSnapshotSchema,
   hasAdminPermission,
   resolveAdminPermissions,
   type ControlPlaneActor,
   type ControlPlaneAdminRole,
   type ControlPlaneService,
+  type PlatformPolicyService,
 } from '@astra/control-plane';
 import {
   AdminService,
@@ -72,6 +78,44 @@ const ModelPricingMutationSchema = z
   })
   .strict();
 
+const FeatureFlagMutationSchema = z.object({
+  snapshot: FeatureFlagSnapshotSchema,
+  metadata: MutationMetadataSchema,
+});
+const MaintenanceMutationSchema = z.object({
+  snapshot: MaintenancePolicySnapshotSchema,
+  metadata: MutationMetadataSchema,
+});
+const CapabilityMutationSchema = z.object({
+  snapshot: CapabilityPolicySnapshotSchema,
+  metadata: MutationMetadataSchema,
+});
+const ReleaseMutationSchema = z.object({
+  snapshot: ReleasePolicySnapshotSchema,
+  metadata: MutationMetadataSchema,
+});
+const RazorpayMappingMutationSchema = z.object({
+  snapshot: RazorpayMappingSnapshotSchema,
+  metadata: MutationMetadataSchema,
+});
+const UserStatusMutationSchema = z.object({
+  status: z.enum(['ACTIVE', 'DISABLED']),
+  metadata: MutationMetadataSchema,
+});
+const UserPlanMutationSchema = z.object({
+  planId: z.string().min(1),
+  metadata: MutationMetadataSchema,
+});
+const AdminReasonSchema = z.object({ metadata: MutationMetadataSchema });
+const OrganizationStatusMutationSchema = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED']),
+  metadata: MutationMetadataSchema,
+});
+const RoomStatusMutationSchema = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED']),
+  metadata: MutationMetadataSchema,
+});
+
 function bearer(request: FastifyRequest): string | null {
   const value = request.headers.authorization;
   if (value?.startsWith('Bearer ')) return value.slice('Bearer '.length).trim() || null;
@@ -99,6 +143,7 @@ export interface AdminRouteDependencies {
   analytics?: AdminAnalyticsPort;
   controlPlane?: ControlPlaneService;
   commercial?: CommercialPolicyService;
+  policy?: PlatformPolicyService;
   remote?: RemoteAccessPort;
 }
 
@@ -121,6 +166,15 @@ function sendControlPlaneError(reply: FastifyReply, error: unknown) {
   return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
 }
 
+function sendRemoteError(reply: FastifyReply, error: unknown) {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String(error.code)
+      : 'REMOTE_DATA_UNAVAILABLE';
+  const status = code === 'PERMISSION_DENIED' ? 403 : code.endsWith('_NOT_FOUND') ? 404 : 400;
+  return reply.code(status).send({ error: code });
+}
+
 async function requireControlPlaneActor(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -131,7 +185,10 @@ async function requireControlPlaneActor(
   actor: ControlPlaneActor;
   context: { sessionId: string; deviceId: string; ipAddress: string; userAgent: string | null };
 } | null> {
-  if (!dependencies.auth || (!dependencies.controlPlane && !dependencies.commercial)) {
+  if (
+    !dependencies.auth ||
+    (!dependencies.controlPlane && !dependencies.commercial && !dependencies.policy)
+  ) {
     reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
     return null;
   }
@@ -168,6 +225,27 @@ async function requireControlPlaneActor(
 function integerQuery(value: unknown, fallback: number): number {
   const parsed = Number(value ?? fallback);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+async function appendAdminMutationAudit(
+  dependencies: AdminRouteDependencies,
+  access: NonNullable<Awaited<ReturnType<typeof requireControlPlaneActor>>>,
+  permission: Parameters<typeof hasAdminPermission>[1],
+  input: {
+    action: string;
+    targetType: string;
+    targetId: string;
+    before?: unknown;
+    after?: unknown;
+    metadata: z.infer<typeof MutationMetadataSchema>;
+  },
+): Promise<void> {
+  await dependencies.controlPlane?.appendAudit({
+    permission,
+    actor: access.actor,
+    context: access.context,
+    ...input,
+  });
 }
 
 export async function registerAdminRoutes(
@@ -297,6 +375,19 @@ export async function registerAdminRoutes(
     } catch (error) {
       return sendAuthError(reply, error);
     }
+  });
+
+  app.get('/v1/admin/health', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.system');
+    if (!access) return;
+    return reply.send({
+      dataStatus: 'CONFIGURED',
+      controlPlane: dependencies.controlPlane ? 'CONFIGURED' : 'UNAVAILABLE',
+      commercial: dependencies.commercial ? 'CONFIGURED' : 'UNAVAILABLE',
+      policy: dependencies.policy ? 'CONFIGURED' : 'UNAVAILABLE',
+      remote: dependencies.remote ? 'CONFIGURED' : 'UNAVAILABLE',
+      analytics: dependencies.analytics ? 'CONFIGURED' : 'NO_LIVE_DATA',
+    });
   });
 
   app.get('/v1/admin/analytics/usage', async (request, reply) => {
@@ -505,6 +596,218 @@ export async function registerAdminRoutes(
       return sendControlPlaneError(reply, error);
     }
   });
+
+  app.put<{ Params: { userId: string } }>(
+    '/v1/admin/users/:userId/status',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.users');
+      if (!access || !dependencies.auth) return;
+      const parsed = UserStatusMutationSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const before = await dependencies.auth.getUserById(request.params.userId);
+        if (!before) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+        const user = await dependencies.auth.adminSetStatus(
+          request.params.userId,
+          parsed.data.status,
+        );
+        await appendAdminMutationAudit(dependencies, access, 'admin.users', {
+          action: 'USER_STATUS_UPDATED',
+          targetType: 'user',
+          targetId: request.params.userId,
+          before,
+          after: user,
+          metadata: parsed.data.metadata,
+        });
+        return reply.send({ user });
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendAuthError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { userId: string } }>(
+    '/v1/admin/users/:userId/plan',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
+      if (!access || !dependencies.auth) return;
+      const parsed = UserPlanMutationSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const before = await dependencies.auth.getUserById(request.params.userId);
+        if (!before) return reply.code(404).send({ error: 'USER_NOT_FOUND' });
+        const user = await dependencies.auth.assignPlan(request.params.userId, parsed.data.planId);
+        await appendAdminMutationAudit(dependencies, access, 'admin.plans', {
+          action: 'USER_PLAN_UPDATED',
+          targetType: 'user',
+          targetId: request.params.userId,
+          before,
+          after: user,
+          metadata: parsed.data.metadata,
+        });
+        return reply.send({ user });
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendAuthError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { userId: string } }>(
+    '/v1/admin/users/:userId/sessions/revoke',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.security');
+      if (!access || !dependencies.auth) return;
+      const parsed = AdminReasonSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        await dependencies.auth.adminRevokeAllSessions(request.params.userId);
+        await appendAdminMutationAudit(dependencies, access, 'admin.security', {
+          action: 'USER_SESSIONS_REVOKED',
+          targetType: 'user',
+          targetId: request.params.userId,
+          metadata: parsed.data.metadata,
+        });
+        return reply.code(204).send();
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendAuthError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { userId: string; deviceSessionId: string } }>(
+    '/v1/admin/users/:userId/devices/:deviceSessionId/revoke',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.security');
+      if (!access || !dependencies.auth) return;
+      const parsed = AdminReasonSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        await dependencies.auth.adminRevokeDevice(
+          request.params.userId,
+          request.params.deviceSessionId,
+        );
+        if (dependencies.remote)
+          await dependencies.remote.adminRevokeDevice(
+            request.params.deviceSessionId,
+            parsed.data.metadata.reason,
+          );
+        await appendAdminMutationAudit(dependencies, access, 'admin.security', {
+          action: 'DEVICE_REVOKED',
+          targetType: 'device',
+          targetId: request.params.deviceSessionId,
+          metadata: parsed.data.metadata,
+        });
+        return reply.code(204).send();
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendAuthError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { organizationId: string } }>(
+    '/v1/admin/organizations/:organizationId/status',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(
+        request,
+        reply,
+        dependencies,
+        'admin.organizations',
+      );
+      if (!access || !dependencies.remote)
+        return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+      const parsed = OrganizationStatusMutationSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const before = await dependencies.remote.getOrganization(request.params.organizationId);
+        const organization = await dependencies.remote.adminSetOrganizationStatus({
+          organizationId: request.params.organizationId,
+          status: parsed.data.status,
+          reason: parsed.data.metadata.reason,
+        });
+        await appendAdminMutationAudit(dependencies, access, 'admin.organizations', {
+          action: 'ORGANIZATION_STATUS_UPDATED',
+          targetType: 'organization',
+          targetId: request.params.organizationId,
+          before,
+          after: organization,
+          metadata: parsed.data.metadata,
+        });
+        return reply.send({ organization });
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendRemoteError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { roomId: string } }>(
+    '/v1/admin/rooms/:roomId/status',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.rooms');
+      if (!access || !dependencies.remote)
+        return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+      const parsed = RoomStatusMutationSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const before = await dependencies.remote.getRoom(request.params.roomId);
+        const room = await dependencies.remote.adminSetRoomStatus({
+          roomId: request.params.roomId,
+          status: parsed.data.status,
+          reason: parsed.data.metadata.reason,
+        });
+        await appendAdminMutationAudit(dependencies, access, 'admin.rooms', {
+          action: 'ROOM_STATUS_UPDATED',
+          targetType: 'room',
+          targetId: request.params.roomId,
+          before,
+          after: room,
+          metadata: parsed.data.metadata,
+        });
+        return reply.send({ room });
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendRemoteError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { deviceId: string } }>(
+    '/v1/admin/devices/:deviceId/revoke',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.security');
+      if (!access || !dependencies.remote)
+        return reply.code(503).send({ error: 'REMOTE_DATA_UNAVAILABLE' });
+      const parsed = AdminReasonSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        await dependencies.remote.adminRevokeDevice(
+          request.params.deviceId,
+          parsed.data.metadata.reason,
+        );
+        await appendAdminMutationAudit(dependencies, access, 'admin.security', {
+          action: 'REMOTE_DEVICE_REVOKED',
+          targetType: 'remote_device',
+          targetId: request.params.deviceId,
+          metadata: parsed.data.metadata,
+        });
+        return reply.code(204).send();
+      } catch (error) {
+        return error instanceof ControlPlaneError
+          ? sendControlPlaneError(reply, error)
+          : sendRemoteError(reply, error);
+      }
+    },
+  );
 
   app.get('/v1/admin/control-plane/plans', async (request, reply) => {
     const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
@@ -826,4 +1129,214 @@ export async function registerAdminRoutes(
       }
     },
   );
+
+  app.get('/v1/admin/policies/feature-flags', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.features');
+    if (!access || !dependencies.policy) return;
+    try {
+      return reply.send({ flags: await dependencies.policy.listFeatureFlags() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { flagId: string } }>(
+    '/v1/admin/policies/feature-flags/:flagId/versions',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.features');
+      if (!access || !dependencies.policy) return;
+      try {
+        return reply.send({
+          versions: await dependencies.policy.listFeatureFlagVersions(request.params.flagId),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.get('/v1/admin/policies/maintenance', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.system');
+    if (!access || !dependencies.policy) return;
+    try {
+      return reply.send({ policies: await dependencies.policy.listMaintenancePolicies() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/policies/capabilities', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.features');
+    if (!access || !dependencies.policy) return;
+    try {
+      return reply.send({ policies: await dependencies.policy.listCapabilityPolicies() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/policies/releases', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.releases');
+    if (!access || !dependencies.policy) return;
+    try {
+      return reply.send({ policies: await dependencies.policy.listReleasePolicies() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/commercial/razorpay-mappings', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+    if (!access || !dependencies.policy) return;
+    try {
+      return reply.send({ mappings: await dependencies.policy.listRazorpayMappings() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.get('/v1/admin/policies/audit', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.security');
+    if (!access || !dependencies.policy) return;
+    const query = request.query as { limit?: string; offset?: string };
+    try {
+      return reply.send({
+        entries: await dependencies.policy.listAudit({
+          limit: integerQuery(query.limit, 100),
+          offset: integerQuery(query.offset, 0),
+        }),
+      });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.put<{ Params: { flagId: string } }>(
+    '/v1/admin/policies/feature-flags/:flagId',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.features');
+      if (!access || !dependencies.policy) return;
+      const parsed = FeatureFlagMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.flagId !== request.params.flagId)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          snapshot: await dependencies.policy.updateFeatureFlag({
+            ...parsed.data,
+            actor: access.actor,
+            context: access.context,
+          }),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { key: string } }>(
+    '/v1/admin/policies/maintenance/:key',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.system');
+      if (!access || !dependencies.policy) return;
+      const parsed = MaintenanceMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.key !== request.params.key)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          snapshot: await dependencies.policy.updateMaintenancePolicy({
+            ...parsed.data,
+            actor: access.actor,
+            context: access.context,
+          }),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { key: string } }>(
+    '/v1/admin/policies/capabilities/:key',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.features');
+      if (!access || !dependencies.policy) return;
+      const parsed = CapabilityMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.key !== request.params.key)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          snapshot: await dependencies.policy.updateCapabilityPolicy({
+            ...parsed.data,
+            actor: access.actor,
+            context: access.context,
+          }),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { channel: string } }>(
+    '/v1/admin/policies/releases/:channel',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.releases');
+      if (!access || !dependencies.policy) return;
+      const parsed = ReleaseMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.channel !== request.params.channel)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          snapshot: await dependencies.policy.updateReleasePolicy({
+            ...parsed.data,
+            actor: access.actor,
+            context: access.context,
+          }),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { mappingId: string } }>(
+    '/v1/admin/commercial/razorpay-mappings/:mappingId',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+      if (!access || !dependencies.policy) return;
+      const parsed = RazorpayMappingMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.mappingId !== request.params.mappingId)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          snapshot: await dependencies.policy.updateRazorpayMapping({
+            ...parsed.data,
+            actor: access.actor,
+            context: access.context,
+          }),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.get<{ Params: { flagId: string } }>('/v1/config/features/:flagId', async (request, reply) => {
+    if (!dependencies.policy || !dependencies.auth)
+      return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+    const token = bearer(request);
+    if (!token) return reply.code(401).send({ error: 'SESSION_INVALID' });
+    try {
+      const identity = await dependencies.auth.authenticate(token);
+      const enabled = await dependencies.policy.evaluateFeatureFlag(request.params.flagId, {
+        userId: identity.user.id,
+        planId: identity.user.planId,
+        internal: identity.user.role === 'SUPER_ADMIN',
+      });
+      return reply.send({ flagId: request.params.flagId, enabled });
+    } catch (error) {
+      if (error instanceof ControlPlaneError) return sendControlPlaneError(reply, error);
+      return sendAuthError(reply, error);
+    }
+  });
 }

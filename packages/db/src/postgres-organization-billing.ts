@@ -114,6 +114,12 @@ function mapReservation(row: Record<string, unknown>): CreditReservation {
     hostDeviceId: row.host_device_id === null ? null : String(row.host_device_id),
     taskId: String(row.task_key),
     ...(row.model_id === null ? {} : { modelId: String(row.model_id) }),
+    ...(row.pricing_version === null || row.pricing_version === undefined
+      ? {}
+      : { pricingVersion: Number(row.pricing_version) }),
+    ...(row.pricing_snapshot
+      ? { pricingSnapshot: row.pricing_snapshot as Record<string, unknown> }
+      : {}),
     amountCredits: String(row.amount_credits),
     status: String(row.status),
     idempotencyKey: String(row.idempotency_key),
@@ -392,6 +398,7 @@ export class PostgresOrganizationBillingStore implements OrganizationBillingStor
           existing.roomId !== roomId ||
           existing.taskId !== input.taskId ||
           existing.modelId !== input.modelId ||
+          existing.pricingVersion !== input.pricingVersion ||
           existing.amountCredits !== amount
         )
           throw new BillingError(
@@ -437,8 +444,8 @@ export class PostgresOrganizationBillingStore implements OrganizationBillingStor
       const reservationResult = await client.query(
         `INSERT INTO organization_credit_reservations
           (id, organization_id, actor_user_id, room_id, host_device_id, task_key,
-           model_id, amount_credits, status, idempotency_key, bucket_allocations, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'RESERVED', $9, $10::jsonb, $11)
+           model_id, pricing_version, pricing_snapshot, amount_credits, status, idempotency_key, bucket_allocations, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, 'RESERVED', $11, $12::jsonb, $13)
          RETURNING *`,
         [
           randomUUID(),
@@ -448,6 +455,8 @@ export class PostgresOrganizationBillingStore implements OrganizationBillingStor
           hostDeviceId,
           input.taskId,
           input.modelId ?? null,
+          input.pricingVersion ?? null,
+          JSON.stringify(input.pricingSnapshot ?? null),
           amount,
           input.idempotencyKey,
           JSON.stringify(

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { resolve } from 'node:path';
@@ -28,6 +28,26 @@ async function sha256(path) {
   return createHash('sha256')
     .update(await readFile(path))
     .digest('hex');
+}
+
+async function copyPinnedTextFile(sourcePath, destinationPath) {
+  const source = await readFile(sourcePath, 'utf8');
+  const pinnedText = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  try {
+    if ((await readFile(destinationPath, 'utf8')) === pinnedText) return;
+  } catch {
+    // The destination is created below when the bundle is first acquired.
+  }
+  await writeFile(destinationPath, pinnedText, 'utf8');
+}
+
+async function writeTextIfChanged(path, value) {
+  try {
+    if ((await readFile(path, 'utf8')) === value) return;
+  } catch {
+    // The destination is created below when the bundle is first acquired.
+  }
+  await writeFile(path, value, 'utf8');
 }
 
 async function download(path) {
@@ -66,8 +86,10 @@ if (artifactSha256 !== officialAssetSha256)
     `Official Codex runtime checksum mismatch: expected ${officialAssetSha256}, got ${artifactSha256}`,
   );
 
-await copyFile(resolve(upstreamCodexRoot, 'LICENSE'), licensePath);
-await copyFile(resolve(upstreamCodexRoot, 'NOTICE'), noticePath);
+// Normalize legal files to UTF-8 LF so Git checkout settings cannot change the
+// certified bytes, and avoid rewriting an identical locked bundle file.
+await copyPinnedTextFile(resolve(upstreamCodexRoot, 'LICENSE'), licensePath);
+await copyPinnedTextFile(resolve(upstreamCodexRoot, 'NOTICE'), noticePath);
 
 const manifest = {
   sourceSha,
@@ -87,6 +109,21 @@ const manifest = {
   buildTimestamp: new Date().toISOString(),
 };
 
-await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+try {
+  const existingManifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  if (
+    existingManifest.sourceSha === manifest.sourceSha &&
+    existingManifest.runtimeSourceSha === manifest.runtimeSourceSha &&
+    existingManifest.releaseTag === manifest.releaseTag &&
+    existingManifest.protocolFingerprint === manifest.protocolFingerprint &&
+    existingManifest.artifactSha256 === manifest.artifactSha256
+  ) {
+    manifest.buildTimestamp = existingManifest.buildTimestamp;
+  }
+} catch {
+  // A fresh or invalid manifest is replaced below.
+}
+
+await writeTextIfChanged(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Official pinned Codex runtime verified at ${artifactPath}`);
 console.log(`Codex runtime manifest written to ${manifestPath}`);

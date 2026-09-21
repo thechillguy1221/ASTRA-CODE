@@ -1,4 +1,5 @@
 import type { AuthService } from '@astra/auth';
+import { ControlPlaneError, type PlatformPolicyService } from '@astra/control-plane';
 import type { PlanCatalog } from '@astra/plans';
 import type { EmailService } from '@astra/email';
 import { randomUUID } from 'node:crypto';
@@ -108,6 +109,11 @@ function sendRemoteError(reply: FastifyReply, error: unknown) {
             : 404;
     return reply.code(status).send({ error: error.code });
   }
+  if (error instanceof ControlPlaneError) {
+    return reply
+      .code(error.code === 'CONTROL_PLANE_UNAVAILABLE' ? 503 : 403)
+      .send({ error: error.code });
+  }
   return reply.code(500).send({ error: 'remote_access_failed' });
 }
 
@@ -121,6 +127,7 @@ export interface RemoteRouteDependencies {
   relaySecret?: string;
   relayGrantTtlMs?: number;
   relayBroker?: RemoteRelayBroker;
+  policy?: PlatformPolicyService;
 }
 
 async function requireUser(
@@ -157,6 +164,9 @@ export async function registerRemoteRoutes(
     const parsed = DeviceSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     try {
+      await dependencies.policy?.assertCapabilityAllowed('REMOTE_ACCESS', {
+        planId: identity.user.planId,
+      });
       const device = await dependencies.remote.registerDevice({
         userId: identity.user.id,
         ...parsed.data,
@@ -190,6 +200,10 @@ export async function registerRemoteRoutes(
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     const roomId = parsed.data.roomId ?? null;
     try {
+      await dependencies.policy?.assertCapabilityAllowed('REMOTE_ACCESS', {
+        planId: identity.user.planId,
+        ...(roomId ? { roomId } : {}),
+      });
       let targetDeviceId = parsed.data.deviceId;
       let permissions: string[];
       if (roomId) {

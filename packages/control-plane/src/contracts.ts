@@ -88,7 +88,18 @@ export const AuditEventInputSchema = z.object({
 export type AuditEventInput = z.infer<typeof AuditEventInputSchema>;
 
 export const InvalidationMessageSchema = z.object({
-  domain: z.enum(['plans', 'models', 'entitlements', 'limits', 'commercial']),
+  domain: z.enum([
+    'plans',
+    'models',
+    'entitlements',
+    'limits',
+    'commercial',
+    'features',
+    'maintenance',
+    'releases',
+    'capabilities',
+    'razorpay',
+  ]),
   resourceId: z.string().min(1),
   version: z.number().int().positive(),
 });
@@ -197,3 +208,162 @@ export const ModelConsumptionPricingSnapshotSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 export type ModelConsumptionPricingSnapshot = z.infer<typeof ModelConsumptionPricingSnapshotSchema>;
+
+export const FeatureFlagScopeSchema = z.enum([
+  'GLOBAL',
+  'PLAN',
+  'USER',
+  'ORGANIZATION',
+  'ROOM',
+  'REGION',
+  'BETA_GROUP',
+  'INTERNAL',
+]);
+export type FeatureFlagScope = z.infer<typeof FeatureFlagScopeSchema>;
+
+export const FeatureFlagTargetingSchema = z
+  .object({
+    planIds: z.array(z.string().min(1)).max(100).default([]),
+    userIds: z.array(z.string().min(1)).max(1000).default([]),
+    organizationIds: z.array(z.string().min(1)).max(1000).default([]),
+    roomIds: z.array(z.string().min(1)).max(1000).default([]),
+    regions: z.array(z.string().min(1).max(20)).max(100).default([]),
+    betaGroup: z.string().min(1).max(120).nullable().default(null),
+    internalOnly: z.boolean().default(false),
+  })
+  .strict();
+export type FeatureFlagTargeting = z.infer<typeof FeatureFlagTargetingSchema>;
+
+export const FeatureFlagStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'RETIRED']);
+export type FeatureFlagStatus = z.infer<typeof FeatureFlagStatusSchema>;
+
+export const FeatureFlagSnapshotSchema = z.object({
+  flagId: z.string().min(1),
+  key: z.string().regex(/^[a-z0-9][a-z0-9._-]{1,119}$/),
+  description: z.string().min(1).max(500),
+  enabled: z.boolean(),
+  scope: FeatureFlagScopeSchema,
+  targeting: FeatureFlagTargetingSchema,
+  rolloutPercentage: z.number().int().min(0).max(100),
+  effectiveFrom: z.string().datetime(),
+  effectiveTo: z.string().datetime().nullable(),
+  status: FeatureFlagStatusSchema,
+  version: z.number().int().positive(),
+  createdBy: z.string().min(1),
+  updatedBy: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type FeatureFlagSnapshot = z.infer<typeof FeatureFlagSnapshotSchema>;
+
+export const FeatureFlagEvaluationContextSchema = z.object({
+  planId: z.string().min(1).optional(),
+  userId: z.string().min(1).optional(),
+  organizationId: z.string().min(1).optional(),
+  roomId: z.string().min(1).optional(),
+  region: z.string().min(1).optional(),
+  betaGroup: z.string().min(1).optional(),
+  internal: z.boolean().optional(),
+  bucketKey: z.string().min(1).optional(),
+});
+export type FeatureFlagEvaluationContext = z.infer<typeof FeatureFlagEvaluationContextSchema>;
+
+export const MaintenanceKeySchema = z.enum([
+  'GLOBAL',
+  'MODELS',
+  'PAYMENTS',
+  'WEB_SEARCH',
+  'WEB_FETCH',
+  'MCP',
+  'PLUGINS',
+  'SKILLS',
+  'REMOTE_ACCESS',
+  'ROOMS',
+  'EMAIL',
+]);
+export type MaintenanceKey = z.infer<typeof MaintenanceKeySchema>;
+
+export const MaintenancePolicySnapshotSchema = z.object({
+  key: MaintenanceKeySchema,
+  enabled: z.boolean(),
+  message: z.string().min(1).max(500),
+  effectiveFrom: z.string().datetime(),
+  expectedEnd: z.string().datetime().nullable(),
+  affectedPlanIds: z.array(z.string().min(1)).max(100),
+  emergencyOverride: z.boolean(),
+  version: z.number().int().positive(),
+  updatedBy: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type MaintenancePolicySnapshot = z.infer<typeof MaintenancePolicySnapshotSchema>;
+
+export const CapabilityPolicyKeySchema = z.enum([
+  'WEB_SEARCH',
+  'WEB_FETCH',
+  'MCP',
+  'PLUGINS',
+  'SKILLS',
+  'REMOTE_ACCESS',
+]);
+export type CapabilityPolicyKey = z.infer<typeof CapabilityPolicyKeySchema>;
+
+export const CapabilityPolicySnapshotSchema = z.object({
+  key: CapabilityPolicyKeySchema,
+  enabled: z.boolean(),
+  allowedPlanIds: z.array(z.string().min(1)).max(100),
+  blockedPlanIds: z.array(z.string().min(1)).max(100),
+  allowedOrganizationIds: z.array(z.string().min(1)).max(1000),
+  blockedOrganizationIds: z.array(z.string().min(1)).max(1000),
+  allowedServers: z.array(z.string().min(1).max(300)).max(1000),
+  blockedServers: z.array(z.string().min(1).max(300)).max(1000),
+  allowedTransports: z.array(z.enum(['stdio', 'sse', 'streamable-http'])).max(10),
+  requireApproval: z.boolean(),
+  maxDevices: z.number().int().positive().nullable(),
+  maxConcurrentSessions: z.number().int().positive().nullable(),
+  sessionTimeoutSeconds: z.number().int().positive().nullable(),
+  periodLimit: z.number().int().positive().nullable(),
+  version: z.number().int().positive(),
+  updatedBy: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type CapabilityPolicySnapshot = z.infer<typeof CapabilityPolicySnapshotSchema>;
+
+export const ReleaseChannelSchema = z.enum(['stable', 'beta', 'nightly']);
+export type ReleaseChannel = z.infer<typeof ReleaseChannelSchema>;
+
+export const ReleasePolicySnapshotSchema = z.object({
+  channel: ReleaseChannelSchema,
+  stableVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  betaVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  minimumSupportedVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  recommendedVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
+  requiredUpdateVersion: z
+    .string()
+    .regex(/^\d+\.\d+\.\d+$/)
+    .nullable(),
+  blockedVersions: z.array(z.string().regex(/^\d+\.\d+\.\d+$/)).max(100),
+  releaseNotesUrl: z.string().url().nullable(),
+  downloadUrl: z.string().url().nullable(),
+  version: z.number().int().positive(),
+  updatedBy: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type ReleasePolicySnapshot = z.infer<typeof ReleasePolicySnapshotSchema>;
+
+export const RazorpayMappingEntitySchema = z.enum(['PLAN', 'TOP_UP']);
+export type RazorpayMappingEntity = z.infer<typeof RazorpayMappingEntitySchema>;
+
+export const RazorpayMappingSnapshotSchema = z.object({
+  mappingId: z.string().min(1),
+  entityType: RazorpayMappingEntitySchema,
+  entityId: z.string().min(1),
+  pricingVersion: z.number().int().positive().nullable(),
+  region: PricingRegionSchema,
+  currency: PricingCurrencySchema,
+  providerProductId: z.string().min(1).max(200),
+  interval: z.enum(['monthly', 'yearly', 'one_time']),
+  active: z.boolean(),
+  version: z.number().int().positive(),
+  updatedBy: z.string().min(1),
+  updatedAt: z.string().datetime(),
+});
+export type RazorpayMappingSnapshot = z.infer<typeof RazorpayMappingSnapshotSchema>;

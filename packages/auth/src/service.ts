@@ -385,6 +385,38 @@ export class AuthService {
     return publicUser(updated);
   }
 
+  async adminSetStatus(userId: string, status: 'ACTIVE' | 'DISABLED'): Promise<PublicUser> {
+    const user = await this.requireUser(userId);
+    const updated = { ...user, status };
+    await this.options.store.updateUser(updated);
+    if (status === 'DISABLED') await this.logoutAllForUser(userId);
+    return publicUser(updated);
+  }
+
+  async adminListDevices(userId: string): Promise<DeviceSession[]> {
+    await this.requireUser(userId);
+    return this.options.store.listDevices(userId);
+  }
+
+  async adminRevokeAllSessions(userId: string): Promise<void> {
+    await this.requireUser(userId);
+    await this.logoutAllForUser(userId);
+  }
+
+  async adminRevokeDevice(userId: string, deviceSessionId: string): Promise<void> {
+    await this.requireUser(userId);
+    const device = await this.options.store.getDevice(deviceSessionId);
+    if (!device || device.userId !== userId)
+      throw new AuthError('DEVICE_NOT_FOUND', 'Device session not found');
+    const revokedAt = this.now().toISOString();
+    await this.options.store.updateDevice({ ...device, revokedAt });
+    await Promise.all(
+      (await this.options.store.listSessions(userId))
+        .filter((session) => session.deviceSessionId === deviceSessionId && !session.revokedAt)
+        .map((session) => this.options.store.updateSession({ ...session, revokedAt })),
+    );
+  }
+
   async loginExternal(input: {
     provider: AuthProvider;
     subject: string;

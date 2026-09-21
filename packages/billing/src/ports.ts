@@ -34,6 +34,8 @@ export interface ReserveCreditsInput {
   modelId?: string;
   amountCredits: string;
   idempotencyKey: string;
+  pricingVersion?: number;
+  pricingSnapshot?: Record<string, unknown>;
 }
 
 export interface SettleCreditsInput {
@@ -102,6 +104,8 @@ export interface OrganizationReserveCreditsInput {
   modelId?: string;
   amountCredits: string;
   idempotencyKey: string;
+  pricingVersion?: number;
+  pricingSnapshot?: Record<string, unknown>;
 }
 
 export interface OrganizationRolloverSubscriptionCreditsInput {

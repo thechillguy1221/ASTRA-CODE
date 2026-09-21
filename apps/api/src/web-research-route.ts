@@ -7,6 +7,7 @@ import {
   type WebSearchRequest,
 } from '@astra/web-research';
 import { RemoteAccessError, type RemoteAccessPort } from '@astra/remote-protocol';
+import { ControlPlaneError, type PlatformPolicyService } from '@astra/control-plane';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -33,6 +34,7 @@ export interface WebResearchRouteDependencies {
   auth: AuthService;
   remote: RemoteAccessPort;
   webResearch: WebResearchService;
+  policy?: PlatformPolicyService;
 }
 
 function tokenFrom(request: FastifyRequest): string | null {
@@ -140,6 +142,11 @@ function sendWebResearchError(reply: FastifyReply, error: unknown) {
           : 400;
     return reply.code(status).send({ error: error.code });
   }
+  if (error instanceof ControlPlaneError) {
+    return reply
+      .code(error.code === 'CONTROL_PLANE_UNAVAILABLE' ? 503 : 403)
+      .send({ error: error.code });
+  }
   return reply.code(500).send({ error: 'web_research_failed' });
 }
 
@@ -161,6 +168,13 @@ export async function registerWebResearchRoutes(
         parsed.data.roomId,
         'web.search',
       );
+      await dependencies.policy?.assertCapabilityAllowed('WEB_SEARCH', {
+        planId: identity.user.planId,
+        ...(context.billingContext.kind === 'organization'
+          ? { organizationId: context.billingContext.organizationId }
+          : {}),
+        ...(parsed.data.roomId ? { roomId: parsed.data.roomId } : {}),
+      });
       const result = await dependencies.webResearch.search(
         {
           query: parsed.data.query,
@@ -205,6 +219,13 @@ export async function registerWebResearchRoutes(
         parsed.data.roomId,
         'web.fetch',
       );
+      await dependencies.policy?.assertCapabilityAllowed('WEB_FETCH', {
+        planId: identity.user.planId,
+        ...(context.billingContext.kind === 'organization'
+          ? { organizationId: context.billingContext.organizationId }
+          : {}),
+        ...(parsed.data.roomId ? { roomId: parsed.data.roomId } : {}),
+      });
       const result = await dependencies.webResearch.fetch(
         {
           url: parsed.data.url,

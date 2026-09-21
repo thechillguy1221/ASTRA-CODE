@@ -48,6 +48,12 @@ function mapReservation(row: Record<string, unknown>): CreditReservation {
     userId: row.user_id,
     taskId: row.task_key ?? row.task_id,
     ...(row.model_id ? { modelId: String(row.model_id) } : {}),
+    ...(row.pricing_version === null || row.pricing_version === undefined
+      ? {}
+      : { pricingVersion: Number(row.pricing_version) }),
+    ...(row.pricing_snapshot
+      ? { pricingSnapshot: row.pricing_snapshot as Record<string, unknown> }
+      : {}),
     amountCredits: String(row.amount_credits),
     status: row.status,
     idempotencyKey: row.idempotency_key,
@@ -369,6 +375,7 @@ export class PostgresBillingStore implements BillingStore {
           existing.userId !== input.userId ||
           existing.taskId !== input.taskId ||
           existing.modelId !== input.modelId ||
+          existing.pricingVersion !== input.pricingVersion ||
           existing.amountCredits !== formatCredits(parseCredits(input.amountCredits))
         )
           throw new BillingError(
@@ -412,14 +419,16 @@ export class PostgresBillingStore implements BillingStore {
         );
       const now = new Date().toISOString();
       const reservationResult = await client.query(
-        `INSERT INTO credit_reservations (id, user_id, task_id, task_key, model_id, amount_credits, status, idempotency_key, created_at, bucket_allocations)
-         VALUES ($1, $2, $3, $4, $5, $6, 'RESERVED', $7, $8, $9::jsonb) RETURNING *`,
+        `INSERT INTO credit_reservations (id, user_id, task_id, task_key, model_id, pricing_version, pricing_snapshot, amount_credits, status, idempotency_key, created_at, bucket_allocations)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, 'RESERVED', $9, $10, $11::jsonb) RETURNING *`,
         [
           randomUUID(),
           userId,
           taskId,
           input.taskId,
           input.modelId ?? null,
+          input.pricingVersion ?? null,
+          JSON.stringify(input.pricingSnapshot ?? null),
           amount,
           input.idempotencyKey,
           now,

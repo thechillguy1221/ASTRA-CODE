@@ -44,6 +44,8 @@ export class OrganizationBillingService {
     idempotencyKey: string;
     activeJobs?: number;
     activeSeats?: number;
+    pricingVersion?: number;
+    pricingSnapshot?: Record<string, unknown>;
   }): Promise<CreditReservation> {
     const plan = this.options.plans.get(input.planId);
     if (!plan.pooledCredits) throw new PlanEntitlementError('POOLED_WALLET_NOT_ENABLED');
@@ -90,6 +92,8 @@ export class OrganizationBillingService {
       modelId: input.modelId,
       amountCredits: input.amountCredits,
       idempotencyKey: input.idempotencyKey,
+      ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+      ...(input.pricingSnapshot === undefined ? {} : { pricingSnapshot: input.pricingSnapshot }),
     };
     return this.options.store.reserveCredits(reservationInput);
   }

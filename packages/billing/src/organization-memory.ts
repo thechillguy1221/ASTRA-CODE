@@ -274,6 +274,7 @@ export class InMemoryOrganizationBillingStore implements OrganizationBillingStor
         existing.roomId !== (input.roomId ?? null) ||
         existing.taskId !== input.taskId ||
         existing.modelId !== input.modelId ||
+        existing.pricingVersion !== input.pricingVersion ||
         existing.amountCredits !== amount
       )
         throw new BillingError(
@@ -302,6 +303,8 @@ export class InMemoryOrganizationBillingStore implements OrganizationBillingStor
       hostDeviceId: input.hostDeviceId ?? null,
       taskId: input.taskId,
       ...(input.modelId ? { modelId: input.modelId } : {}),
+      ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+      ...(input.pricingSnapshot === undefined ? {} : { pricingSnapshot: input.pricingSnapshot }),
       amountCredits: amount,
       status: 'RESERVED',
       idempotencyKey: input.idempotencyKey,

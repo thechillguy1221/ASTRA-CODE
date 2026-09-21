@@ -7,7 +7,11 @@ import {
   loadPlanCatalog,
   PostgresPaymentStore,
 } from '@astra/db';
-import { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
+import {
+  CommercialPolicyService,
+  ControlPlaneService,
+  PlatformPolicyService,
+} from '@astra/control-plane';
 import { VercelGatewayClient, VercelResponsesGatewayClient } from '@astra/model-gateway';
 import {
   AuthService,
@@ -107,6 +111,12 @@ const controlPlane = postgres
 const commercial = postgres
   ? new CommercialPolicyService({
       repository: postgres.commercial,
+      invalidationBus: postgres.controlPlaneInvalidation,
+    })
+  : undefined;
+const policy = postgres
+  ? new PlatformPolicyService({
+      repository: postgres.policy,
       invalidationBus: postgres.controlPlaneInvalidation,
     })
   : undefined;
@@ -221,6 +231,7 @@ const app = buildApi({
   plans,
   ...(controlPlane ? { controlPlane } : {}),
   ...(commercial ? { commercial } : {}),
+  ...(policy ? { policy } : {}),
   ...(razorpay ? { razorpay } : {}),
   ...(email ? { email } : {}),
   ...(config.publicSiteUrl ? { publicSiteUrl: config.publicSiteUrl } : {}),

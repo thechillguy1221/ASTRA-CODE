@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { ControlPlaneModelSnapshot, ControlPlanePlanSnapshot } from '@astra/control-plane';
+import type {
+  CapabilityPolicySnapshot,
+  ControlPlaneModelSnapshot,
+  ControlPlanePlanSnapshot,
+  FeatureFlagSnapshot,
+  MaintenancePolicySnapshot,
+  RazorpayMappingSnapshot,
+  ReleasePolicySnapshot,
+} from '@astra/control-plane';
 import type { RemoteDeviceRecord, RemoteOrganization, RemoteRoom } from '@astra/remote-protocol';
 import { adminPermissions, canAdmin, NO_LIVE_DATA, type AdminRole } from './access.js';
 import './app.css';
@@ -11,8 +19,14 @@ const sections = [
     group: 'Operations',
     items: ['Users', 'Organizations', 'Rooms', 'Devices', 'Models', 'AI Usage'],
   },
-  { group: 'Platform', items: ['Web Search', 'MCP', 'Plugins', 'Skills', 'Remote Access'] },
-  { group: 'System', items: ['Email', 'Security', 'Audit', 'Releases', 'Maintenance'] },
+  {
+    group: 'Platform',
+    items: ['Feature Flags', 'Web Search', 'MCP', 'Plugins', 'Skills', 'Remote Access'],
+  },
+  {
+    group: 'System',
+    items: ['Email', 'Security', 'Audit', 'Releases', 'Maintenance', 'Service Health'],
+  },
 ];
 
 interface AdminOverview {
@@ -79,6 +93,15 @@ interface PricingResponse {
   }>;
 }
 
+interface AdminHealth {
+  dataStatus: 'CONFIGURED' | typeof NO_LIVE_DATA;
+  controlPlane: string;
+  commercial: string;
+  policy: string;
+  remote: string;
+  analytics: string;
+}
+
 type SenderKind = 'DEFAULT' | 'NOREPLY' | 'SUPPORT' | 'BILLING' | 'SECURITY';
 interface SenderIdentity {
   kind: SenderKind;
@@ -126,6 +149,12 @@ export function App(): React.JSX.Element {
   const [changeReason, setChangeReason] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [modelStatus, setModelStatus] = useState('AVAILABLE');
+  const [featureFlags, setFeatureFlags] = useState<FeatureFlagSnapshot[]>([]);
+  const [maintenancePolicies, setMaintenancePolicies] = useState<MaintenancePolicySnapshot[]>([]);
+  const [capabilityPolicies, setCapabilityPolicies] = useState<CapabilityPolicySnapshot[]>([]);
+  const [releasePolicies, setReleasePolicies] = useState<ReleasePolicySnapshot[]>([]);
+  const [razorpayMappings, setRazorpayMappings] = useState<RazorpayMappingSnapshot[]>([]);
+  const [health, setHealth] = useState<AdminHealth | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -221,6 +250,16 @@ export function App(): React.JSX.Element {
         if (!pricingResponse.ok) throw new Error('Commercial configuration is unavailable.');
         setPricing((await pricingResponse.json()) as PricingResponse);
       }
+      if (section === 'Payments') {
+        const mappingsResponse = await fetch('/v1/admin/commercial/razorpay-mappings', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!mappingsResponse.ok) throw new Error('Payment mappings are unavailable.');
+        setRazorpayMappings(
+          ((await mappingsResponse.json()) as { mappings: RazorpayMappingSnapshot[] }).mappings,
+        );
+      }
       if (section === 'Audit' || section === 'Security') {
         const auditResponse = await fetch('/v1/admin/control-plane/audit', {
           credentials: 'include',
@@ -228,6 +267,52 @@ export function App(): React.JSX.Element {
         });
         if (!auditResponse.ok) throw new Error('Audit history is unavailable.');
         setControlAudit(((await auditResponse.json()) as { entries: ControlPlaneAudit[] }).entries);
+      }
+      if (section === 'Feature Flags') {
+        const policyResponse = await fetch('/v1/admin/policies/feature-flags', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!policyResponse.ok) throw new Error('Feature flag policy is unavailable.');
+        setFeatureFlags(((await policyResponse.json()) as { flags: FeatureFlagSnapshot[] }).flags);
+      }
+      if (['Web Search', 'MCP', 'Plugins', 'Skills', 'Remote Access'].includes(section)) {
+        const policyResponse = await fetch('/v1/admin/policies/capabilities', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!policyResponse.ok) throw new Error('Capability policy is unavailable.');
+        setCapabilityPolicies(
+          ((await policyResponse.json()) as { policies: CapabilityPolicySnapshot[] }).policies,
+        );
+      }
+      if (section === 'Maintenance') {
+        const policyResponse = await fetch('/v1/admin/policies/maintenance', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!policyResponse.ok) throw new Error('Maintenance policy is unavailable.');
+        setMaintenancePolicies(
+          ((await policyResponse.json()) as { policies: MaintenancePolicySnapshot[] }).policies,
+        );
+      }
+      if (section === 'Releases') {
+        const policyResponse = await fetch('/v1/admin/policies/releases', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!policyResponse.ok) throw new Error('Release policy is unavailable.');
+        setReleasePolicies(
+          ((await policyResponse.json()) as { policies: ReleasePolicySnapshot[] }).policies,
+        );
+      }
+      if (section === 'Service Health') {
+        const healthResponse = await fetch('/v1/admin/health', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!healthResponse.ok) throw new Error('Service health is unavailable.');
+        setHealth((await healthResponse.json()) as AdminHealth);
       }
     };
     void load().catch((error: unknown) =>
@@ -477,6 +562,146 @@ export function App(): React.JSX.Element {
     );
     setChangeReason('');
     setMessage(`${body.model.displayName} saved at version ${body.model.version}.`);
+  }
+
+  async function savePlatformPolicy(
+    path: string,
+    snapshot: Record<string, unknown>,
+    expectedVersion: number,
+  ): Promise<boolean> {
+    const reason = changeReason.trim();
+    if (!reason) {
+      setMessage('Enter a reason before changing platform policy.');
+      return false;
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== 'cookie-session') headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(path, {
+      method: 'PUT',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        snapshot: {
+          ...snapshot,
+          version: expectedVersion + 1,
+          updatedBy: 'admin-ui',
+          updatedAt: new Date().toISOString(),
+        },
+        metadata: { expectedVersion, reason, requestId: `admin-ui-${Date.now()}` },
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      snapshot?: Record<string, unknown>;
+      error?: string;
+    };
+    if (!response.ok || !body.snapshot) {
+      setMessage(body.error ?? 'Policy was not saved. Refresh and retry.');
+      return false;
+    }
+    setChangeReason('');
+    setMessage('Policy saved with a new version.');
+    return true;
+  }
+
+  async function toggleFeatureFlag(flag: FeatureFlagSnapshot): Promise<void> {
+    if (
+      await savePlatformPolicy(
+        `/v1/admin/policies/feature-flags/${flag.flagId}`,
+        { ...flag, enabled: !flag.enabled },
+        flag.version,
+      )
+    )
+      setFeatureFlags((current) =>
+        current.map((item) =>
+          item.flagId === flag.flagId
+            ? {
+                ...item,
+                enabled: !item.enabled,
+                version: item.version + 1,
+                updatedBy: 'admin-ui',
+                updatedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+  }
+
+  async function toggleCapability(policy: CapabilityPolicySnapshot): Promise<void> {
+    if (
+      await savePlatformPolicy(
+        `/v1/admin/policies/capabilities/${policy.key}`,
+        { ...policy, enabled: !policy.enabled },
+        policy.version,
+      )
+    )
+      setCapabilityPolicies((current) =>
+        current.map((item) =>
+          item.key === policy.key
+            ? {
+                ...item,
+                enabled: !item.enabled,
+                version: item.version + 1,
+                updatedBy: 'admin-ui',
+                updatedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+  }
+
+  async function toggleMaintenance(policy: MaintenancePolicySnapshot): Promise<void> {
+    if (
+      await savePlatformPolicy(
+        `/v1/admin/policies/maintenance/${policy.key}`,
+        { ...policy, enabled: !policy.enabled },
+        policy.version,
+      )
+    )
+      setMaintenancePolicies((current) =>
+        current.map((item) =>
+          item.key === policy.key
+            ? {
+                ...item,
+                enabled: !item.enabled,
+                version: item.version + 1,
+                updatedBy: 'admin-ui',
+                updatedAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
+  }
+
+  async function adminStatusMutation(
+    path: string,
+    method: 'POST' | 'PUT',
+    body: Record<string, unknown>,
+    onSuccess: () => void,
+  ): Promise<void> {
+    const reason = changeReason.trim();
+    if (!reason) {
+      setMessage('Enter a reason before making an administrative change.');
+      return;
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== 'cookie-session') headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(path, {
+      method,
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        ...body,
+        metadata: { expectedVersion: 0, reason, requestId: `admin-ui-${Date.now()}` },
+      }),
+    });
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      setMessage(result.error ?? 'Administrative change failed.');
+      return;
+    }
+    setChangeReason('');
+    onSuccess();
+    setMessage('Administrative change applied.');
   }
 
   if (!token || !role) {
@@ -756,6 +981,34 @@ export function App(): React.JSX.Element {
             ) : null}
           </section>
         ) : null}
+        {section === 'Payments' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Razorpay product mappings</h2>
+              <span>{razorpayMappings.length} versioned mappings</span>
+            </div>
+            {razorpayMappings.length === 0 ? (
+              <p className="form-note">No provider mappings are configured.</p>
+            ) : (
+              razorpayMappings.map((mapping) => (
+                <div className="action-row" key={mapping.mappingId}>
+                  <span>
+                    <strong>
+                      {mapping.entityType} · {mapping.entityId}
+                    </strong>
+                    <small>
+                      {mapping.region}/{mapping.currency} · v{mapping.version}
+                    </small>
+                  </span>
+                  <span>
+                    {mapping.providerProductId} · {mapping.interval} ·{' '}
+                    {mapping.active ? 'ACTIVE' : 'INACTIVE'}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
         {section === 'Models' ? (
           <section className="admin-table control-surface">
             <div className="table-heading">
@@ -823,6 +1076,14 @@ export function App(): React.JSX.Element {
               <h2>Organizations</h2>
               <span>{organizations.length} loaded</span>
             </div>
+            <label>
+              Reason for status change
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is this organization changing?"
+              />
+            </label>
             {organizations.length === 0 ? (
               <p className="form-note">{NO_LIVE_DATA}</p>
             ) : (
@@ -836,6 +1097,29 @@ export function App(): React.JSX.Element {
                     {organization.status} · {organization.seatLimit} seats ·{' '}
                     {organization.pooledCredits} pooled credits
                   </span>
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      void adminStatusMutation(
+                        `/v1/admin/organizations/${organization.id}/status`,
+                        'PUT',
+                        { status: organization.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' },
+                        () =>
+                          setOrganizations((current) =>
+                            current.map((item) =>
+                              item.id === organization.id
+                                ? {
+                                    ...item,
+                                    status: item.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                                  }
+                                : item,
+                            ),
+                          ),
+                      )
+                    }
+                  >
+                    {organization.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
+                  </button>
                 </div>
               ))
             )}
@@ -847,6 +1131,14 @@ export function App(): React.JSX.Element {
               <h2>Rooms</h2>
               <span>{rooms.length} loaded</span>
             </div>
+            <label>
+              Reason for status change
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is this room changing?"
+              />
+            </label>
             {rooms.length === 0 ? (
               <p className="form-note">{NO_LIVE_DATA}</p>
             ) : (
@@ -859,6 +1151,29 @@ export function App(): React.JSX.Element {
                   <span>
                     {room.status} · host {room.hostAvailability.toLowerCase()}
                   </span>
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      void adminStatusMutation(
+                        `/v1/admin/rooms/${room.id}/status`,
+                        'PUT',
+                        { status: room.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' },
+                        () =>
+                          setRooms((current) =>
+                            current.map((item) =>
+                              item.id === room.id
+                                ? {
+                                    ...item,
+                                    status: item.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE',
+                                  }
+                                : item,
+                            ),
+                          ),
+                      )
+                    }
+                  >
+                    {room.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
+                  </button>
                 </div>
               ))
             )}
@@ -870,6 +1185,14 @@ export function App(): React.JSX.Element {
               <h2>Devices</h2>
               <span>{devices.length} loaded</span>
             </div>
+            <label>
+              Reason for device revocation
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is this device being revoked?"
+              />
+            </label>
             {devices.length === 0 ? (
               <p className="form-note">{NO_LIVE_DATA}</p>
             ) : (
@@ -883,6 +1206,28 @@ export function App(): React.JSX.Element {
                     {device.revokedAt ? 'REVOKED' : device.lastSeenAt ? 'SEEN' : 'NOT SEEN'} ·{' '}
                     {device.userId}
                   </span>
+                  {!device.revokedAt ? (
+                    <button
+                      className="text-button"
+                      onClick={() =>
+                        void adminStatusMutation(
+                          `/v1/admin/devices/${device.id}/revoke`,
+                          'POST',
+                          {},
+                          () =>
+                            setDevices((current) =>
+                              current.map((item) =>
+                                item.id === device.id
+                                  ? { ...item, revokedAt: new Date().toISOString() }
+                                  : item,
+                              ),
+                            ),
+                        )
+                      }
+                    >
+                      Revoke
+                    </button>
+                  ) : null}
                 </div>
               ))
             )}
@@ -907,24 +1252,147 @@ export function App(): React.JSX.Element {
             ))}
           </section>
         ) : null}
-        {[
-          'Web Search',
-          'MCP',
-          'Plugins',
-          'Skills',
-          'Remote Access',
-          'Releases',
-          'Maintenance',
-        ].includes(section) ? (
+        {section === 'Feature Flags' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Feature flags</h2>
+              <span>{featureFlags.length} versioned flags</span>
+            </div>
+            <label>
+              Reason for change
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is this flag changing?"
+              />
+            </label>
+            {featureFlags.length === 0 ? (
+              <p className="form-note">No flags have been configured.</p>
+            ) : (
+              featureFlags.map((flag) => (
+                <div className="action-row" key={flag.flagId}>
+                  <span>
+                    <strong>{flag.key}</strong>
+                    <small>
+                      {flag.description} · {flag.scope} · v{flag.version}
+                    </small>
+                  </span>
+                  <button className="text-button" onClick={() => void toggleFeatureFlag(flag)}>
+                    {flag.enabled ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+              ))
+            )}
+          </section>
+        ) : null}
+        {['Web Search', 'MCP', 'Plugins', 'Skills', 'Remote Access'].includes(section) ? (
           <section className="admin-table control-surface">
             <div className="table-heading">
               <h2>{section} policy</h2>
-              <span>Server boundary</span>
+              <span>Server-enforced capability gate</span>
             </div>
-            <p className="form-note">
-              This surface is reserved for the next policy adapter. Authorization remains
-              server-side; this console never treats a local toggle as permission.
-            </p>
+            <label>
+              Reason for change
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is this capability changing?"
+              />
+            </label>
+            {capabilityPolicies
+              .filter((policy) => policy.key === section.toUpperCase().replace(' ', '_'))
+              .map((policy) => (
+                <div className="action-row" key={policy.key}>
+                  <span>
+                    <strong>{policy.key}</strong>
+                    <small>
+                      v{policy.version} · transports:{' '}
+                      {policy.allowedTransports.join(', ') || 'none'}
+                    </small>
+                  </span>
+                  <button className="text-button" onClick={() => void toggleCapability(policy)}>
+                    {policy.enabled ? 'Disable' : 'Enable'}
+                  </button>
+                </div>
+              ))}
+            {!capabilityPolicies.some(
+              (policy) => policy.key === section.toUpperCase().replace(' ', '_'),
+            ) ? (
+              <p className="form-note">No policy snapshot is available.</p>
+            ) : null}
+          </section>
+        ) : null}
+        {section === 'Maintenance' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Maintenance windows</h2>
+              <span>{maintenancePolicies.length} subsystem policies</span>
+            </div>
+            <label>
+              Reason for change
+              <input
+                value={changeReason}
+                onChange={(event) => setChangeReason(event.target.value)}
+                placeholder="Why is maintenance changing?"
+              />
+            </label>
+            {maintenancePolicies.map((policy) => (
+              <div className="action-row" key={policy.key}>
+                <span>
+                  <strong>{policy.key}</strong>
+                  <small>
+                    {policy.message} · v{policy.version}
+                  </small>
+                </span>
+                <button className="text-button" onClick={() => void toggleMaintenance(policy)}>
+                  {policy.enabled ? 'End maintenance' : 'Schedule maintenance'}
+                </button>
+              </div>
+            ))}
+          </section>
+        ) : null}
+        {section === 'Releases' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Desktop release policy</h2>
+              <span>{releasePolicies.length} channels</span>
+            </div>
+            {releasePolicies.map((policy) => (
+              <div className="action-row" key={policy.channel}>
+                <span>
+                  <strong>{policy.channel}</strong>
+                  <small>
+                    stable {policy.stableVersion} · beta {policy.betaVersion} · policy v
+                    {policy.version}
+                  </small>
+                </span>
+                <span>
+                  {policy.requiredUpdateVersion
+                    ? `Required &lt; ${policy.requiredUpdateVersion}`
+                    : 'No forced update'}
+                </span>
+              </div>
+            ))}
+          </section>
+        ) : null}
+        {section === 'Service Health' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Service health</h2>
+              <span>{health?.dataStatus ?? NO_LIVE_DATA}</span>
+            </div>
+            {health ? (
+              Object.entries(health)
+                .filter(([key]) => key !== 'dataStatus')
+                .map(([key, value]) => (
+                  <div className="action-row" key={key}>
+                    <span>{key}</span>
+                    <span>{value}</span>
+                  </div>
+                ))
+            ) : (
+              <p className="form-note">{NO_LIVE_DATA}</p>
+            )}
           </section>
         ) : null}
         {section === 'Email' && canAdmin(role, 'manage_email') ? (

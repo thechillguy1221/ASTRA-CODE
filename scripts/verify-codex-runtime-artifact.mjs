@@ -18,6 +18,11 @@ async function requireFile(path, label) {
   }
 }
 
+async function normalizedTextHash(path) {
+  const text = (await readFile(path, 'utf8')).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return createHash('sha256').update(text, 'utf8').digest('hex');
+}
+
 await requireFile(executable, 'bundled Codex app-server executable');
 await requireFile(manifestPath, 'Codex runtime manifest');
 await requireFile(licensePath, 'bundled Codex Apache-2.0 license');
@@ -50,21 +55,15 @@ if (manifest.artifact.sha256 !== hash || manifest.artifactSha256 !== hash)
     `Codex runtime artifact hash mismatch: expected ${manifest.artifact.sha256}, got ${hash}`,
   );
 
-const licenseHash = createHash('sha256')
-  .update(await readFile(licensePath))
-  .digest('hex');
-if (licenseHash !== 'aa5e89edcbbd01fc3fb188a527d8bdc0da5812305cab220c84348c14ea427288')
+const licenseHash = await normalizedTextHash(licensePath);
+if (licenseHash !== 'd17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc')
   throw new Error(`Codex LICENSE hash mismatch: got ${licenseHash}`);
 
-const noticeHash = createHash('sha256')
-  .update(await readFile(noticePath))
-  .digest('hex');
-if (noticeHash !== '3c505dc54be731583470ef3584e5cb96d60df7add3e7e36294cf4dea8316a5cb')
+const noticeHash = await normalizedTextHash(noticePath);
+if (noticeHash !== '9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915')
   throw new Error(`Codex NOTICE hash mismatch: got ${noticeHash}`);
 
-const clineLicenseHash = createHash('sha256')
-  .update(await readFile(clineLicensePath))
-  .digest('hex');
+const clineLicenseHash = await normalizedTextHash(clineLicensePath);
 if (clineLicenseHash !== 'f704446a5f1271608805598b557e4288cf8580477ea038c9c3d8b361f693f6b8')
   throw new Error(`Cline LICENSE hash mismatch: got ${clineLicenseHash}`);
 

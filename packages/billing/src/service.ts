@@ -40,6 +40,8 @@ export class BillingService {
     idempotencyKey: string;
     activeJobs?: number;
     activeSeats?: number;
+    pricingVersion?: number;
+    pricingSnapshot?: Record<string, unknown>;
   }): Promise<CreditReservation> {
     const activeJobs =
       input.activeJobs ?? (await this.options.store.countActiveReservations?.(input.userId)) ?? 0;
@@ -79,6 +81,8 @@ export class BillingService {
       modelId: input.modelId,
       amountCredits: input.amountCredits,
       idempotencyKey: input.idempotencyKey,
+      ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+      ...(input.pricingSnapshot === undefined ? {} : { pricingSnapshot: input.pricingSnapshot }),
     });
   }
 

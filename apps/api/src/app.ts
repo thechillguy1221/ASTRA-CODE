@@ -36,7 +36,11 @@ import type { ReleaseManifest } from '@astra/releases';
 import type { EmailService } from '@astra/email';
 import type { GoogleDesktopOAuthService } from '@astra/auth';
 import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@astra/email';
-import type { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
+import type {
+  CommercialPolicyService,
+  ControlPlaneService,
+  PlatformPolicyService,
+} from '@astra/control-plane';
 import {
   RemoteAccessService,
   type RemoteAccessPort,
@@ -68,6 +72,7 @@ export interface ApiDependencies {
   audit?: AdminAuditStore;
   controlPlane?: ControlPlaneService;
   commercial?: CommercialPolicyService;
+  policy?: PlatformPolicyService;
   razorpay?: RazorpayWebhookService;
   developmentEntitlement?: boolean;
   releaseManifest?: ReleaseManifest;
@@ -216,6 +221,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     audit,
     ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
     ...(dependencies.commercial ? { commercial: dependencies.commercial } : {}),
+    ...(dependencies.policy ? { policy: dependencies.policy } : {}),
     remote,
     ...(dependencies.analytics ? { analytics: dependencies.analytics } : {}),
   });
@@ -232,7 +238,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   void registerRazorpayRoutes(app, {
     ...(dependencies.razorpay ? { webhook: dependencies.razorpay } : {}),
   });
-  void registerReleaseRoutes(app, dependencies.releaseManifest);
+  void registerReleaseRoutes(app, dependencies.releaseManifest, dependencies.policy);
   if (dependencies.auth) {
     void registerRemoteRoutes(app, {
       auth: dependencies.auth,
@@ -240,6 +246,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       remote,
       ...(dependencies.relaySecret ? { relaySecret: dependencies.relaySecret } : {}),
       ...(dependencies.relayBroker ? { relayBroker: dependencies.relayBroker } : {}),
+      ...(dependencies.policy ? { policy: dependencies.policy } : {}),
       ...(dependencies.email ? { email: dependencies.email } : {}),
       ...(dependencies.publicSiteUrl ? { publicSiteUrl: dependencies.publicSiteUrl } : {}),
       ...(dependencies.exposeDevelopmentTokens === undefined
@@ -250,6 +257,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       auth: dependencies.auth,
       remote,
       webResearch,
+      ...(dependencies.policy ? { policy: dependencies.policy } : {}),
     });
     void registerCodexRuntimeRoutes(app, {
       auth: dependencies.auth,

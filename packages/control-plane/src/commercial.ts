@@ -20,6 +20,56 @@ import type { CommercialRepository, CommercialTransaction, InvalidationBus } fro
 import { hasAdminPermission } from './permissions.js';
 import type { ControlPlaneActor } from './service.js';
 
+const PRICING_SCALE = 10_000_000n;
+
+function parsePricingDecimal(value: string): bigint {
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole ?? '0') * PRICING_SCALE + BigInt(fraction.padEnd(7, '0').slice(0, 7) || '0');
+}
+
+function formatPricingCredits(value: bigint): string {
+  const whole = value / PRICING_SCALE;
+  const fraction = value % PRICING_SCALE;
+  if (fraction === 0n) return whole.toString();
+  return `${whole}.${fraction.toString().padStart(7, '0').replace(/0+$/, '')}`;
+}
+
+function roundPricingDivision(numerator: bigint, denominator: bigint): bigint {
+  const quotient = numerator / denominator;
+  return (numerator % denominator) * 2n >= denominator ? quotient + 1n : quotient;
+}
+
+export function calculateModelUsageCredits(
+  pricing: ModelConsumptionPricingSnapshot,
+  usage: {
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    cacheReadTokens?: number | null;
+    cacheWriteTokens?: number | null;
+    reasoningUnits?: number | null;
+    imageUnits?: number | null;
+    audioUnits?: number | null;
+  },
+): string {
+  let total = 0n;
+  const addPerThousand = (units: number | null | undefined, rate: string | null | undefined) => {
+    if (units === null || units === undefined || !Number.isFinite(units) || units <= 0 || !rate)
+      return;
+    total += roundPricingDivision(BigInt(Math.floor(units)) * parsePricingDecimal(rate), 1000n);
+  };
+  addPerThousand(usage.inputTokens, pricing.inputCreditsPer1k);
+  addPerThousand(usage.outputTokens, pricing.outputCreditsPer1k);
+  addPerThousand(usage.cacheReadTokens, pricing.cachedInputCreditsPer1k);
+  addPerThousand(usage.cacheWriteTokens, pricing.cachedInputCreditsPer1k);
+  addPerThousand(usage.reasoningUnits, pricing.reasoningCreditsPer1k);
+  if (usage.imageUnits && pricing.imageCredits)
+    total += BigInt(Math.floor(usage.imageUnits)) * parsePricingDecimal(pricing.imageCredits);
+  if (usage.audioUnits && pricing.audioCredits)
+    total += BigInt(Math.floor(usage.audioUnits)) * parsePricingDecimal(pricing.audioCredits);
+  const minimum = parsePricingDecimal(pricing.minimumChargeCredits);
+  return formatPricingCredits(total > minimum ? total : minimum);
+}
+
 export interface CommercialPolicyServiceOptions {
   repository: CommercialRepository;
   invalidationBus: InvalidationBus;

@@ -287,6 +287,7 @@ export class InMemoryBillingStore implements BillingStore {
         existing.userId !== input.userId ||
         existing.taskId !== input.taskId ||
         existing.modelId !== input.modelId ||
+        existing.pricingVersion !== input.pricingVersion ||
         existing.amountCredits !== formatCredits(parseCredits(input.amountCredits))
       )
         throw new BillingError(
@@ -307,6 +308,8 @@ export class InMemoryBillingStore implements BillingStore {
       userId: input.userId,
       taskId: input.taskId,
       ...(input.modelId ? { modelId: input.modelId } : {}),
+      ...(input.pricingVersion === undefined ? {} : { pricingVersion: input.pricingVersion }),
+      ...(input.pricingSnapshot === undefined ? {} : { pricingSnapshot: input.pricingSnapshot }),
       amountCredits: amount,
       status: 'RESERVED',
       idempotencyKey: input.idempotencyKey,

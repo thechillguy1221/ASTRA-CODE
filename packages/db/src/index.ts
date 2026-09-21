@@ -13,3 +13,4 @@ export * from './postgres-remote.js';
 export * from './postgres-organization-billing.js';
 export * from './postgres-control-plane.js';
 export * from './postgres-commercial.js';
+export * from './postgres-policy.js';

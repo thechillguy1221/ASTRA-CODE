@@ -16,5 +16,5 @@
   },
   "args": ["--listen", "stdio://", "--session-source", "vscode"],
   "acquisition": "official-github-release",
-  "buildTimestamp": "2026-09-20T22:37:59.029Z"
+  "buildTimestamp": "2026-09-21T14:33:37.012Z"
 }

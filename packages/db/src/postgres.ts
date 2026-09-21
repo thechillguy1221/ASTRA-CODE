@@ -33,6 +33,7 @@ import {
   PostgresInvalidationBus,
 } from './postgres-control-plane.js';
 import { PostgresCommercialRepository } from './postgres-commercial.js';
+import { PostgresPlatformPolicyRepository } from './postgres-policy.js';
 import type { CommercialRepository } from '@astra/control-plane';
 import type { ControlPlaneRepository, InvalidationBus } from '@astra/control-plane';
 
@@ -56,6 +57,7 @@ export interface PostgresStores {
   controlPlane: ControlPlaneRepository;
   controlPlaneInvalidation: InvalidationBus;
   commercial: CommercialRepository;
+  policy: import('@astra/control-plane').PlatformPolicyRepository;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -251,6 +253,7 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     controlPlane: new PostgresControlPlaneRepository(pool),
     controlPlaneInvalidation: new PostgresInvalidationBus(pool),
     commercial: new PostgresCommercialRepository(pool),
+    policy: new PostgresPlatformPolicyRepository(pool),
   };
 }
 
@@ -271,6 +274,14 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0015_email_sender_identities', file: '0015_email_sender_identities.sql' },
     { version: '0016_control_plane_foundation', file: '0016_control_plane_foundation.sql' },
     { version: '0017_commercial_control_plane', file: '0017_commercial_control_plane.sql' },
+    {
+      version: '0018_platform_policy_control_plane',
+      file: '0018_platform_policy_control_plane.sql',
+    },
+    {
+      version: '0019_pricing_snapshot_reservations',
+      file: '0019_pricing_snapshot_reservations.sql',
+    },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

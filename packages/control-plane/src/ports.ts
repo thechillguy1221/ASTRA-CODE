@@ -3,11 +3,18 @@ import type {
   CommercialPlanPriceSnapshot,
   ControlPlaneModelSnapshot,
   ControlPlanePlanSnapshot,
+  CapabilityPolicySnapshot,
+  FeatureFlagSnapshot,
   InvalidationMessage,
+  MaintenanceKey,
+  MaintenancePolicySnapshot,
   ModelConsumptionPricingSnapshot,
   ModelWriteInput,
   PlanWriteInput,
   PromotionSnapshot,
+  RazorpayMappingSnapshot,
+  ReleaseChannel,
+  ReleasePolicySnapshot,
   TopUpPackageSnapshot,
 } from './contracts.js';
 
@@ -63,6 +70,52 @@ export interface CommercialTransaction {
     expectedVersion: number;
     audit: AuditEventInput;
   }): Promise<ModelConsumptionPricingSnapshot>;
+  appendAudit(event: AuditEventInput): Promise<void>;
+}
+
+export interface PlatformPolicyRepository {
+  listFeatureFlags(): Promise<FeatureFlagSnapshot[]>;
+  getFeatureFlag(flagId: string): Promise<FeatureFlagSnapshot | undefined>;
+  listFeatureFlagVersions(flagId: string): Promise<FeatureFlagSnapshot[]>;
+  listMaintenancePolicies(): Promise<MaintenancePolicySnapshot[]>;
+  getMaintenancePolicy(key: MaintenanceKey): Promise<MaintenancePolicySnapshot | undefined>;
+  listCapabilityPolicies(): Promise<CapabilityPolicySnapshot[]>;
+  getCapabilityPolicy(
+    key: CapabilityPolicySnapshot['key'],
+  ): Promise<CapabilityPolicySnapshot | undefined>;
+  getReleasePolicy(channel: ReleaseChannel): Promise<ReleasePolicySnapshot | undefined>;
+  listReleasePolicies(): Promise<ReleasePolicySnapshot[]>;
+  listRazorpayMappings(): Promise<RazorpayMappingSnapshot[]>;
+  listAudit(input?: { limit?: number; offset?: number }): Promise<AuditEventInput[]>;
+  transaction<T>(operation: (transaction: PlatformPolicyTransaction) => Promise<T>): Promise<T>;
+}
+
+export interface PlatformPolicyTransaction {
+  putFeatureFlag(input: {
+    snapshot: FeatureFlagSnapshot;
+    expectedVersion: number;
+    audit: AuditEventInput;
+  }): Promise<FeatureFlagSnapshot>;
+  putMaintenancePolicy(input: {
+    snapshot: MaintenancePolicySnapshot;
+    expectedVersion: number;
+    audit: AuditEventInput;
+  }): Promise<MaintenancePolicySnapshot>;
+  putCapabilityPolicy(input: {
+    snapshot: CapabilityPolicySnapshot;
+    expectedVersion: number;
+    audit: AuditEventInput;
+  }): Promise<CapabilityPolicySnapshot>;
+  putReleasePolicy(input: {
+    snapshot: ReleasePolicySnapshot;
+    expectedVersion: number;
+    audit: AuditEventInput;
+  }): Promise<ReleasePolicySnapshot>;
+  putRazorpayMapping(input: {
+    snapshot: RazorpayMappingSnapshot;
+    expectedVersion: number;
+    audit: AuditEventInput;
+  }): Promise<RazorpayMappingSnapshot>;
   appendAudit(event: AuditEventInput): Promise<void>;
 }
 

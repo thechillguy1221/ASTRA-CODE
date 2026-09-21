@@ -185,6 +185,7 @@ export interface RemoteAccessPort {
   ): RemoteDeviceRecord | Promise<RemoteDeviceRecord>;
   getDevice(deviceId: string): RemoteDeviceRecord | Promise<RemoteDeviceRecord>;
   revokeDevice(userId: string, deviceId: string): void | Promise<void>;
+  adminRevokeDevice(deviceId: string, reason: string): void | Promise<void>;
   createOrganization(input: {
     ownerUserId: string;
     displayName: string;
@@ -199,6 +200,11 @@ export interface RemoteAccessPort {
     status: RemoteOrganization['status'];
     reason: string;
   }): RemoteOrganization | Promise<RemoteOrganization>;
+  adminSetOrganizationStatus(input: {
+    organizationId: string;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): RemoteOrganization | Promise<RemoteOrganization>;
   createRoom(input: {
     actorUserId: string;
     organizationId: string;
@@ -209,6 +215,11 @@ export interface RemoteAccessPort {
   getRoom(roomId: string): RemoteRoom | Promise<RemoteRoom>;
   listRooms(actorUserId: string): RemoteRoom[] | Promise<RemoteRoom[]>;
   listAllRooms(): RemoteRoom[] | Promise<RemoteRoom[]>;
+  adminSetRoomStatus(input: {
+    roomId: string;
+    status: RemoteRoom['status'];
+    reason: string;
+  }): RemoteRoom | Promise<RemoteRoom>;
   handoffRoom(input: {
     actorUserId: string;
     roomId: string;
@@ -568,6 +579,15 @@ export class RemoteAccessService {
     device.credentialVersion += 1;
   }
 
+  adminRevokeDevice(deviceId: string, reason: string): void {
+    const device = this.requireDevice(deviceId);
+    device.revokedAt = this.now().toISOString();
+    device.credentialVersion += 1;
+    this.recordAudit(device.userId, null, null, 'device.revoked_by_admin', 'device', deviceId, {
+      reason,
+    });
+  }
+
   createOrganization(input: {
     ownerUserId: string;
     displayName: string;
@@ -648,6 +668,25 @@ export class RemoteAccessService {
       'organization.entitlement.changed',
       'organization',
       organization.id,
+    );
+    return { ...organization };
+  }
+
+  adminSetOrganizationStatus(input: {
+    organizationId: string;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): RemoteOrganization {
+    const organization = this.requireOrganization(input.organizationId);
+    organization.status = input.status;
+    this.recordAudit(
+      organization.id,
+      null,
+      null,
+      'organization.status.changed_by_admin',
+      'organization',
+      organization.id,
+      { reason: input.reason },
     );
     return { ...organization };
   }
@@ -1290,6 +1329,26 @@ export class RemoteAccessService {
       .map((room) => this.getRoom(room.id));
   }
 
+  adminSetRoomStatus(input: {
+    roomId: string;
+    status: RemoteRoom['status'];
+    reason: string;
+  }): RemoteRoom {
+    const room = this.requireRoom(input.roomId);
+    room.status = input.status;
+    room.updatedAt = this.now().toISOString();
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      null,
+      'room.status.changed_by_admin',
+      'room',
+      room.id,
+      { reason: input.reason },
+    );
+    return { ...room };
+  }
+
   listAudit(organizationId: string): RoomAuditEvent[] {
     return this.audit
       .filter((event) => event.organizationId === organizationId)
@@ -1435,6 +1494,7 @@ export class RemoteAccessService {
     action: string,
     targetType: string,
     targetId: string,
+    metadata?: Record<string, unknown>,
   ): void {
     this.audit.push({
       id: randomUUID(),
@@ -1444,6 +1504,7 @@ export class RemoteAccessService {
       action,
       targetType,
       targetId,
+      ...(metadata ? { metadata } : {}),
       createdAt: this.now().toISOString(),
     });
   }

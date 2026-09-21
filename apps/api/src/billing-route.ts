@@ -5,6 +5,8 @@ import {
   OrganizationBillingService,
   formatUsd,
   parseUsd,
+  addCredits,
+  creditsToUsd,
 } from '@astra/billing';
 import { AUTO_MODEL_ID, type BillingMode } from '@astra/contracts';
 import type { ModelCatalogStore } from '@astra/db';
@@ -21,7 +23,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveRequestedModel } from './model-selection.js';
 import { RemoteAccessError, type RemoteAccessPort } from '@astra/remote-protocol';
-import type { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
+import {
+  calculateModelUsageCredits,
+  ModelConsumptionPricingSnapshotSchema,
+  type CommercialPolicyService,
+  type ControlPlaneService,
+} from '@astra/control-plane';
 
 const ReservationSchema = z.object({
   organizationId: z.string().min(1).optional(),
@@ -304,6 +311,12 @@ export async function registerBillingRoutes(
             reason: policy.reason,
           });
       }
+      const pricingRegion = pricingRegionForCountryCode(countryHintFrom(request));
+      const pricingSnapshot = dependencies.commercial
+        ? await dependencies.commercial.getModelPricing(selectedModelId, pricingRegion)
+        : undefined;
+      if (dependencies.commercial && !pricingSnapshot)
+        return reply.code(503).send({ error: 'MODEL_PRICING_UNAVAILABLE' });
       const reservation = organizationContext
         ? await dependencies.organizationBilling.reserveTask({
             organizationId: organizationContext.organizationId,
@@ -317,6 +330,9 @@ export async function registerBillingRoutes(
             mode: parsed.data.mode as BillingMode,
             amountCredits: parsed.data.amountCredits,
             idempotencyKey: parsed.data.idempotencyKey,
+            ...(pricingSnapshot
+              ? { pricingVersion: pricingSnapshot.version, pricingSnapshot }
+              : {}),
             activeSeats: (
               await dependencies.remote.listRoomMembers(identity.user.id, organizationRoom!.id)
             ).filter((member) => member.status === 'ACTIVE').length,
@@ -330,6 +346,9 @@ export async function registerBillingRoutes(
             mode: parsed.data.mode as BillingMode,
             amountCredits: parsed.data.amountCredits,
             idempotencyKey: parsed.data.idempotencyKey,
+            ...(pricingSnapshot
+              ? { pricingVersion: pricingSnapshot.version, pricingSnapshot }
+              : {}),
           });
       return reply.code(201).send({ reservation });
     } catch (error) {
@@ -396,17 +415,39 @@ export async function registerBillingRoutes(
       // Provider receipts are the source of truth. The desktop request fields
       // remain accepted for wire compatibility but are never trusted for
       // financial settlement.
+      let customerBillableCostUsd = providerCost;
+      if (reservation.pricingSnapshot) {
+        const pricing = ModelConsumptionPricingSnapshotSchema.parse(reservation.pricingSnapshot);
+        let settledCredits = '0';
+        for (const receipt of receipts) {
+          settledCredits = addCredits(
+            settledCredits,
+            calculateModelUsageCredits(pricing, {
+              inputTokens: receipt.inputTokens,
+              outputTokens: receipt.outputTokens,
+              cacheReadTokens: receipt.cacheReadTokens ?? receipt.cacheTokens,
+              ...(receipt.cacheWriteTokens === undefined
+                ? {}
+                : { cacheWriteTokens: receipt.cacheWriteTokens }),
+              ...(receipt.reasoningUnits === undefined
+                ? {}
+                : { reasoningUnits: receipt.reasoningUnits }),
+            }),
+          );
+        }
+        customerBillableCostUsd = creditsToUsd(settledCredits);
+      }
       const settlement = reservation.organizationId
         ? await dependencies.organizationBilling.settleTask({
             reservationId: reservation.reservationId,
             providerActualCostUsd: providerCost,
-            customerBillableCostUsd: providerCost,
+            customerBillableCostUsd,
             idempotencyKey: parsed.data.idempotencyKey,
           })
         : await dependencies.billing.settleTask({
             reservationId: reservation.reservationId,
             providerActualCostUsd: providerCost,
-            customerBillableCostUsd: providerCost,
+            customerBillableCostUsd,
             idempotencyKey: parsed.data.idempotencyKey,
           });
       return reply.send({ settlement });

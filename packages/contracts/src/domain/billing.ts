@@ -136,6 +136,8 @@ export const CreditReservationSchema = z.object({
   hostDeviceId: z.string().min(1).nullable().optional(),
   taskId: z.string().min(1),
   modelId: z.string().min(1).optional(),
+  pricingVersion: z.number().int().positive().optional(),
+  pricingSnapshot: z.record(z.unknown()).optional(),
   amountCredits: CreditAmountSchema,
   status: z.enum(['RESERVED', 'SETTLED', 'RELEASED', 'CANCELLED']),
   idempotencyKey: z.string().min(1),

@@ -139,6 +139,35 @@ export class ControlPlaneService {
     return this.repository.listAudit(input);
   }
 
+  async appendAudit(
+    input: ControlPlaneWriteRequest & {
+      permission: AdminPermission;
+      action: string;
+      targetType: string;
+      targetId: string;
+      before?: unknown;
+      after?: unknown;
+    },
+  ): Promise<void> {
+    this.assertPermission(input.actor, input.permission);
+    const metadata = MutationMetadataSchema.parse(input.metadata);
+    const event = redactAuditEvent(
+      AuditEventInputSchema.parse({
+        actor: input.actor,
+        action: input.action,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        before: input.before,
+        after: input.after,
+        reason: metadata.reason,
+        requestId: metadata.requestId,
+        context: input.context,
+        createdAt: new Date(this.now()).toISOString(),
+      }),
+    );
+    await this.repository.transaction((transaction) => transaction.appendAudit(event));
+  }
+
   async updatePlan(input: {
     plan: ControlPlanePlanSnapshot;
     metadata: MutationMetadata;

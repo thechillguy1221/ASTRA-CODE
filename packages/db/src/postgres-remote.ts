@@ -316,6 +316,15 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
     if (!result.rows[0]) throw new RemoteAccessError('DEVICE_NOT_FOUND', 'Device not found');
   }
 
+  async adminRevokeDevice(deviceId: string, _reason: string): Promise<void> {
+    void _reason;
+    const result = await this.pool.query(
+      'UPDATE remote_devices SET revoked_at = COALESCE(revoked_at, $2), credential_version = credential_version + 1 WHERE id = $1 RETURNING id',
+      [deviceId, this.now().toISOString()],
+    );
+    if (!result.rows[0]) throw new RemoteAccessError('DEVICE_NOT_FOUND', 'Device not found');
+  }
+
   async createOrganization(input: {
     ownerUserId: string;
     displayName: string;
@@ -429,6 +438,39 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
           input.organizationId,
           input.actorUserId,
           `organization.entitlement.changed:${input.reason.slice(0, 240)}`,
+        ],
+      );
+      await client.query('COMMIT');
+      return mapOrganization(result.rows[0] as Record<string, unknown>);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async adminSetOrganizationStatus(input: {
+    organizationId: string;
+    status: RemoteOrganization['status'];
+    reason: string;
+  }): Promise<RemoteOrganization> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'UPDATE organizations SET status = $2, updated_at = now() WHERE id = $1 RETURNING *',
+        [input.organizationId, input.status],
+      );
+      if (!result.rows[0])
+        throw new RemoteAccessError('ORGANIZATION_NOT_FOUND', 'Organization not found');
+      await client.query(
+        `INSERT INTO room_audit_events(id, organization_id, room_id, actor_user_id, action, target_type, target_id)
+         VALUES ($1, $2, NULL, NULL, $3, 'organization', $2)`,
+        [
+          randomUUID(),
+          input.organizationId,
+          `organization.status.changed_by_admin:${input.reason.slice(0, 240)}`,
         ],
       );
       await client.query('COMMIT');
@@ -560,6 +602,39 @@ export class PostgresRemoteAccessService implements RemoteAccessPort {
         ),
       });
     });
+  }
+
+  async adminSetRoomStatus(input: {
+    roomId: string;
+    status: RemoteRoom['status'];
+    reason: string;
+  }): Promise<RemoteRoom> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        'UPDATE rooms SET status = $2, updated_at = now() WHERE id = $1 RETURNING organization_id',
+        [input.roomId, input.status],
+      );
+      if (!result.rows[0]) throw new RemoteAccessError('ROOM_NOT_FOUND', 'Room not found');
+      await client.query(
+        `INSERT INTO room_audit_events(id, organization_id, room_id, actor_user_id, action, target_type, target_id)
+         VALUES ($1, $2, $3, NULL, $4, 'room', $3)`,
+        [
+          randomUUID(),
+          String(result.rows[0].organization_id),
+          input.roomId,
+          `room.status.changed_by_admin:${input.reason.slice(0, 240)}`,
+        ],
+      );
+      await client.query('COMMIT');
+      return this.getRoom(input.roomId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async handoffRoom(input: {

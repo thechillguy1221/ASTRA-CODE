@@ -123,4 +123,23 @@ describe('commercial control-plane API', () => {
     });
     expect(denied.statusCode).toBe(403);
   });
+
+  it('fails closed when commercial billing has no authoritative model pricing snapshot', async () => {
+    const identity = await sessionFor('USER');
+    const app = buildApi({ auth: identity.auth, commercial: commercial() });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/reservations',
+      headers: { authorization: `Bearer ${identity.token}` },
+      payload: {
+        taskId: 'unpriced-task',
+        modelId: 'approved-core',
+        mode: 'BUILD',
+        amountCredits: '10',
+        idempotencyKey: 'unpriced-reservation',
+      },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: 'MODEL_PRICING_UNAVAILABLE' });
+  });
 });
