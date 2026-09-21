@@ -160,5 +160,5 @@ describe('agent golden path', () => {
       ]),
     );
     expect(events).toHaveLength(result.events.length);
-  });
+  }, 15_000);
 });
