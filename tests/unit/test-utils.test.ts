@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DeterministicModel } from '@lyntar/test-utils';
+import { DeterministicModel } from '@astra/test-utils';
 
 describe('deterministic test utilities', () => {
   it('returns configured structured decisions in order', async () => {

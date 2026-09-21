@@ -5,7 +5,7 @@ import {
   InMemoryEmailProvider,
   renderTemplate,
   sanitizeEmailHtml,
-} from '@lyntar/email';
+} from '@astra/email';
 
 describe('Astra email infrastructure', () => {
   it('renders escaped template variables and rejects active HTML content', () => {

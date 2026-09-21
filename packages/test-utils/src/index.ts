@@ -1,5 +1,5 @@
-import type { ModelPort } from '@lyntar/agent-core';
-import type { ModelDecision, ModelRequest } from '@lyntar/contracts';
+import type { ModelPort } from '@astra/agent-core';
+import type { ModelDecision, ModelRequest } from '@astra/contracts';
 
 export class DeterministicModel implements ModelPort {
   private readonly remaining: ModelDecision[];

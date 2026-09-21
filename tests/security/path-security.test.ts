@@ -6,7 +6,7 @@ import {
   assertWorkspacePath,
   canonicalizeWorkspaceRoot,
   WorkspaceEscapeError,
-} from '@lyntar/workspace';
+} from '@astra/workspace';
 
 const temporaryRoots: string[] = [];
 
@@ -18,7 +18,7 @@ afterEach(async () => {
 
 describe('workspace path security', () => {
   it('rejects traversal and absolute Windows device paths', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-path-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-path-'));
     temporaryRoots.push(root);
     const workspace = await canonicalizeWorkspaceRoot(root);
 
@@ -34,8 +34,8 @@ describe('workspace path security', () => {
   });
 
   it('rejects a junction that resolves outside the workspace', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-junction-'));
-    const outside = await mkdtemp(join(tmpdir(), 'lyntar-outside-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-junction-'));
+    const outside = await mkdtemp(join(tmpdir(), 'astra-outside-'));
     temporaryRoots.push(root, outside);
     await writeFile(join(outside, 'secret.txt'), 'secret');
     await mkdir(join(root, 'linked'));
@@ -49,7 +49,7 @@ describe('workspace path security', () => {
   });
 
   it('rejects alternate data streams, reserved device names, and UNC paths', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-path-syntax-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-path-syntax-'));
     temporaryRoots.push(root);
     const workspace = await canonicalizeWorkspaceRoot(root);
 
@@ -64,7 +64,7 @@ describe('workspace path security', () => {
   });
 
   it('rejects a workspace root replaced by a junction after selection', async () => {
-    const parent = await mkdtemp(join(tmpdir(), 'lyntar-root-replacement-'));
+    const parent = await mkdtemp(join(tmpdir(), 'astra-root-replacement-'));
     const root = join(parent, 'workspace');
     const outside = join(parent, 'outside');
     await mkdir(root);

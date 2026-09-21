@@ -1,6 +1,6 @@
 # Astra Code open-source notices
 
-Astra Code's internal `@lyntar/*` packages are private and marked `UNLICENSED`.
+Astra Code's internal `@astra/*` packages are private and marked `UNLICENSED`.
 The desktop renderer incorporates selected Cline SDK UI components from the
 pinned Apache-2.0 checkout:
 

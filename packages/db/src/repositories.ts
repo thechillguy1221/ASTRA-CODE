@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentEvent, ModelCatalogEntry, UsageReceipt } from '@lyntar/contracts';
+import type { AgentEvent, ModelCatalogEntry, UsageReceipt } from '@astra/contracts';
 
 export interface UsageReceiptStore {
   save(receipt: UsageReceipt): Promise<void>;

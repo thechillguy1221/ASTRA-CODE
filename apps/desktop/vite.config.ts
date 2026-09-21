@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@lyntar/contracts': resolve(repositoryRoot, 'packages/contracts/src/index.ts'),
+      '@astra/contracts': resolve(repositoryRoot, 'packages/contracts/src/index.ts'),
     },
   },
   build: { outDir: 'dist/renderer', emptyOutDir: true },

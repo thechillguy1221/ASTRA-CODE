@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
-import { InMemoryBillingStore } from '@lyntar/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
+import { InMemoryBillingStore } from '@astra/billing';
 
 describe('V1 plan catalog', () => {
   it('Free plan grants exactly 25 credits', () => {

@@ -1,5 +1,5 @@
 {
-  "name": "lyntar",
+  "name": "astra",
   "productName": "Astra Code",
   "description": "Astra Code desktop coding agent platform with bounded local execution, model routing, and verified results.",
   "version": "0.1.0",
@@ -15,19 +15,19 @@
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",
     "typecheck": "tsc -b",
-    "build:packages": "npm run build --workspace @lyntar/contracts && npm run build --workspace @lyntar/config && npm run build --workspace @lyntar/auth && npm run build --workspace @lyntar/plans && npm run build --workspace @lyntar/billing && npm run build --workspace @lyntar/skills && npm run build --workspace @lyntar/mcp && npm run build --workspace @lyntar/plugins && npm run build --workspace @lyntar/integrations && npm run build --workspace @lyntar/modes && npm run build --workspace @lyntar/releases && npm run build --workspace @lyntar/email && npm run build --workspace @lyntar/observability && npm run build --workspace @lyntar/marketplace && npm run build --workspace @lyntar/remote-protocol && npm run build --workspace @lyntar/db && npm run build --workspace @lyntar/model-gateway && npm run build --workspace @lyntar/workspace && npm run build --workspace @lyntar/codex-runtime && npm run build --workspace @lyntar/web-research && npm run build --workspace @lyntar/agent-core && npm run build --workspace @lyntar/test-utils",
-    "build": "npm run build:packages && npm run build --workspace @lyntar/api && npm run build --workspace @lyntar/desktop && npm run build --workspace @lyntar/web && node --import tsx scripts/prerender-web.mjs && npm run build --workspace @lyntar/admin",
-    "package:win": "npm run package:win --workspace @lyntar/desktop",
-    "package:win:unsigned": "npm run package:win:unsigned --workspace @lyntar/desktop",
+    "build:packages": "npm run build --workspace @astra/contracts && npm run build --workspace @astra/config && npm run build --workspace @astra/auth && npm run build --workspace @astra/plans && npm run build --workspace @astra/billing && npm run build --workspace @astra/skills && npm run build --workspace @astra/mcp && npm run build --workspace @astra/plugins && npm run build --workspace @astra/integrations && npm run build --workspace @astra/modes && npm run build --workspace @astra/releases && npm run build --workspace @astra/email && npm run build --workspace @astra/observability && npm run build --workspace @astra/marketplace && npm run build --workspace @astra/remote-protocol && npm run build --workspace @astra/db && npm run build --workspace @astra/model-gateway && npm run build --workspace @astra/workspace && npm run build --workspace @astra/codex-runtime && npm run build --workspace @astra/web-research && npm run build --workspace @astra/agent-core && npm run build --workspace @astra/test-utils",
+    "build": "npm run build:packages && npm run build --workspace @astra/api && npm run build --workspace @astra/desktop && npm run build --workspace @astra/web && node --import tsx scripts/prerender-web.mjs && npm run build --workspace @astra/admin",
+    "package:win": "npm run package:win --workspace @astra/desktop",
+    "package:win:unsigned": "npm run package:win:unsigned --workspace @astra/desktop",
     "build:codex-runtime": "node scripts/build-codex-runtime.mjs",
-    "certify:codex-runtime": "npm run build --workspace @lyntar/codex-runtime && node scripts/verify-codex-runtime-artifact.mjs && node scripts/certify-codex-runtime.mjs",
+    "certify:codex-runtime": "npm run build --workspace @astra/codex-runtime && node scripts/verify-codex-runtime-artifact.mjs && node scripts/certify-codex-runtime.mjs",
     "verify:source-provenance": "node scripts/verify-source-provenance.mjs",
     "lint": "eslint .",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"packages/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"scripts/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"tests/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"docs/**/*.{md,json,yml,yaml}\" \"*.{json,js,ts,mjs,cjs,md,yml,yaml}\"",
     "golden-path": "node --import tsx scripts/run-golden-path.mjs",
     "certify:postgres": "npm run build:packages && node --import tsx scripts/postgres-certification.mjs",
     "dev:api": "npm run build:packages && tsx apps/api/src/server.ts",
-    "dev:desktop": "npm run dev --workspace @lyntar/desktop"
+    "dev:desktop": "npm run dev --workspace @astra/desktop"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",

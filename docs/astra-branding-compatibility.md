@@ -1,30 +1,28 @@
 # Astra AI branding and compatibility
 
-The public product name is **Astra Code** (short UI label: **Astra**). The repository still contains
-internal `lyntar` identifiers because they are part of the current workspace, package, environment,
-IPC, and database compatibility surface.
+The public product name is **Astra Code** (short UI label: **Astra**). The repository now uses
+`astra` identifiers across its workspace, packages, environment, IPC, storage, and public metadata.
 
 ## Public migration
 
 - User-facing titles, navigation, copy, error messages, desktop window labels, email copy, public
   metadata, and public route content use Astra Code.
-- New public host and deployment metadata must be configured explicitly; the legacy `lyntar.dev`
-  canonical host is retained only until the production domain migration is supplied.
+- Public host and deployment metadata must be configured explicitly. The repository default is
+  `https://astra.dev`; replace it with the verified production domain before launch if that domain
+  is not the intended canonical host.
 - The website uses a server/config-driven plan response. It must not invent plan pricing in the UI.
 
-## Preserved internal identifiers
+## Renamed internal identifiers
 
-- npm package names such as `@lyntar/auth` and the root workspace name `lyntar` remain stable for
-  workspace consumers and built desktop artifacts.
-- Existing `LYNTAR_*` environment variables remain canonical for this release. Astra aliases may be
-  added only as an explicit migration, never by silently changing the meaning of an existing key.
-- Existing `window.lyntar` IPC exposure and persisted `lyntar-session.bin` storage remain available
-  for compatibility. The desktop may add an `astra` alias without removing the legacy surface.
-- Migration filenames, immutable migration IDs, event identifiers, protocol fields, and persisted
-  values are not renamed retroactively.
+- npm package names use the `@astra/*` scope and the root workspace is `astra`.
+- Runtime configuration uses `ASTRA_*` environment variables.
+- The desktop exposes `window.astra` and persists `astra-session.bin`.
+- Active protocol headers, route slugs, TypeScript symbols, migration references, and test fixtures
+  use Astra naming.
 
 ## Cutover requirements
 
-Before a public domain/installer cutover, configure the Astra host, update signed release metadata,
+Before a public deployment, configure the verified Astra host, update signed release metadata,
 verify OAuth redirect URIs, update transactional email links, and run a migration-aware desktop
-upgrade test. No production certification is implied by this source-level rebrand.
+upgrade test for users migrating from earlier internal identifiers. No production certification is
+implied by this source-level rebrand.

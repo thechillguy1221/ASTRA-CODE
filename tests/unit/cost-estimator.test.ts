@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { estimateTaskCost, getWarningLevel } from '@lyntar/agent-core';
-import type { ModelCatalogEntry, SpendingThresholds } from '@lyntar/contracts';
-import { SpendingThresholdsSchema } from '@lyntar/contracts';
+import { estimateTaskCost, getWarningLevel } from '@astra/agent-core';
+import type { ModelCatalogEntry, SpendingThresholds } from '@astra/contracts';
+import { SpendingThresholdsSchema } from '@astra/contracts';
 
 const model: ModelCatalogEntry = {
   modelId: 'fable-5.1',

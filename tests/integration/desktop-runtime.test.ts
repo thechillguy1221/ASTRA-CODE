@@ -9,12 +9,12 @@ import {
   createMemoryCatalog,
   createMemoryEventStore,
   createMemoryReceiptStore,
-} from '@lyntar/api';
+} from '@astra/api';
 import {
   DesktopRuntime,
   type DesktopRuntimeOptions,
 } from '../../apps/desktop/electron/desktop-runtime.js';
-import type { ModelDecision } from '@lyntar/contracts';
+import type { ModelDecision } from '@astra/contracts';
 
 const execFileAsync = promisify(execFile);
 const temporaryRoots: string[] = [];
@@ -31,14 +31,14 @@ async function git(root: string, ...args: string[]): Promise<void> {
 
 describe('desktop runtime adapter', () => {
   it('runs the local repository vertical slice through the HTTP model boundary', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-desktop-runtime-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-desktop-runtime-'));
     temporaryRoots.push(root);
     const repository = join(root, 'broken-node-app');
     await mkdir(repository);
     await cp('tests/fixtures/broken-node-app', repository, { recursive: true });
     await git(repository, 'init');
-    await git(repository, 'config', 'user.email', 'test@lyntar.local');
-    await git(repository, 'config', 'user.name', 'Lyntar Test');
+    await git(repository, 'config', 'user.email', 'test@astra.local');
+    await git(repository, 'config', 'user.name', 'Astra Test');
     await git(repository, 'add', '.');
     await git(repository, 'commit', '-m', 'fixture');
     await writeFile(join(repository, 'README.md'), 'pre-existing note\n');
@@ -129,7 +129,7 @@ describe('desktop runtime adapter', () => {
       expect(models[0].modelId).toBe('deterministic');
       expect(result.state).toBe('COMPLETED');
       expect(result.verification.status).toBe('passed');
-      expect(result.gitDiff.lyntarPaths).toEqual(['src/validate.ts']);
+      expect(result.gitDiff.astraPaths).toEqual(['src/validate.ts']);
       expect(result.gitDiff.preExistingPaths).toContain('README.md');
       expect(events).toContain('task.completed');
       expect(await eventStore.listForTask('desktop-runtime-task')).toHaveLength(events.length);

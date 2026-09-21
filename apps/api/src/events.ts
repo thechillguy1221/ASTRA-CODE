@@ -1,1 +1,1 @@
-export { createMemoryEventStore, InMemoryAgentEventStore } from '@lyntar/db';
+export { createMemoryEventStore, InMemoryAgentEventStore } from '@astra/db';

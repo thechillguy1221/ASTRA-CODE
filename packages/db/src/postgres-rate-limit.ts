@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { RateLimitDecision, RateLimitStore } from '@lyntar/auth';
+import type { RateLimitDecision, RateLimitStore } from '@astra/auth';
 
 /** PostgreSQL-backed fixed-window limiter shared by all API instances. */
 export class PostgresRateLimitStore implements RateLimitStore {

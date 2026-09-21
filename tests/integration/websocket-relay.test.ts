@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { createRelayGrant, RemoteRelayBroker, WebSocketRelayServer } from '@lyntar/remote-protocol';
+import { createRelayGrant, RemoteRelayBroker, WebSocketRelayServer } from '@astra/remote-protocol';
 import { WebSocket, type RawData } from 'ws';
 
 type RelayFrame = { type?: string; messageId?: string; [key: string]: unknown };

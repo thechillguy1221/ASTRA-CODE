@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/admin",
+  "name": "@astra/admin",
   "description": "Astra Code secure operations and financial administration console.",
   "version": "0.1.0",
   "private": true,

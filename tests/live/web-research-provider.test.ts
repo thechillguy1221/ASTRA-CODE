@@ -3,13 +3,13 @@ import {
   HttpWebSearchProvider,
   WebResearchService,
   type WebResearchContext,
-} from '@lyntar/web-research';
+} from '@astra/web-research';
 
 const endpoint = process.env.ASTRA_WEB_SEARCH_ENDPOINT;
 const apiKey = process.env.ASTRA_WEB_SEARCH_API_KEY;
-const enabled = process.env.LYNTAR_LIVE_TEST === '1';
+const enabled = process.env.ASTRA_LIVE_TEST === '1';
 const missing = [
-  ...(enabled ? [] : ['LYNTAR_LIVE_TEST=1']),
+  ...(enabled ? [] : ['ASTRA_LIVE_TEST=1']),
   ...(endpoint ? [] : ['ASTRA_WEB_SEARCH_ENDPOINT']),
   ...(apiKey ? [] : ['ASTRA_WEB_SEARCH_API_KEY']),
 ];

@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
-import { PlanSchema } from '@lyntar/contracts';
-import { PlanCatalog } from '@lyntar/plans';
+import { PlanSchema } from '@astra/contracts';
+import { PlanCatalog } from '@astra/plans';
 
 export async function loadPlanCatalog(pool: Pool, fallback: PlanCatalog): Promise<PlanCatalog> {
   const result = await pool.query(

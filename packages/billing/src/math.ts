@@ -1,4 +1,4 @@
-import type { CreditAmount, UsdAmount } from '@lyntar/contracts';
+import type { CreditAmount, UsdAmount } from '@astra/contracts';
 
 export const CREDIT_SCALE = 10_000_000n;
 export const USD_SCALE = 10_000_000_000n;

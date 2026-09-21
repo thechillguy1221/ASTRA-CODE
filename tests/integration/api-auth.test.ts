@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi } from '@lyntar/api';
+import { buildApi } from '@astra/api';
 import {
   AuthService,
   createPkceChallenge,
@@ -7,7 +7,7 @@ import {
   GoogleDesktopOAuthService,
   InMemoryAuthStore,
   InMemoryOAuthTransactionStore,
-} from '@lyntar/auth';
+} from '@astra/auth';
 
 describe('authentication API', () => {
   it('registers, verifies, logs in, refreshes, and lists devices', async () => {
@@ -23,7 +23,7 @@ describe('authentication API', () => {
         email: 'api@example.com',
         password: 'correct horse battery staple',
         device: {
-          label: 'Lyntar Windows',
+          label: 'Astra Windows',
           platform: 'win32',
           architecture: 'x64',
           appVersion: '0.1.0',
@@ -45,7 +45,7 @@ describe('authentication API', () => {
         email: 'api@example.com',
         password: 'correct horse battery staple',
         device: {
-          label: 'Lyntar Windows',
+          label: 'Astra Windows',
           platform: 'win32',
           architecture: 'x64',
           appVersion: '0.1.0',

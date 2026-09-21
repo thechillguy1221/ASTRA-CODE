@@ -8,7 +8,7 @@ import type {
   EmailDelivery,
   EmailDeliveryStore,
   EmailKind,
-} from '@lyntar/email';
+} from '@astra/email';
 
 function mapCampaign(row: Record<string, unknown>): EmailCampaign {
   return {

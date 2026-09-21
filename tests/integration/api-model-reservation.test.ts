@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog } from '@lyntar/api';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
+import { buildApi, createMemoryCatalog } from '@astra/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
 import {
   BillingService,
   InMemoryBillingStore,
   InMemoryOrganizationBillingStore,
   OrganizationBillingService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
-import { RemoteAccessService } from '@lyntar/remote-protocol';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
+import { RemoteAccessService } from '@astra/remote-protocol';
 
 describe('authenticated model reservation boundary', () => {
   it('does not let an authenticated task call the model without a reservation', async () => {
@@ -94,7 +94,7 @@ describe('authenticated model reservation boundary', () => {
       url: '/v1/model-requests',
       headers: {
         authorization: `Bearer ${login.accessToken}`,
-        'x-lyntar-reservation-id': reservation.reservationId,
+        'x-astra-reservation-id': reservation.reservationId,
       },
       payload: body,
     });
@@ -243,7 +243,7 @@ describe('authenticated model reservation boundary', () => {
       url: '/v1/model-requests',
       headers: {
         authorization: `Bearer ${login.accessToken}`,
-        'x-lyntar-reservation-id': reservation.reservationId,
+        'x-astra-reservation-id': reservation.reservationId,
       },
       payload: {
         requestId: 'model-binding-request',
@@ -358,7 +358,7 @@ describe('authenticated model reservation boundary', () => {
       url: '/v1/model-requests',
       headers: {
         authorization: `Bearer ${login.accessToken}`,
-        'x-lyntar-reservation-id': reservation.reservationId,
+        'x-astra-reservation-id': reservation.reservationId,
       },
       payload: {
         requestId: 'team-model-request',

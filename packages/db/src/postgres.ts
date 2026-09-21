@@ -9,7 +9,7 @@ import {
   type AgentEvent,
   type ModelCatalogEntry,
   type UsageReceipt,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import type { AgentEventStore, ModelCatalogStore, UsageReceiptStore } from './repositories.js';
 import { PostgresAuthStore } from './postgres-auth.js';
 import { PostgresBillingStore } from './postgres-billing.js';
@@ -18,12 +18,12 @@ import { PostgresAdminAnalytics, PostgresEmailPreferenceStore } from './postgres
 import { PostgresEmailCampaignStore, PostgresEmailDeliveryStore } from './postgres-email.js';
 import { PostgresOAuthTransactionStore } from './postgres-oauth.js';
 import { PostgresAdminAuditStore } from './postgres-admin.js';
-import type { AuthStore } from '@lyntar/auth';
-import type { BillingStore } from '@lyntar/billing';
-import type { OrganizationBillingStore } from '@lyntar/billing';
+import type { AuthStore } from '@astra/auth';
+import type { BillingStore } from '@astra/billing';
+import type { OrganizationBillingStore } from '@astra/billing';
 import { PostgresRateLimitStore } from './postgres-rate-limit.js';
 import { PostgresRemoteAccessService } from './postgres-remote.js';
-import type { RemoteAccessPort } from '@lyntar/remote-protocol';
+import type { RemoteAccessPort } from '@astra/remote-protocol';
 
 export interface PostgresStores {
   pool: Pool;
@@ -251,14 +251,14 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0014_room_memberships', file: '0014_room_memberships.sql' },
   ];
   await client.query(
-    'CREATE TABLE IF NOT EXISTS lyntar_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
+    'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
   );
   await client.query('BEGIN');
   try {
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('lyntar:migrations'))");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('astra:migrations'))");
     for (const migration of migrations) {
       const existing = await client.query(
-        'SELECT version FROM lyntar_schema_migrations WHERE version = $1',
+        'SELECT version FROM astra_schema_migrations WHERE version = $1',
         [migration.version],
       );
       if (existing.rowCount) continue;
@@ -267,7 +267,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
       );
       const migrationSql = await readFile(migrationPath, 'utf8');
       await client.query(migrationSql);
-      await client.query('INSERT INTO lyntar_schema_migrations(version) VALUES ($1)', [
+      await client.query('INSERT INTO astra_schema_migrations(version) VALUES ($1)', [
         migration.version,
       ]);
     }

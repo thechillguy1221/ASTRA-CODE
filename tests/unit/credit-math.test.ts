@@ -5,7 +5,7 @@ import {
   creditsFromUsd,
   creditsToUsd,
   subtractCredits,
-} from '@lyntar/billing';
+} from '@astra/billing';
 
 describe('fixed-point credit math', () => {
   it('converts provider USD amounts without floating-point drift', () => {

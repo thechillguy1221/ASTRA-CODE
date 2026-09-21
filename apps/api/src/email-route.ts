@@ -1,11 +1,11 @@
-import type { AuthService } from '@lyntar/auth';
-import { AdminService, type AdminAuditStore, type AdminRole } from '@lyntar/billing';
+import type { AuthService } from '@astra/auth';
+import { AdminService, type AdminAuditStore, type AdminRole } from '@astra/billing';
 import {
   EmailCampaignService,
   EmailService,
   type CampaignAudience,
   type CampaignUser,
-} from '@lyntar/email';
+} from '@astra/email';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

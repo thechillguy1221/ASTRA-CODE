@@ -39,7 +39,7 @@ The following paths are intentionally excluded from Astra's production path:
 Reproducible evidence:
 
 ```text
-npm.cmd run build:renderer --workspace @lyntar/desktop
+npm.cmd run build:renderer --workspace @astra/desktop
 node scripts/verify-source-provenance.mjs
 ```
 

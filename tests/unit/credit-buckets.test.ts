@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { BillingService, InMemoryBillingStore } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 describe('fixed-point credit buckets', () => {
   it('allocates earliest-expiring buckets first and releases unused reservation credits', async () => {

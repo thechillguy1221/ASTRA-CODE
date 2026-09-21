@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import type { AuthService } from '@lyntar/auth';
-import { BillingService, OrganizationBillingService } from '@lyntar/billing';
-import type { ModelCatalogStore, UsageReceiptStore } from '@lyntar/db';
-import { parseUsageReceipt, type ResponsesGatewayClient } from '@lyntar/model-gateway';
+import type { AuthService } from '@astra/auth';
+import { BillingService, OrganizationBillingService } from '@astra/billing';
+import type { ModelCatalogStore, UsageReceiptStore } from '@astra/db';
+import { parseUsageReceipt, type ResponsesGatewayClient } from '@astra/model-gateway';
 import {
   ROOM_PERMISSIONS,
   type RemoteAccessPort,
   type RoomPermission,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CodexRuntimeTokenService } from './codex-runtime-auth.js';

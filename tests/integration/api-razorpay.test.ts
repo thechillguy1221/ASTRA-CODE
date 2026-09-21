@@ -5,9 +5,9 @@ import {
   InMemoryBillingStore,
   InMemoryPaymentStore,
   RazorpayWebhookService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
-import { buildApi } from '@lyntar/api';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
+import { buildApi } from '@astra/api';
 
 describe('Razorpay API boundary', () => {
   it('accepts only server-verified webhook signatures and remains idempotent', async () => {

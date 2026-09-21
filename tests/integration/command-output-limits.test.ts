@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LocalCommandRunner, LocalWorkspace } from '@lyntar/workspace';
+import { LocalCommandRunner, LocalWorkspace } from '@astra/workspace';
 
 const roots: string[] = [];
 
@@ -12,7 +12,7 @@ afterEach(async () => {
 
 describe('command output limits', () => {
   it('truncates large output and records the observed size', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-command-output-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-command-output-'));
     roots.push(root);
     await writeFile(join(root, 'output.js'), "process.stdout.write('x'.repeat(1000));\n");
     const workspace = await LocalWorkspace.open(root);

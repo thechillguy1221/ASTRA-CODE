@@ -1,4 +1,4 @@
--- Lyntar Remote device pairing and session tracking
+-- Astra Remote device pairing and session tracking
 
 CREATE TABLE IF NOT EXISTS remote_devices (
   id uuid PRIMARY KEY,

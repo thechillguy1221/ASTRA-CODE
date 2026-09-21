@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog } from '@lyntar/api';
-import type { UsageReceipt } from '@lyntar/contracts';
+import { buildApi, createMemoryCatalog } from '@astra/api';
+import type { UsageReceipt } from '@astra/contracts';
 
 describe('API model stream boundary', () => {
   it('forwards model metadata, provider, decision, and usage as newline-delimited events', async () => {

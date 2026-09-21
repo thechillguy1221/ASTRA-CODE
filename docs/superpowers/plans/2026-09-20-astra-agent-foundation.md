@@ -1,14 +1,14 @@
-# Lyntar Agent Foundation Implementation Plan
+# Astra Agent Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the minimum production-grade Lyntar monorepo foundation and a real Windows-oriented local Git repository agent workflow that inspects, edits, executes, verifies, repairs within budget, and reports an isolated diff with actual usage receipts when available.
+**Goal:** Build the minimum production-grade Astra monorepo foundation and a real Windows-oriented local Git repository agent workflow that inspects, edits, executes, verifies, repairs within budget, and reports an isolated diff with actual usage receipts when available.
 
 **Architecture:** Use an npm-workspaces TypeScript monorepo. Electron is a thin OS/lifecycle adapter around `packages/agent-core`; Fastify owns the server boundary and model catalog; `packages/contracts` owns all process contracts; `packages/workspace` owns Windows-safe local capabilities; `packages/model-gateway` owns provider payloads and usage normalization; `packages/db` owns PostgreSQL schema/migrations and receipt persistence.
 
 **Tech Stack:** Node.js 24+, TypeScript 5.x, npm workspaces, Vitest, Zod, Fastify, Electron, React, Vite, PostgreSQL via `pg`/Drizzle-compatible SQL migrations, and a Vercel AI Gateway-compatible HTTP adapter.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-lyntar-agent-foundation-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-20-astra-agent-foundation-design.md`
 
 ## Global Constraints
 
@@ -27,7 +27,7 @@
 ## Review Focus
 
 - A Windows junction/symlink or case-variant path must not escape the selected workspace; owned by Task 4 security tests.
-- A pre-existing dirty Git file must not appear in the Lyntar-created diff; owned by Task 4 Git tests.
+- A pre-existing dirty Git file must not appear in the Astra-created diff; owned by Task 4 Git tests.
 - Cancellation while a streamed model call or child command is active must terminate downstream work and emit `task.cancelled`; owned by Tasks 3 and 7.
 - A malformed or unavailable provider usage payload must not fabricate a cost receipt; owned by Task 5 receipt tests.
 - A repair loop must stop at its configured budget and become `BLOCKED`, never retrying indefinitely; owned by Task 6 budget/golden-path tests.
@@ -53,7 +53,7 @@
 **Interfaces:**
 
 - Produces the workspace scripts consumed by every later task: `npm test`, `npm run typecheck`, `npm run build`, `npm run lint`, and `npm run test:live`.
-- Produces npm workspace names `@lyntar/contracts`, `@lyntar/agent-core`, `@lyntar/workspace`, `@lyntar/model-gateway`, `@lyntar/db`, `@lyntar/config`, `@lyntar/test-utils`, `@lyntar/api`, and `@lyntar/desktop`.
+- Produces npm workspace names `@astra/contracts`, `@astra/agent-core`, `@astra/workspace`, `@astra/model-gateway`, `@astra/db`, `@astra/config`, `@astra/test-utils`, `@astra/api`, and `@astra/desktop`.
 
 - [ ] **Step 1: Write the failing tooling test**
 
@@ -83,7 +83,7 @@ Create a root manifest with the workspaces and these scripts:
 
 ```json
 {
-  "name": "lyntar",
+  "name": "astra",
   "private": true,
   "type": "module",
   "workspaces": ["apps/*", "packages/*"],
@@ -121,7 +121,7 @@ Document Node 24+, PostgreSQL configuration, deterministic tests, and the opt-in
 
 ```bash
 git add package.json package-lock.json tsconfig.base.json tsconfig.json vitest.config.ts eslint.config.mjs .gitignore .env.example README.md docs/local-development.md tests/unit/tooling.test.ts apps packages
-git commit -m "chore: bootstrap lyntar monorepo"
+git commit -m "chore: bootstrap astra monorepo"
 ```
 
 ---
@@ -154,7 +154,7 @@ git commit -m "chore: bootstrap lyntar monorepo"
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { AgentEventSchema, IpcCommandSchema, TaskBudgetSchema } from '@lyntar/contracts';
+import { AgentEventSchema, IpcCommandSchema, TaskBudgetSchema } from '@astra/contracts';
 
 describe('shared contracts', () => {
   it('accepts a bounded task budget and a safe agent event', () => {
@@ -196,7 +196,7 @@ it('rejects an illegal COMPLETED to EXECUTING transition', () => {
 
 Run: `npm test -- tests/unit/contracts.test.ts tests/unit/task-state-machine.test.ts`
 
-Expected: FAIL because `@lyntar/contracts` has no schemas or transition function yet.
+Expected: FAIL because `@astra/contracts` has no schemas or transition function yet.
 
 - [ ] **Step 3: Implement the schemas and transition table**
 
@@ -241,7 +241,7 @@ git commit -m "feat: add shared task and IPC contracts"
 
 **Interfaces:**
 
-- Produces `LyntarConfig` with `apiPort`, `databaseUrl?`, `modelGatewayBaseUrl?`, `modelGatewayApiKey?`, and `liveTestsEnabled`.
+- Produces `AstraConfig` with `apiPort`, `databaseUrl?`, `modelGatewayBaseUrl?`, `modelGatewayApiKey?`, and `liveTestsEnabled`.
 - Produces `BudgetTracker.consume(kind: 'model' | 'repair' | 'command', estimatedCostUsd?: number): void`, `assertWallTime(): void`, and `snapshot(): BudgetSnapshot`.
 - Produces `CancellationToken` with `signal: AbortSignal`, `cancel(reason?: string): void`, and `throwIfCancelled(): void`.
 - Produces `DeterministicModel` implementing the later `ModelPort` interface and configurable with a sequence of normalized decisions.
@@ -373,13 +373,13 @@ it('restores the original bytes when a later file in a patch batch fails', async
 ```
 
 ```ts
-it('marks an existing dirty file as pre-existing and excludes it from Lyntar diff', async () => {
+it('marks an existing dirty file as pre-existing and excludes it from Astra diff', async () => {
   const baseline = await git.captureBaseline(repoRoot);
   await editPreExistingFile();
-  await editLyntarFile();
+  await editAstraFile();
   const diff = await git.diffFromBaseline(repoRoot, baseline);
   expect(diff.preExistingPaths).toContain('README.md');
-  expect(diff.lyntarPaths).not.toContain('README.md');
+  expect(diff.astraPaths).not.toContain('README.md');
 });
 ```
 
@@ -397,9 +397,9 @@ Resolve the workspace root and existing target segments before authorization. Co
 
 Use structured `{ executable, args, cwdRelative }` commands with `shell: false`, a timeout, output byte caps, and `AbortSignal` termination. Detect Node commands from `package.json` scripts, and return `verification: unavailable` instead of assuming `npm test` when no supported command exists. Keep verification on a separate port from arbitrary command execution.
 
-- [ ] **Step 5: Implement Git baseline capture and Lyntar-only diffing**
+- [ ] **Step 5: Implement Git baseline capture and Astra-only diffing**
 
-Capture repository root, HEAD, status paths, and content hashes before mutation. At the end, classify paths as pre-existing, Lyntar-created, or both, and include hunks only for Lyntar-owned changes. Never call `git reset`, `git clean`, or destructive recovery commands.
+Capture repository root, HEAD, status paths, and content hashes before mutation. At the end, classify paths as pre-existing, Astra-created, or both, and include hunks only for Astra-owned changes. Never call `git reset`, `git clean`, or destructive recovery commands.
 
 - [ ] **Step 6: Run focused and full tests**
 
@@ -573,7 +573,7 @@ it('repairs a broken validation implementation without changing the test', async
   });
   expect(result.state).toBe('COMPLETED');
   expect(result.verification.status).toBe('passed');
-  expect(result.gitDiff.lyntarPaths).toEqual(['src/validate.ts']);
+  expect(result.gitDiff.astraPaths).toEqual(['src/validate.ts']);
   expect(result.gitDiff.preExistingPaths).toContain('README.md');
   expect(result.events.map((event) => event.type)).toEqual(
     expect.arrayContaining([
@@ -637,7 +637,7 @@ Make the fixture fail because `validateInput` accepts an empty name, while the t
 
 Run: `npm test -- tests/unit/agent-core.test.ts tests/unit/agent-cancellation.test.ts tests/golden-path/agent-broken-node.test.ts`
 
-Expected: PASS with exactly one bounded repair and a completed Lyntar-only diff.
+Expected: PASS with exactly one bounded repair and a completed Astra-only diff.
 
 Run: `npm test`
 
@@ -670,7 +670,7 @@ git commit -m "feat: implement bounded local coding agent"
 
 **Interfaces:**
 
-- Produces `window.lyntar` with only typed methods `workspace.open()`, `workspace.readFile(relativePath)`, `workspace.search(query)`, `agent.startTask(input)`, `agent.cancelTask(taskId)`, `agent.approveAction(taskId, requestId)`, `agent.rejectAction(taskId, requestId)`, `models.list()`, and `events.subscribe(listener)`.
+- Produces `window.astra` with only typed methods `workspace.open()`, `workspace.readFile(relativePath)`, `workspace.search(query)`, `agent.startTask(input)`, `agent.cancelTask(taskId)`, `agent.approveAction(taskId, requestId)`, `agent.rejectAction(taskId, requestId)`, `models.list()`, and `events.subscribe(listener)`.
 - Produces an Electron main adapter that creates `AgentTaskRunner` with real workspace/command/Git/model/API ports.
 - Produces an initial renderer that displays workspace selection, task input, append-only progress, permission controls, Stop, verification, usage receipts, and isolated diff categories.
 
@@ -712,7 +712,7 @@ Create a BrowserWindow with context isolation and sandbox-safe defaults. Constru
 
 - [ ] **Step 5: Implement the minimal React surface and development scripts**
 
-Provide an explicit Open repository action, task textarea, model catalog display from `/v1/models`, event timeline, permission dialogs, Stop button, verification result, usage receipt list, and Lyntar/pre-existing diff sections. Do not add placeholder navigation for deferred product areas.
+Provide an explicit Open repository action, task textarea, model catalog display from `/v1/models`, event timeline, permission dialogs, Stop button, verification result, usage receipt list, and Astra/pre-existing diff sections. Do not add placeholder navigation for deferred product areas.
 
 - [ ] **Step 6: Run desktop tests, typecheck, and build**
 
@@ -756,7 +756,7 @@ git commit -m "feat: add typed electron desktop adapter"
 
 **Interfaces:**
 
-- Produces `npm run test:live` as an opt-in test that requires `LYNTAR_LIVE_TEST=1`, `LYNTAR_MODEL_GATEWAY_URL`, `LYNTAR_MODEL_GATEWAY_API_KEY`, and `LYNTAR_MODEL_ID`.
+- Produces `npm run test:live` as an opt-in test that requires `ASTRA_LIVE_TEST=1`, `ASTRA_MODEL_GATEWAY_URL`, `ASTRA_MODEL_GATEWAY_API_KEY`, and `ASTRA_MODEL_ID`.
 - Produces a golden-path command that exits nonzero on failure and prints task state, changed-file categories, verification result, receipts, and blocked/unverified conditions without secrets or source dumps.
 - Produces a certification report that distinguishes implemented, verified, blocked, unverified, and deferred requirements.
 
@@ -810,7 +810,7 @@ Expected: either PASS with an actual receipt or an explicit BLOCKED/UNVERIFIED r
 
 ```bash
 git add vitest.live.config.ts tests/live scripts docs README.md tests/integration/certification-report.test.ts
-git commit -m "docs: certify lyntar agent vertical slice"
+git commit -m "docs: certify astra agent vertical slice"
 ```
 
 ---

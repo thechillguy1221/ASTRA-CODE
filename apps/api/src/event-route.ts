@@ -1,5 +1,5 @@
-import { AgentEventSchema } from '@lyntar/contracts';
-import type { AgentEventStore } from '@lyntar/db';
+import { AgentEventSchema } from '@astra/contracts';
+import type { AgentEventStore } from '@astra/db';
 import type { FastifyInstance } from 'fastify';
 
 export async function registerAgentEventRoutes(

@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/billing",
+  "name": "@astra/billing",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -22,7 +22,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@lyntar/contracts": "0.1.0",
-    "@lyntar/plans": "0.1.0"
+    "@astra/contracts": "0.1.0",
+    "@astra/plans": "0.1.0"
   }
 }

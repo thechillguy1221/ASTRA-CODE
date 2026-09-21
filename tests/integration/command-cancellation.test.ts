@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LocalCommandRunner, LocalWorkspace } from '@lyntar/workspace';
+import { LocalCommandRunner, LocalWorkspace } from '@astra/workspace';
 
 const temporaryRoots: string[] = [];
 
@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe('local command cancellation', () => {
   it('terminates a running Windows-compatible child process on abort', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-command-cancel-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-command-cancel-'));
     temporaryRoots.push(root);
     await writeFile(join(root, 'sleep.js'), 'setTimeout(() => {}, 30000);\n');
     const workspace = await LocalWorkspace.open(root);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRelayGrant, RelayError, RemoteRelayBroker } from '@lyntar/remote-protocol';
+import { createRelayGrant, RelayError, RemoteRelayBroker } from '@astra/remote-protocol';
 
 const SECRET = 'relay-test-secret';
 

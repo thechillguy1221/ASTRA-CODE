@@ -1,4 +1,4 @@
-import { RazorpayWebhookService } from '@lyntar/billing';
+import { RazorpayWebhookService } from '@astra/billing';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 type RawBodyRequest = FastifyRequest & { rawBody?: string };

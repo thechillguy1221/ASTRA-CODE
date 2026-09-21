@@ -4,7 +4,7 @@ import {
   calculateSubscriptionRollover,
   consumeEarliestExpiringBuckets,
   topUpExpiresAt,
-} from '@lyntar/billing';
+} from '@astra/billing';
 
 describe('commercial bucket policy', () => {
   it('caps subscription rollover at one monthly allocation', () => {

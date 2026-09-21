@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/auth",
+  "name": "@astra/auth",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -17,6 +17,6 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@lyntar/contracts": "0.1.0"
+    "@astra/contracts": "0.1.0"
   }
 }

@@ -4,7 +4,7 @@ import type {
   DeviceSession,
   PublicUser,
   UserRole,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 
 export interface StoredUser {
   id: string;

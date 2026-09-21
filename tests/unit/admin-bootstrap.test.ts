@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureSuperAdmin, InMemoryAuthStore } from '@lyntar/auth';
+import { ensureSuperAdmin, InMemoryAuthStore } from '@astra/auth';
 
 const hash = '$scrypt$16384$8$1$c2FsdA$dmFsaWQ';
 

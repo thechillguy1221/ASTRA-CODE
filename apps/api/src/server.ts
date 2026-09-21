@@ -1,12 +1,12 @@
-import { assertProductionConfiguration, loadConfig } from '@lyntar/config';
+import { assertProductionConfiguration, loadConfig } from '@astra/config';
 import {
   applyFoundationMigration,
   createPostgresStores,
   listPostgresCampaignUsers,
   loadPlanCatalog,
   PostgresPaymentStore,
-} from '@lyntar/db';
-import { VercelGatewayClient, VercelResponsesGatewayClient } from '@lyntar/model-gateway';
+} from '@astra/db';
+import { VercelGatewayClient, VercelResponsesGatewayClient } from '@astra/model-gateway';
 import {
   AuthService,
   GoogleDesktopOAuthService,
@@ -14,7 +14,7 @@ import {
   InMemoryAuthStore,
   InMemoryOAuthTransactionStore,
   ensureSuperAdmin,
-} from '@lyntar/auth';
+} from '@astra/auth';
 import {
   BillingService,
   InMemoryBillingStore,
@@ -22,13 +22,13 @@ import {
   OrganizationBillingService,
   InMemoryPaymentStore,
   RazorpayWebhookService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 import {
   RemoteAccessService,
   RemoteRelayBroker,
   WebSocketRelayServer,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import { buildApi } from './app.js';
 import {
   EmailCampaignService,
@@ -36,7 +36,7 @@ import {
   InMemoryEmailCampaignStore,
   InMemoryEmailPreferenceStore,
   ResendEmailProvider,
-} from '@lyntar/email';
+} from '@astra/email';
 
 const config = loadConfig();
 assertProductionConfiguration(config);

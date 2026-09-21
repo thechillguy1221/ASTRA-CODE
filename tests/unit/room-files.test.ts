@@ -6,7 +6,7 @@ import {
   extractRoomArchive,
   inspectRoomArchive,
   normalizeRoomFileUpload,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 
 const TEAM = {
   id: 'TEAM',

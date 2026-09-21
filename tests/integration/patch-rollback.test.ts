@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LocalWorkspace, PatchApplicationError, WorkspaceEscapeError } from '@lyntar/workspace';
+import { LocalWorkspace, PatchApplicationError, WorkspaceEscapeError } from '@astra/workspace';
 
 const temporaryRoots: string[] = [];
 
@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe('atomic patching', () => {
   it('restores the original bytes when a later file in a patch batch fails', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-patch-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-patch-'));
     temporaryRoots.push(root);
     await writeFile(join(root, 'a.txt'), 'old-a');
     await writeFile(join(root, 'blocked'), 'not a directory');
@@ -32,7 +32,7 @@ describe('atomic patching', () => {
   });
 
   it('writes binary Room import content atomically under the workspace root', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-binary-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-binary-'));
     temporaryRoots.push(root);
     const workspace = await LocalWorkspace.open(root);
     const bytes = Buffer.from([0, 255, 1, 2, 3, 254]);

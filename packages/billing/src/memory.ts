@@ -11,7 +11,7 @@ import {
   WalletBucketSchema,
   type WalletBucket,
   type WalletBucketSourceType,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import {
   addCredits,
   compareCredits,

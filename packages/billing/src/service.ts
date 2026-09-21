@@ -5,8 +5,8 @@ import type {
   Wallet,
   WalletLedgerEntry,
   WalletBucket,
-} from '@lyntar/contracts';
-import type { PlanCatalog } from '@lyntar/plans';
+} from '@astra/contracts';
+import type { PlanCatalog } from '@astra/plans';
 import { BillingError, InMemoryBillingStore } from './memory.js';
 import type {
   AdjustCreditsInput,

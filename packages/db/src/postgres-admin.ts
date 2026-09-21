@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import type { AdminAuditEntry, AdminAuditStore } from '@lyntar/billing';
+import type { AdminAuditEntry, AdminAuditStore } from '@astra/billing';
 
 function mapAudit(row: Record<string, unknown>): AdminAuditEntry {
   return {

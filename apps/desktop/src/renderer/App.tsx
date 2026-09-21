@@ -17,8 +17,8 @@ import type {
   VivaQuestion,
   WorkspaceDescriptor,
   Wallet,
-} from '@lyntar/contracts';
-import { addCredits } from '@lyntar/billing/math';
+} from '@astra/contracts';
+import { addCredits } from '@astra/billing/math';
 import { AstraClineApprovalCard, AstraClineSessionStatus } from './cline-workspace.js';
 import { deriveProgressRows } from './view-model.js';
 
@@ -112,29 +112,29 @@ export function App(): ReactElement {
       setRoomImport(null);
       return;
     }
-    void window.lyntar.rooms
+    void window.astra.rooms
       .listFiles(selectedRoomId)
       .then(setRoomFiles)
       .catch((fileError: unknown) => setError(errorMessage(fileError)));
   }, [selectedRoomId]);
 
   useEffect(() => {
-    void window.lyntar.models
+    void window.astra.models
       .list()
       .then((nextModels) => {
         setModels(nextModels);
         setSelectedModelId(nextModels.length > 0 ? 'AUTO' : '');
       })
       .catch((loadError: unknown) => setError(errorMessage(loadError)));
-    void window.lyntar.auth
+    void window.astra.auth
       .status()
       .then((user) => {
         setAuthUser(user);
         if (user)
           void Promise.all([
-            window.lyntar.billing.wallet(),
-            window.lyntar.devices.list(),
-            window.lyntar.rooms.list(),
+            window.astra.billing.wallet(),
+            window.astra.devices.list(),
+            window.astra.rooms.list(),
           ])
             .then(([nextWallet, nextDevices, nextRooms]) => {
               setWallet(nextWallet);
@@ -148,7 +148,7 @@ export function App(): ReactElement {
             });
       })
       .catch((authError: unknown) => setError(errorMessage(authError)));
-    return window.lyntar.events.subscribe((event) => {
+    return window.astra.events.subscribe((event) => {
       setEvents((current) => [...current, event]);
       if (event.type === 'permission.requested') setPendingPermission(event.payload);
       if (event.type === 'usage.received' && event.payload.creditsUsed)
@@ -157,15 +157,15 @@ export function App(): ReactElement {
   }, []);
 
   useEffect(() => {
-    return window.lyntar.auth.onGoogleCallback((code) => {
-      void window.lyntar.auth
+    return window.astra.auth.onGoogleCallback((code) => {
+      void window.astra.auth
         .googleComplete(code)
         .then((user) => {
           setAuthUser(user);
           return Promise.all([
-            window.lyntar.billing.wallet(),
-            window.lyntar.devices.list(),
-            window.lyntar.rooms.list(),
+            window.astra.billing.wallet(),
+            window.astra.devices.list(),
+            window.astra.rooms.list(),
           ]);
         })
         .then(([nextWallet, nextDevices, nextRooms]) => {
@@ -180,7 +180,7 @@ export function App(): ReactElement {
   async function signIn(): Promise<void> {
     try {
       setError(null);
-      const user = await window.lyntar.auth.login({
+      const user = await window.astra.auth.login({
         email: authEmail.trim(),
         password: authPassword,
         device: {
@@ -191,9 +191,9 @@ export function App(): ReactElement {
         },
       });
       setAuthUser(user);
-      setWallet(await window.lyntar.billing.wallet());
-      setDevices(await window.lyntar.devices.list());
-      setRooms(await window.lyntar.rooms.list());
+      setWallet(await window.astra.billing.wallet());
+      setDevices(await window.astra.devices.list());
+      setRooms(await window.astra.rooms.list());
       setAuthPassword('');
     } catch (authError) {
       setError(errorMessage(authError));
@@ -201,7 +201,7 @@ export function App(): ReactElement {
   }
 
   async function signOut(): Promise<void> {
-    await window.lyntar.auth.logout();
+    await window.astra.auth.logout();
     setAuthUser(null);
     setWallet(null);
     setDevices([]);
@@ -214,7 +214,7 @@ export function App(): ReactElement {
   async function signInGoogle(): Promise<void> {
     try {
       setError(null);
-      await window.lyntar.auth.googleStart();
+      await window.astra.auth.googleStart();
       setError(
         'Google opened in your system browser. Return through the Astra callback to finish sign-in.',
       );
@@ -226,7 +226,7 @@ export function App(): ReactElement {
   async function openWorkspace(): Promise<void> {
     try {
       setError(null);
-      const opened = await window.lyntar.workspace.open();
+      const opened = await window.astra.workspace.open();
       if (opened) setWorkspace(opened);
     } catch (openError) {
       setError(errorMessage(openError));
@@ -257,7 +257,7 @@ export function App(): ReactElement {
     setEvents([]);
     setObservedCredits('0');
     try {
-      const taskResult = await window.lyntar.agent.startTask({
+      const taskResult = await window.astra.agent.startTask({
         taskId: nextTaskId,
         prompt: prompt.trim(),
         modelId: selectedModelId,
@@ -277,7 +277,7 @@ export function App(): ReactElement {
     if (!selectedRoomId) return;
     try {
       setError(null);
-      const file = await window.lyntar.rooms.uploadFile({ roomId: selectedRoomId, intent });
+      const file = await window.astra.rooms.uploadFile({ roomId: selectedRoomId, intent });
       if (file) setRoomFiles((current) => [file, ...current.filter((item) => item.id !== file.id)]);
     } catch (fileError) {
       setError(errorMessage(fileError));
@@ -288,7 +288,7 @@ export function App(): ReactElement {
     if (!selectedRoomId) return;
     try {
       setError(null);
-      await window.lyntar.rooms.deleteFile(selectedRoomId, fileId);
+      await window.astra.rooms.deleteFile(selectedRoomId, fileId);
       setRoomFiles((current) => current.filter((file) => file.id !== fileId));
     } catch (fileError) {
       setError(errorMessage(fileError));
@@ -300,7 +300,7 @@ export function App(): ReactElement {
     try {
       setError(null);
       setRoomImport(
-        await window.lyntar.rooms.previewImport({
+        await window.astra.rooms.previewImport({
           roomId: selectedRoomId,
           fileId,
           destinationRelative,
@@ -315,22 +315,22 @@ export function App(): ReactElement {
     if (!selectedRoomId || !roomImport) return;
     try {
       setError(null);
-      await window.lyntar.rooms.importFile(selectedRoomId, roomImport.id);
+      await window.astra.rooms.importFile(selectedRoomId, roomImport.id);
       setRoomImport(null);
-      setRoomFiles(await window.lyntar.rooms.listFiles(selectedRoomId));
+      setRoomFiles(await window.astra.rooms.listFiles(selectedRoomId));
     } catch (importError) {
       setError(errorMessage(importError));
     }
   }
 
   async function stopTask(): Promise<void> {
-    if (taskId) await window.lyntar.agent.cancelTask(taskId);
+    if (taskId) await window.astra.agent.cancelTask(taskId);
   }
 
   async function resolvePermission(approved: boolean): Promise<void> {
     if (!taskId || !pendingPermission) return;
-    if (approved) await window.lyntar.agent.approveAction(taskId, pendingPermission.requestId);
-    else await window.lyntar.agent.rejectAction(taskId, pendingPermission.requestId);
+    if (approved) await window.astra.agent.approveAction(taskId, pendingPermission.requestId);
+    else await window.astra.agent.rejectAction(taskId, pendingPermission.requestId);
     setPendingPermission(null);
   }
 
@@ -339,7 +339,7 @@ export function App(): ReactElement {
     try {
       setError(null);
       setLearnResult(
-        await window.lyntar.modes.learnFile({
+        await window.astra.modes.learnFile({
           path: learnPath.trim(),
           depth: learnDepth,
           ...(learnQuestion.trim() ? { question: learnQuestion.trim() } : {}),
@@ -354,7 +354,7 @@ export function App(): ReactElement {
     if (!workspace) return;
     try {
       setError(null);
-      const questions = await window.lyntar.modes.generateViva({
+      const questions = await window.astra.modes.generateViva({
         categories: ['AUTHENTICATION', 'CODE_READING', 'TESTING'],
         difficulty: vivaDifficulty,
         count: 3,
@@ -373,7 +373,7 @@ export function App(): ReactElement {
     try {
       setError(null);
       setVivaEvaluation(
-        await window.lyntar.modes.evaluateViva({ question: selectedQuestion, answer: vivaAnswer }),
+        await window.astra.modes.evaluateViva({ question: selectedQuestion, answer: vivaAnswer }),
       );
     } catch (evaluationError) {
       setError(errorMessage(evaluationError));
@@ -385,7 +385,7 @@ export function App(): ReactElement {
     try {
       setError(null);
       setHackathonPlan(
-        await window.lyntar.modes.hackathonPlan({
+        await window.astra.modes.hackathonPlan({
           problem: hackathonProblem.trim(),
           criteria: hackathonCriteria
             .split(',')
@@ -575,14 +575,14 @@ export function App(): ReactElement {
             signInGoogle={() => void signInGoogle()}
             signOut={() => void signOut()}
             refreshDevices={() =>
-              void window.lyntar.devices
+              void window.astra.devices
                 .list()
                 .then(setDevices)
                 .catch(() => setDevices([]))
             }
             revokeDevice={(deviceId) =>
-              void window.lyntar.devices.revoke(deviceId).then(async () => {
-                setDevices(await window.lyntar.devices.list());
+              void window.astra.devices.revoke(deviceId).then(async () => {
+                setDevices(await window.astra.devices.list());
               })
             }
           />
@@ -892,7 +892,7 @@ function ResultPanel({ result }: { result: IpcTaskResult }): ReactElement {
         <div>
           <h3>Astra changes</h3>
           <ul>
-            {result.gitDiff.lyntarPaths.map((path) => (
+            {result.gitDiff.astraPaths.map((path) => (
               <li key={path}>{path}</li>
             ))}
           </ul>

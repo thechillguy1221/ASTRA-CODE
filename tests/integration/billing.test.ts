@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BillingError, BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { BillingError, BillingService, InMemoryBillingStore } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 describe('wallet reservation and settlement', () => {
   it('reserves, settles exact usage, and releases the unused reservation', async () => {
@@ -36,7 +36,7 @@ describe('wallet reservation and settlement', () => {
     expect((await billing.getWallet('user-1')).consumedCredits).toBe('3.7826');
   });
 
-  it('keeps provider cost separate when a Lyntar failure absorbs the cost', async () => {
+  it('keeps provider cost separate when a Astra failure absorbs the cost', async () => {
     const store = new InMemoryBillingStore();
     const billing = new BillingService({ store, plans: createDefaultPlanCatalog() });
     await billing.grantCredits({

@@ -7,11 +7,11 @@ import {
   type AgentEventStore,
   type ModelCatalogStore,
   type UsageReceiptStore,
-} from '@lyntar/db';
-import type { GatewayModelClient, ResponsesGatewayClient } from '@lyntar/model-gateway';
-import type { AuthService } from '@lyntar/auth';
-import type { RateLimitStore } from '@lyntar/auth';
-import { hashRateLimitIdentity } from '@lyntar/auth';
+} from '@astra/db';
+import type { GatewayModelClient, ResponsesGatewayClient } from '@astra/model-gateway';
+import type { AuthService } from '@astra/auth';
+import type { RateLimitStore } from '@astra/auth';
+import { hashRateLimitIdentity } from '@astra/auth';
 import {
   AdminService,
   BillingService,
@@ -22,8 +22,8 @@ import {
   type AdminAuditStore,
   type RazorpayWebhookService,
   type AdminAnalyticsPort,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog, type PlanCatalog } from '@lyntar/plans';
+} from '@astra/billing';
+import { createDefaultPlanCatalog, type PlanCatalog } from '@astra/plans';
 import { registerModelRoutes } from './model-route.js';
 import { registerAgentEventRoutes } from './event-route.js';
 import { registerAuthRoutes } from './auth-route.js';
@@ -32,21 +32,21 @@ import { registerAdminRoutes } from './admin-route.js';
 import { registerRazorpayRoutes } from './razorpay-route.js';
 import { registerReleaseRoutes } from './release-route.js';
 import { registerEmailRoutes } from './email-route.js';
-import type { ReleaseManifest } from '@lyntar/releases';
-import type { EmailService } from '@lyntar/email';
-import type { GoogleDesktopOAuthService } from '@lyntar/auth';
-import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@lyntar/email';
+import type { ReleaseManifest } from '@astra/releases';
+import type { EmailService } from '@astra/email';
+import type { GoogleDesktopOAuthService } from '@astra/auth';
+import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@astra/email';
 import {
   RemoteAccessService,
   type RemoteAccessPort,
   type RemoteRelayBroker,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import { registerRemoteRoutes } from './remote-route.js';
 import {
   UnavailableWebSearchProvider,
   WebResearchService,
   type WebResearchService as WebResearchServiceType,
-} from '@lyntar/web-research';
+} from '@astra/web-research';
 import { registerWebResearchRoutes } from './web-research-route.js';
 import { CodexRuntimeTokenService } from './codex-runtime-auth.js';
 import { registerCodexRuntimeRoutes } from './codex-runtime-route.js';

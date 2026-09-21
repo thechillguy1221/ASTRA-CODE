@@ -1,5 +1,5 @@
-import { UsageReceiptSchema, type UsageReceipt } from '@lyntar/contracts';
-import type { ModelCostMetadata } from '@lyntar/contracts';
+import { UsageReceiptSchema, type UsageReceipt } from '@astra/contracts';
+import type { ModelCostMetadata } from '@astra/contracts';
 import type { ReceiptContext } from './contracts.js';
 
 function numberAt(value: unknown, ...paths: string[]): number | undefined {

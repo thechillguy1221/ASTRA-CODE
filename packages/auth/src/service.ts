@@ -4,7 +4,7 @@ import {
   type AuthProvider,
   type DeviceSession,
   type PublicUser,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import { hashPassword, verifyPassword } from './password.js';
 import {
   hashRateLimitIdentity,

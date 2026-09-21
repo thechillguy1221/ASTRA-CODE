@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ModelDecision } from '@lyntar/contracts';
+import type { ModelDecision } from '@astra/contracts';
 
 export class RunawayAgentError extends Error {
   constructor(public readonly fingerprint: string) {

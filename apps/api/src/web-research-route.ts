@@ -1,12 +1,12 @@
-import type { AuthService } from '@lyntar/auth';
+import type { AuthService } from '@astra/auth';
 import {
   WebResearchError,
   type WebFetchRequest,
   type WebResearchContext,
   type WebResearchService,
   type WebSearchRequest,
-} from '@lyntar/web-research';
-import { RemoteAccessError, type RemoteAccessPort } from '@lyntar/remote-protocol';
+} from '@astra/web-research';
+import { RemoteAccessError, type RemoteAccessPort } from '@astra/remote-protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

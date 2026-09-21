@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RemoteAccessError, RemoteAccessService } from '@lyntar/remote-protocol';
+import { RemoteAccessError, RemoteAccessService } from '@astra/remote-protocol';
 
 const teamPlan = {
   id: 'TEAM',

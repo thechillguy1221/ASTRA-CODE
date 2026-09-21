@@ -1,6 +1,6 @@
-import type { AuthService } from '@lyntar/auth';
-import type { PlanCatalog } from '@lyntar/plans';
-import type { EmailService } from '@lyntar/email';
+import type { AuthService } from '@astra/auth';
+import type { PlanCatalog } from '@astra/plans';
+import type { EmailService } from '@astra/email';
 import { randomUUID } from 'node:crypto';
 import {
   createRelayGrant,
@@ -11,7 +11,7 @@ import {
   type RoomPermission,
   type RoomRole,
   RoomFileError,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

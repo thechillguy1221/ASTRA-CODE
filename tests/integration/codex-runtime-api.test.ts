@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog, createMemoryReceiptStore } from '@lyntar/api';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { buildApi, createMemoryCatalog, createMemoryReceiptStore } from '@astra/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
+import { BillingService, InMemoryBillingStore } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 describe('Codex runtime API boundary', () => {
   it('issues a task-bound runtime token and streams through the server gateway', async () => {
@@ -137,7 +137,7 @@ describe('Codex runtime API boundary', () => {
       url: '/v1/billing/tasks/codex-task-1/receipts',
       headers: {
         authorization: `Bearer ${accessToken}`,
-        'x-lyntar-reservation-id': reservationId,
+        'x-astra-reservation-id': reservationId,
       },
     });
     expect(receiptResponse.statusCode).toBe(200);

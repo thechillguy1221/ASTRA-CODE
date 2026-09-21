@@ -11,7 +11,7 @@ import {
   type OrganizationWalletLedgerEntry,
   type UsageSettlement,
   type WalletBucketSourceType,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import {
   addCredits,
   compareCredits,

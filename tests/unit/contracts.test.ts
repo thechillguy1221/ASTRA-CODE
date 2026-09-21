@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AgentEventSchema, IpcCommandSchema, TaskBudgetSchema } from '@lyntar/contracts';
+import { AgentEventSchema, IpcCommandSchema, TaskBudgetSchema } from '@astra/contracts';
 
 describe('shared contracts', () => {
   it('accepts a bounded task budget and a safe agent event', () => {

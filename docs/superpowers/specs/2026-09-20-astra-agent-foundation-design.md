@@ -1,4 +1,4 @@
-# Lyntar Agent Foundation and Windows Vertical Slice
+# Astra Agent Foundation and Windows Vertical Slice
 
 **Date:** 2026-09-20
 **Status:** Approved design
@@ -6,7 +6,7 @@
 
 ## Goal
 
-Create the smallest production-oriented Lyntar architecture that can support a replaceable Windows desktop shell, a local coding-agent runtime, a server-mediated model boundary, auditable usage receipts, and a deterministic certification path. The first meaningful product result is a Windows user opening a local Git repository, asking for a bounded coding task, allowing Lyntar to inspect and edit only that repository, run a real command and verification, repair a failure within task budgets, and receive a Lyntar-specific diff/result.
+Create the smallest production-oriented Astra architecture that can support a replaceable Windows desktop shell, a local coding-agent runtime, a server-mediated model boundary, auditable usage receipts, and a deterministic certification path. The first meaningful product result is a Windows user opening a local Git repository, asking for a bounded coding task, allowing Astra to inspect and edit only that repository, run a real command and verification, repair a failure within task budgets, and receive a Astra-specific diff/result.
 
 The public marketing site, billing, marketplace, MCP, Skills, Plugins, student modes, and admin UI are explicitly out of scope until this vertical slice works.
 
@@ -27,7 +27,7 @@ The public marketing site, billing, marketplace, MCP, Skills, Plugins, student m
 ## Repository layout
 
 ```text
-lyntar/
+astra/
 ├── apps/
 │   ├── api/                      # Fastify HTTP boundary and model/catalog/receipt persistence
 │   └── desktop/                  # Electron adapter, React renderer, typed preload bridge
@@ -101,7 +101,7 @@ Illegal transitions are rejected. The renderer derives progress from append-only
 - `WorkspacePort`: lists/searches/reads files within an authorized canonical workspace.
 - `PatchPort`: applies a multi-file patch through a checkpoint and rolls back on partial failure.
 - `CommandPort`: executes classified commands with timeout/output limits and cancellation.
-- `GitPort`: detects the repository, captures baseline status/dirty files, and computes a final Lyntar-only diff.
+- `GitPort`: detects the repository, captures baseline status/dirty files, and computes a final Astra-only diff.
 - `VerificationPort`: detects/executes a project verification command separately from arbitrary agent commands.
 - `EventPort`: appends and publishes safe events.
 - `PermissionPort`: classifies proposed actions and resolves safe, approval-required, high-risk, and prohibited actions.
@@ -135,7 +135,7 @@ The first policy blocks destructive filesystem and Git reset/clean operations, s
 
 ## Git baseline and diff isolation
 
-Before any mutation, `GitPort` records repository identity, baseline status, and the set/content hashes of pre-existing dirty files. After the task, it computes changed files and hunks attributable to Lyntar, keeping pre-existing modifications distinct. The renderer must label those categories separately and never claim a pre-existing change as agent-created.
+Before any mutation, `GitPort` records repository identity, baseline status, and the set/content hashes of pre-existing dirty files. After the task, it computes changed files and hunks attributable to Astra, keeping pre-existing modifications distinct. The renderer must label those categories separately and never claim a pre-existing change as agent-created.
 
 ## Project command detection and verification
 
@@ -184,7 +184,7 @@ The renderer implements only the vertical-slice surface:
 - show concise append-only progress events;
 - approve/reject permission requests;
 - stop a task;
-- show Lyntar-created vs pre-existing changes;
+- show Astra-created vs pre-existing changes;
 - show verification output, usage receipt, and unresolved issues.
 
 It does not implement marketing, account billing, extension management, or the full product navigation yet.

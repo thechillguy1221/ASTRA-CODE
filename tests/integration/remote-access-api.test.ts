@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { buildApi } from '@lyntar/api';
-import { RemoteRelayBroker, verifyRelayGrant } from '@lyntar/remote-protocol';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
+import { buildApi } from '@astra/api';
+import { RemoteRelayBroker, verifyRelayGrant } from '@astra/remote-protocol';
 
 async function registerAndLogin(app: ReturnType<typeof buildApi>, email: string): Promise<string> {
   const registered = await app.inject({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryAdminAnalytics, NO_LIVE_DATA } from '@lyntar/billing';
+import { InMemoryAdminAnalytics, NO_LIVE_DATA } from '@astra/billing';
 
 describe('admin analytics data honesty', () => {
   it('returns NO_LIVE_DATA until a real snapshot is supplied', async () => {

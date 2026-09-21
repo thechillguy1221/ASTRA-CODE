@@ -1,8 +1,8 @@
-import type { AuthError, AuthService, DeviceInput } from '@lyntar/auth';
-import type { GoogleDesktopOAuthService } from '@lyntar/auth';
-import type { EmailService } from '@lyntar/email';
-import type { BillingService } from '@lyntar/billing';
-import type { PlanCatalog } from '@lyntar/plans';
+import type { AuthError, AuthService, DeviceInput } from '@astra/auth';
+import type { GoogleDesktopOAuthService } from '@astra/auth';
+import type { EmailService } from '@astra/email';
+import type { BillingService } from '@astra/billing';
+import type { PlanCatalog } from '@astra/plans';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertTaskTransition } from '@lyntar/contracts';
+import { assertTaskTransition } from '@astra/contracts';
 
 describe('task state machine', () => {
   it('rejects an illegal COMPLETED to EXECUTING transition', () => {

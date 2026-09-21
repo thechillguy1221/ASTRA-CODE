@@ -1,4 +1,4 @@
-# Lyntar Phase 2 Live Foundation Implementation Plan
+# Astra Phase 2 Live Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, npm workspaces, Electron, React/Vite, Fastify, PostgreSQL/`pg`, Vitest, Docker when available, Vercel AI Gateway-compatible HTTP streaming.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-lyntar-phase2-live-foundation-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-20-astra-phase2-live-foundation-design.md`
 
 ## Global Constraints
 

@@ -15,4 +15,4 @@ Billable execution follows:
 
 The provider cost, customer-billable cost, and absorbed cost are distinct. An internal failure can therefore be recorded without rewriting provider usage history.
 
-The default `buildApi()` test harness enables development entitlement mode. The long-running API server reads `LYNTAR_DEVELOPMENT_ENTITLEMENT`, which defaults to disabled. A production authenticated task must present a valid reservation header.
+The default `buildApi()` test harness enables development entitlement mode. The long-running API server reads `ASTRA_DEVELOPMENT_ENTITLEMENT`, which defaults to disabled. A production authenticated task must present a valid reservation header.

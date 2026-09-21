@@ -32,7 +32,7 @@ This is the implementation audit for the native-Windows production-hardening pas
 | Skills/MCP/Plugins           | extension routes/surfaces                | package registries                    | agent/tool boundary packages                                           | registry metadata                                        | extensions, remote permission tests                      | Deterministically implemented; live hostile endpoint/plugin certification unavailable                                                |
 | Learn/Viva/Hackathon         | desktop modes and web feature routes     | local runtime services                | `packages/modes` plus workspace snapshot                               | none required for deterministic mode                     | modes                                                    | Implemented/deterministic-tested                                                                                                     |
 | Super Admin                  | `apps/admin`                             | admin/email/analytics routes          | none                                                                   | PostgreSQL admin/analytics stores                        | admin/analytics/email                                    | Implemented/deterministic-tested; live data certification blocked                                                                    |
-| Public web/SEO               | `apps/web`, prerender script             | plan/release endpoints                | none                                                                   | none                                                     | browser smoke/route tests                                | Crawlable prerender and metadata implemented; public domain still configured centrally to legacy `lyntar.dev` until supplied         |
+| Public web/SEO               | `apps/web`, prerender script             | plan/release endpoints                | none                                                                   | none                                                     | browser smoke/route tests                                | Crawlable prerender and metadata implemented; public domain still configured centrally to legacy `astra.dev` until supplied          |
 | Windows release              | Electron Builder NSIS                    | release manifest route                | Electron main/preload                                                  | release metadata                                         | package/build checks                                     | Fresh Astra-branded unsigned x64 installer generated and hashed; signing and installed-app E2E remain blocked                        |
 
 ## Cline lineage matrix
@@ -45,7 +45,7 @@ This is the implementation audit for the native-Windows production-hardening pas
 | Session persistence     | None found                     | Not applicable          | Independent agent-core/session stores   | No Cline notice identified                  | session tests                                                        |
 | MCP                     | None found                     | Not applicable          | Independent `packages/mcp`              | No Cline notice identified                  | extension/permission tests                                           |
 | Desktop UI              | None found                     | Not applicable          | Electron/React/Vite implementation      | No Cline notice identified                  | desktop build and IPC tests                                          |
-| Astra wrapper boundary  | Not applicable                 | Not applicable          | `@lyntar/*` internal packages           | Internal compatibility identifiers retained | Public Astra branding; no evidence of a Cline-derived implementation |
+| Astra wrapper boundary  | Not applicable                 | Not applicable          | `@astra/*` internal packages            | Internal compatibility identifiers retained | Public Astra branding; no evidence of a Cline-derived implementation |
 
 Conclusion: the repository is Astra-owned and independently implemented in the audited paths. The release must not claim Cline SDK/Core reuse or inherit Cline licensing obligations without new source evidence.
 
@@ -122,8 +122,8 @@ Public routes are defined centrally in `apps/web/src/routes.ts`: home, pricing, 
 
 | External gate     | Status at audit | Exact blocker                                                                            |
 | ----------------- | --------------- | ---------------------------------------------------------------------------------------- |
-| AI Gateway/model  | BLOCKED         | `LYNTAR_LIVE_TEST`, gateway URL/key/model absent                                         |
-| PostgreSQL        | BLOCKED         | `LYNTAR_DATABASE_URL` and disposable restore target absent                               |
+| AI Gateway/model  | BLOCKED         | `ASTRA_LIVE_TEST`, gateway URL/key/model absent                                          |
+| PostgreSQL        | BLOCKED         | `ASTRA_DATABASE_URL` and disposable restore target absent                                |
 | Google OAuth      | BLOCKED         | real OAuth client configuration absent                                                   |
 | Resend            | BLOCKED         | real API key and verified sender absent                                                  |
 | Razorpay          | BLOCKED         | sandbox credentials absent                                                               |

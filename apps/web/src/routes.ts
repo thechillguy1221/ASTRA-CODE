@@ -404,7 +404,7 @@ const routeDefinitions: Array<
     undefined,
   ],
   [
-    '/compare/lyntar-vs-cursor',
+    '/compare/astra-vs-cursor',
     'Astra Code vs Cursor',
     'Legacy alias for the current Astra Code versus Cursor comparison.',
     'comparison',
@@ -412,7 +412,7 @@ const routeDefinitions: Array<
     'cursor',
   ],
   [
-    '/compare/lyntar-vs-github-copilot',
+    '/compare/astra-vs-github-copilot',
     'Astra Code vs GitHub Copilot',
     'Legacy alias for the current Astra Code versus GitHub Copilot comparison.',
     'comparison',
@@ -420,7 +420,7 @@ const routeDefinitions: Array<
     'github-copilot',
   ],
   [
-    '/compare/lyntar-vs-cline',
+    '/compare/astra-vs-cline',
     'Astra Code vs Cline',
     'Legacy alias for the current Astra Code versus Cline comparison.',
     'comparison',
@@ -428,7 +428,7 @@ const routeDefinitions: Array<
     'cline',
   ],
   [
-    '/compare/lyntar-vs-windsurf',
+    '/compare/astra-vs-windsurf',
     'Astra Code vs Windsurf',
     'Legacy alias for a comparison pending a current official Windsurf product source.',
     'comparison',

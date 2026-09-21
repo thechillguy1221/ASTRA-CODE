@@ -1,5 +1,5 @@
-import { ModelDecisionSchema, ModelStreamEventSchema } from '@lyntar/contracts';
-import type { ModelStreamEvent } from '@lyntar/contracts';
+import { ModelDecisionSchema, ModelStreamEventSchema } from '@astra/contracts';
+import type { ModelStreamEvent } from '@astra/contracts';
 import type { GatewayModelClient, GatewayRequest } from './contracts.js';
 import { parseUsageReceipt } from './receipt.js';
 
@@ -75,7 +75,7 @@ export class VercelGatewayClient implements GatewayModelClient {
         headers: {
           Authorization: `Bearer ${this.options.apiKey}`,
           'Content-Type': 'application/json',
-          'X-Lyntar-Request-Id': request.requestId,
+          'X-Astra-Request-Id': request.requestId,
         },
         signal,
         body: JSON.stringify({

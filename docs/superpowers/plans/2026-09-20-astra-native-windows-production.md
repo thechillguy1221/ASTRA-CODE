@@ -8,7 +8,7 @@
 
 **Spec:** The newest Astra native-Windows production prompt, including real installed Windows packaging, backend-authoritative model/plan/credit controls, personal devices, Team/Business pooled wallets, Rooms, secure remote boundaries, and truthful certification.
 
-**Global Constraints:** Preserve existing passing behavior and internal `@lyntar/*`, `LYNTAR_*`, `window.lyntar`, migration, and protocol identifiers where compatibility requires them. Do not migrate Electron to Tauri without a concrete defect. Do not put provider or billing secrets in desktop code. Do not call deterministic tests live certification. Do not weaken workspace, command, cancellation, or permission safeguards. Do not alter unrelated user work. Use tests before production changes and run the full verification suite before release identity is recorded.
+**Global Constraints:** Preserve existing passing behavior and internal `@astra/*`, `ASTRA_*`, `window.astra`, migration, and protocol identifiers where compatibility requires them. Do not migrate Electron to Tauri without a concrete defect. Do not put provider or billing secrets in desktop code. Do not call deterministic tests live certification. Do not weaken workspace, command, cancellation, or permission safeguards. Do not alter unrelated user work. Use tests before production changes and run the full verification suite before release identity is recorded.
 
 **Review Focus:** Organization wallet correctness and race resistance; user/Room authorization; desktop-to-relay boundaries; installer/deep-link/native behavior; secret handling; exact test evidence; distinction between implemented, deterministic, live, blocked, and certified.
 

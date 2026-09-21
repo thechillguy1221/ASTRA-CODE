@@ -9,7 +9,7 @@ import type {
   OrganizationWallet,
   OrganizationWalletLedgerEntry,
   OrganizationWalletBucket,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 
 export interface GrantCreditsInput {
   userId: string;

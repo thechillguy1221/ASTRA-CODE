@@ -11,7 +11,7 @@ import {
   type WalletLedgerEntry,
   WalletBucketSchema,
   type WalletBucket,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import {
   BillingError,
   type AdjustCreditsInput,
@@ -29,7 +29,7 @@ import {
   parseUsd,
   subtractCredits,
   subtractUsd,
-} from '@lyntar/billing';
+} from '@astra/billing';
 
 function mapWallet(row: Record<string, unknown>): Wallet {
   return WalletSchema.parse({

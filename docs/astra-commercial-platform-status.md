@@ -6,8 +6,8 @@ not a production-ready claim.
 ## Implemented in this continuation
 
 - Astra AI public naming in user-facing web, desktop, admin, and model-agent copy.
-- Compatibility plan for existing `@lyntar/*`, `LYNTAR_*`, `window.lyntar`, persisted storage, and
-  migration identifiers.
+- Repository-wide Astra naming across `@astra/*`, `ASTRA_*`, `window.astra`, persisted storage, and
+  active migration references.
 - Hashed six-digit email OTPs with expiry, resend cooldown, attempt limits, single use, and generic
   unknown-email behavior.
 - Google OAuth/OIDC boundary with server-fixed provider redirect URI, state, PKCE challenge binding,
@@ -52,8 +52,8 @@ not a production-ready claim.
   reservation path are implemented and deterministically tested. Installed desktop host/client
   integration, durable multi-instance relay state, and staging network certification remain pending.
 
-## Compatibility note
+## Rename note
 
-Public Astra copy does not imply that internal identifiers have been renamed. The cutover of the
-production domain, installer identity, OAuth redirect URLs, email links, and signed release manifest
-must be a separate migration with an upgrade test.
+The internal identifier cutover is complete in the current source tree. The production domain,
+installer identity, OAuth redirect URLs, email links, and signed release manifest still require
+environment-specific release configuration and an upgrade test before public deployment.

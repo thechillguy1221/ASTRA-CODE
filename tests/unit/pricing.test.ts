@@ -7,7 +7,7 @@ import {
   getPlanRegionalPrice,
   listCreditPacks,
   pricingRegionForCountryCode,
-} from '@lyntar/plans';
+} from '@astra/plans';
 
 describe('Astra Code regional commercial catalog', () => {
   it('keeps the finalized India and Global subscription prices centralized', () => {

@@ -3,11 +3,11 @@ import {
   ModelRequestSchema,
   type ModelDecision,
   type UsageReceipt,
-} from '@lyntar/contracts';
-import type { AuthService } from '@lyntar/auth';
-import type { BillingService, OrganizationBillingService } from '@lyntar/billing';
-import type { ModelCatalogStore, UsageReceiptStore } from '@lyntar/db';
-import type { GatewayModelClient } from '@lyntar/model-gateway';
+} from '@astra/contracts';
+import type { AuthService } from '@astra/auth';
+import type { BillingService, OrganizationBillingService } from '@astra/billing';
+import type { ModelCatalogStore, UsageReceiptStore } from '@astra/db';
+import type { GatewayModelClient } from '@astra/model-gateway';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { resolveRequestedModel } from './model-selection.js';
 
@@ -51,7 +51,7 @@ export async function registerModelRoutes(
     }
     let reservation: Awaited<ReturnType<BillingService['getReservation']>>;
     if (identity && dependencies.billing) {
-      const reservationId = request.headers['x-lyntar-reservation-id'];
+      const reservationId = request.headers['x-astra-reservation-id'];
       if (typeof reservationId !== 'string')
         return reply.code(409).send({ error: 'RESERVATION_REQUIRED' });
       reservation = await dependencies.billing.getReservation(reservationId);

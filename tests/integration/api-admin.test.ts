@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
-import { buildApi } from '@lyntar/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
+import { BillingService, InMemoryBillingStore } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
+import { buildApi } from '@astra/api';
 
 describe('admin API boundary', () => {
   it('rejects ordinary users and exposes only explicit server role controls', async () => {

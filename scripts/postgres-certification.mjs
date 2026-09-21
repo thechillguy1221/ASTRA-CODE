@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { randomUUID } from 'node:crypto';
-import { applyFoundationMigration, createPostgresStores } from '@lyntar/db';
+import { applyFoundationMigration, createPostgresStores } from '@astra/db';
 
 const execFileAsync = promisify(execFile);
-const databaseUrl = process.env.LYNTAR_DATABASE_URL;
+const databaseUrl = process.env.ASTRA_DATABASE_URL;
 
 function sanitize(value) {
   return String(value).replace(/postgres(?:ql)?:\/\/[^\s]+/gi, 'postgres://[redacted]');
@@ -23,18 +23,18 @@ async function executableAvailable(name) {
 }
 
 async function backupAndRestore() {
-  const restoreUrl = process.env.LYNTAR_POSTGRES_RESTORE_URL;
+  const restoreUrl = process.env.ASTRA_POSTGRES_RESTORE_URL;
   const hasDump = await executableAvailable('pg_dump');
   const hasRestore = await executableAvailable('pg_restore');
   if (!hasDump || !hasRestore || !restoreUrl) {
     return {
       status: 'BLOCKED',
-      reason: 'pg_dump, pg_restore, and LYNTAR_POSTGRES_RESTORE_URL are required',
+      reason: 'pg_dump, pg_restore, and ASTRA_POSTGRES_RESTORE_URL are required',
     };
   }
 
-  const directory = await mkdtemp(join(tmpdir(), 'lyntar-postgres-cert-'));
-  const backupPath = join(directory, 'lyntar.dump');
+  const directory = await mkdtemp(join(tmpdir(), 'astra-postgres-cert-'));
+  const backupPath = join(directory, 'astra.dump');
   try {
     await execFileAsync('pg_dump', ['--format=custom', '--file', backupPath, databaseUrl]);
     await execFileAsync('pg_restore', [
@@ -57,7 +57,7 @@ async function certify() {
   if (!databaseUrl) {
     return {
       status: 'BLOCKED',
-      reason: 'LYNTAR_DATABASE_URL is not configured',
+      reason: 'ASTRA_DATABASE_URL is not configured',
       backupRestore: { status: 'BLOCKED' },
     };
   }
@@ -255,11 +255,11 @@ async function certify() {
 }
 
 const report =
-  process.env.LYNTAR_POSTGRES_CERTIFY === '1'
+  process.env.ASTRA_POSTGRES_CERTIFY === '1'
     ? await certify()
     : {
         status: 'BLOCKED',
-        reason: 'Set LYNTAR_POSTGRES_CERTIFY=1 only for a disposable certification database',
+        reason: 'Set ASTRA_POSTGRES_CERTIFY=1 only for a disposable certification database',
         backupRestore: { status: 'BLOCKED' },
       };
 console.log(`[POSTGRES-CERTIFICATION] ${JSON.stringify(report)}`);

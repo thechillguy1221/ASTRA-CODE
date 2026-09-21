@@ -3,7 +3,7 @@ import {
   assertRoomWorkspacePath,
   RemoteAccessService,
   WorkspaceWriteCoordinator,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 
 const TEAM = {
   id: 'TEAM',

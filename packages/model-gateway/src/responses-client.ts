@@ -1,4 +1,4 @@
-import type { ModelCostMetadata } from '@lyntar/contracts';
+import type { ModelCostMetadata } from '@astra/contracts';
 import { ModelGatewayError } from './vercel-gateway-client.js';
 
 export interface ResponsesGatewayRequest {
@@ -65,7 +65,7 @@ export class VercelResponsesGatewayClient implements ResponsesGatewayClient {
         Authorization: `Bearer ${this.options.apiKey}`,
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
-        'X-Lyntar-Request-Id': request.requestId,
+        'X-Astra-Request-Id': request.requestId,
       },
       body: JSON.stringify({ ...request.body, model: request.model, stream: true }),
       signal,

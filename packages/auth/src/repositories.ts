@@ -1,4 +1,4 @@
-import type { DeviceSession } from '@lyntar/contracts';
+import type { DeviceSession } from '@astra/contracts';
 import type {
   AuthStore,
   EmailOtpRecord,

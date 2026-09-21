@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AgentEventSchema, ModelCatalogEntrySchema } from '@lyntar/contracts';
-import { parseUsageReceipt } from '@lyntar/model-gateway';
+import { AgentEventSchema, ModelCatalogEntrySchema } from '@astra/contracts';
+import { parseUsageReceipt } from '@astra/model-gateway';
 
 describe('phase 2 audit contracts', () => {
   it('reconciles provider cost against catalog pricing without replacing actual cost', () => {

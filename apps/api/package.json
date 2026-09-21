@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/api",
+  "name": "@astra/api",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -17,17 +17,17 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@lyntar/config": "0.1.0",
-    "@lyntar/auth": "0.1.0",
-    "@lyntar/billing": "0.1.0",
-    "@lyntar/contracts": "0.1.0",
-    "@lyntar/db": "0.1.0",
-    "@lyntar/email": "0.1.0",
-    "@lyntar/model-gateway": "0.1.0",
-    "@lyntar/plans": "0.1.0",
-    "@lyntar/releases": "0.1.0",
-    "@lyntar/remote-protocol": "0.1.0",
-    "@lyntar/web-research": "0.1.0",
+    "@astra/config": "0.1.0",
+    "@astra/auth": "0.1.0",
+    "@astra/billing": "0.1.0",
+    "@astra/contracts": "0.1.0",
+    "@astra/db": "0.1.0",
+    "@astra/email": "0.1.0",
+    "@astra/model-gateway": "0.1.0",
+    "@astra/plans": "0.1.0",
+    "@astra/releases": "0.1.0",
+    "@astra/remote-protocol": "0.1.0",
+    "@astra/web-research": "0.1.0",
     "fastify": "^5.2.1"
   }
 }

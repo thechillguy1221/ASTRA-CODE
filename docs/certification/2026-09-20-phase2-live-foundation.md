@@ -1,4 +1,4 @@
-# Lyntar Phase 2 Certification Report
+# Astra Phase 2 Certification Report
 
 Date: 2026-09-20
 Scope: live Windows-agent foundation gates and release baseline
@@ -45,10 +45,10 @@ remain gated behind live foundation certification, as required.
 
 The live suite requires all of the following and none were configured:
 
-- `LYNTAR_LIVE_TEST=1`
-- `LYNTAR_MODEL_GATEWAY_URL`
-- `LYNTAR_MODEL_GATEWAY_API_KEY`
-- `LYNTAR_MODEL_ID`
+- `ASTRA_LIVE_TEST=1`
+- `ASTRA_MODEL_GATEWAY_URL`
+- `ASTRA_MODEL_GATEWAY_API_KEY`
+- `ASTRA_MODEL_ID`
 
 Therefore this run has no real model, provider route, gateway request ID,
 usage receipt, or actual provider cost to report. The suite does not fall back to
@@ -91,7 +91,7 @@ The following were **not verified** in this environment:
 - backup and restore.
 
 The certification runner is deliberately guarded by
-`LYNTAR_POSTGRES_CERTIFY=1` and requires a disposable certification database;
+`ASTRA_POSTGRES_CERTIFY=1` and requires a disposable certification database;
 it reported `BLOCKED` without making a database connection. `psql`,
 `pg_isready`, `pg_dump`, and `pg_restore` were unavailable, and Docker Desktop’s
 Linux daemon was not running.

@@ -18,7 +18,7 @@ export const GitBaselineSchema = z.object({
 export type GitBaseline = z.infer<typeof GitBaselineSchema>;
 
 export const GitDiffSchema = z.object({
-  lyntarPaths: z.array(z.string()),
+  astraPaths: z.array(z.string()),
   preExistingPaths: z.array(z.string()),
   mixedPaths: z.array(z.string()),
   patch: z.string(),

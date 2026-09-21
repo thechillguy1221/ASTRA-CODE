@@ -1,8 +1,8 @@
-import type { LyntarIpcApi } from '@lyntar/contracts';
+import type { AstraIpcApi } from '@astra/contracts';
 
 declare global {
   interface Window {
-    lyntar: LyntarIpcApi;
+    astra: AstraIpcApi;
   }
 }
 

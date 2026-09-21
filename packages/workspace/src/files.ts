@@ -126,7 +126,7 @@ export class LocalWorkspace {
         }
 
         await mkdir(dirname(confirmed), { recursive: true });
-        const temporary = `${confirmed}.${randomUUID()}.lyntar-tmp`;
+        const temporary = `${confirmed}.${randomUUID()}.astra-tmp`;
         temporaryFiles.push(temporary);
         await writeFile(temporary, file.content, 'utf8');
         throwIfAborted(signal);
@@ -178,7 +178,7 @@ export class LocalWorkspace {
         }
 
         await mkdir(dirname(confirmed), { recursive: true });
-        const temporary = `${confirmed}.${randomUUID()}.lyntar-tmp`;
+        const temporary = `${confirmed}.${randomUUID()}.astra-tmp`;
         temporaryFiles.push(temporary);
         await writeFile(temporary, file.content);
         throwIfAborted(signal);

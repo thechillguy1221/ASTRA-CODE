@@ -1,4 +1,4 @@
-import type { TaskBudget } from '@lyntar/contracts';
+import type { TaskBudget } from '@astra/contracts';
 
 export type BudgetKind = 'model' | 'repair' | 'command';
 

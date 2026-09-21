@@ -1,4 +1,4 @@
--- Agent session persistence and checkpoint support for Lyntar V1
+-- Agent session persistence and checkpoint support for Astra V1
 
 -- Extend agent_sessions with canonical session fields
 ALTER TABLE agent_sessions ADD COLUMN IF NOT EXISTS objective text;

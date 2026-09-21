@@ -1,4 +1,4 @@
-import { ModelCatalogEntrySchema, type ModelCatalogEntry } from '@lyntar/contracts';
+import { ModelCatalogEntrySchema, type ModelCatalogEntry } from '@astra/contracts';
 import { calculateExpectedCostUsd } from './receipt.js';
 
 export type AutoMode = 'Save Credits' | 'Balanced' | 'Best Result';

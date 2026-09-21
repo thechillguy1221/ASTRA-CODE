@@ -3,8 +3,8 @@ import {
   BillingError,
   InMemoryOrganizationBillingStore,
   OrganizationBillingService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 function service(): OrganizationBillingService {
   return new OrganizationBillingService({

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { InMemorySessionStore } from '@lyntar/agent-core';
+import { InMemorySessionStore } from '@astra/agent-core';
 import { randomUUID } from 'node:crypto';
 
 function makeSession(overrides?: Partial<Parameters<InMemorySessionStore['createSession']>[0]>) {

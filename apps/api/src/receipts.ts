@@ -1,1 +1,1 @@
-export { createMemoryReceiptStore, InMemoryUsageReceiptStore } from '@lyntar/db';
+export { createMemoryReceiptStore, InMemoryUsageReceiptStore } from '@astra/db';

@@ -21,7 +21,7 @@ import {
   type RoomMember,
   type RoomPermission,
   type RoomRole,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import {
   buildRoomFileImportManifest,
   normalizeRoomFileUpload,
@@ -30,7 +30,7 @@ import {
   type RoomFileImportProposal,
   type RoomFileRecord,
   type RoomFileIntent,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

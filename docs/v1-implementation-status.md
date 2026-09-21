@@ -36,8 +36,8 @@ This document separates code that exists and passes deterministic verification f
   - Command classification policy: SAFE / SENSITIVE / PROHIBITED.
   - Secret redaction for environment variables, bearer tokens, API keys, private keys, and payment secrets.
   - Prompt injection defense: untrusted repository content wrapped with non-elevating trust boundary markers.
-- **Astra Remote Protocol (internal package `@lyntar/remote-protocol`, spec §48–§64)**:
-  - Mobile-first structured RPC protocol (`@lyntar/remote-protocol`) over outbound secure connections.
+- **Astra Remote Protocol (internal package `@astra/remote-protocol`, spec §48–§64)**:
+  - Mobile-first structured RPC protocol (`@astra/remote-protocol`) over outbound secure connections.
   - HMAC-signed QR code pairing with 60s TTL and public-key device fingerprinting.
   - Tiers for remote terminal commands, diff viewing, and spend authorization.
   - Device and Room-member revocation removes matching active broker connections immediately.

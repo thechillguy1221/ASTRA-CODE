@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog } from '@lyntar/api';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { AUTO_MODEL_ID } from '@lyntar/contracts';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { buildApi, createMemoryCatalog } from '@astra/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
+import { BillingService, InMemoryBillingStore } from '@astra/billing';
+import { AUTO_MODEL_ID } from '@astra/contracts';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 const model = (modelId: string, displayName: string, recommended = false) => ({
   modelId,
@@ -121,7 +121,7 @@ describe('server-authoritative Auto model selection', () => {
       url: '/v1/model-requests',
       headers: {
         authorization: `Bearer ${login.accessToken}`,
-        'x-lyntar-reservation-id': reservation.reservationId,
+        'x-astra-reservation-id': reservation.reservationId,
       },
       payload: {
         requestId: 'auto-request-authenticated',

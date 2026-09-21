@@ -4,9 +4,9 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AgentTaskRunner, type AgentPorts } from '@lyntar/agent-core';
-import { GitWorkspace, LocalCommandRunner, LocalWorkspace, verifyProject } from '@lyntar/workspace';
-import type { AgentEvent, ModelDecision } from '@lyntar/contracts';
+import { AgentTaskRunner, type AgentPorts } from '@astra/agent-core';
+import { GitWorkspace, LocalCommandRunner, LocalWorkspace, verifyProject } from '@astra/workspace';
+import type { AgentEvent, ModelDecision } from '@astra/contracts';
 
 const execFileAsync = promisify(execFile);
 const temporaryRoots: string[] = [];
@@ -23,14 +23,14 @@ async function git(root: string, ...args: string[]): Promise<void> {
 
 describe('agent golden path', () => {
   it('repairs a broken validation implementation without changing the test', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-golden-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-golden-'));
     temporaryRoots.push(root);
     const repo = join(root, 'broken-node-app');
     await mkdir(repo);
     await cp('tests/fixtures/broken-node-app', repo, { recursive: true });
     await git(repo, 'init');
-    await git(repo, 'config', 'user.email', 'test@lyntar.local');
-    await git(repo, 'config', 'user.name', 'Lyntar Test');
+    await git(repo, 'config', 'user.email', 'test@astra.local');
+    await git(repo, 'config', 'user.name', 'Astra Test');
     await git(repo, 'add', '.');
     await git(repo, 'commit', '-m', 'fixture');
     await writeFile(join(repo, 'README.md'), 'pre-existing note\n');
@@ -143,7 +143,7 @@ describe('agent golden path', () => {
 
     expect(result.state).toBe('COMPLETED');
     expect(result.verification.status).toBe('passed');
-    expect(result.gitDiff.lyntarPaths).toEqual(['src/validate.ts']);
+    expect(result.gitDiff.astraPaths).toEqual(['src/validate.ts']);
     expect(result.gitDiff.preExistingPaths).toContain('README.md');
     expect(await readFile(join(repo, 'test/validate.test.js'), 'utf8')).toContain(
       'name is required',

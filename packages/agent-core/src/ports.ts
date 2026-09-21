@@ -8,7 +8,7 @@ import type {
   TaskState,
   UsageReceipt,
   UsageSummary,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import type { SessionStore } from './session.js';
 
 export interface WorkspaceSearchResult {

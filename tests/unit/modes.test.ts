@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HackathonService, LearnService, VivaService } from '@lyntar/modes';
+import { HackathonService, LearnService, VivaService } from '@astra/modes';
 
 const files = {
   'src/auth.ts': `export function validateEmail(value: string): boolean { return value.includes('@'); }`,

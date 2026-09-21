@@ -5,9 +5,9 @@ import type {
   OrganizationWalletBucket,
   OrganizationWalletLedgerEntry,
   UsageSettlement,
-} from '@lyntar/contracts';
-import type { PlanCatalog } from '@lyntar/plans';
-import { PlanEntitlementError } from '@lyntar/plans';
+} from '@astra/contracts';
+import type { PlanCatalog } from '@astra/plans';
+import { PlanEntitlementError } from '@astra/plans';
 import { BillingError } from './memory.js';
 import type {
   OrganizationBillingStore,

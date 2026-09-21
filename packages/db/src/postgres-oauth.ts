@@ -4,7 +4,7 @@ import type {
   DeviceInput,
   OAuthTransaction,
   OAuthTransactionStore,
-} from '@lyntar/auth';
+} from '@astra/auth';
 
 export class PostgresOAuthTransactionStore implements OAuthTransactionStore {
   constructor(private readonly pool: Pool) {}

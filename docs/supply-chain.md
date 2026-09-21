@@ -18,4 +18,4 @@ On 2026-09-20, after adding the reviewed WebSocket relay and Windows packaging d
 
 License compatibility still requires review of the generated direct inventory before distribution. The Cline lineage audit is recorded in `docs/cline-lineage.md`; no Cline package or copied Cline source is present in the current repository, so no Cline-specific attribution obligation was identified in this pass. No production certification claim is based solely on the audit count.
 
-Private Astra AI workspaces are explicitly marked `UNLICENSED`; third-party direct dependencies must carry a declared license in the generated report before any public package or installer distribution. Internal `@lyntar/*` package identifiers remain compatibility names and are not the public product name.
+Private Astra AI workspaces are explicitly marked `UNLICENSED`; third-party direct dependencies must carry a declared license in the generated report before any public package or installer distribution. Internal `@astra/*` package identifiers remain compatibility names and are not the public product name.

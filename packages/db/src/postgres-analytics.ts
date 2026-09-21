@@ -1,11 +1,11 @@
 import type { Pool } from 'pg';
-import type { EmailPreferenceStore } from '@lyntar/email';
+import type { EmailPreferenceStore } from '@astra/email';
 import {
   NO_LIVE_DATA,
   type AdminAnalyticsPort,
   type AdminOverview,
   type AdminUsageRow,
-} from '@lyntar/billing';
+} from '@astra/billing';
 
 export class PostgresEmailPreferenceStore implements EmailPreferenceStore {
   constructor(private readonly pool: Pool) {}

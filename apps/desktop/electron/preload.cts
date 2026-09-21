@@ -1,11 +1,11 @@
 // The sandboxed preload must compile to CommonJS; Electron does not load an ESM preload in this mode.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import electron = require('electron');
-import type { AgentEvent, LyntarIpcApi, TaskBudget } from '@lyntar/contracts';
+import type { AgentEvent, AstraIpcApi, TaskBudget } from '@astra/contracts';
 
 const { contextBridge, ipcRenderer } = electron;
 
-const api: LyntarIpcApi = {
+const api: AstraIpcApi = {
   workspace: {
     open: () => ipcRenderer.invoke('workspace.open'),
     readFile: (relativePath: string) => ipcRenderer.invoke('workspace.readFile', relativePath),
@@ -99,4 +99,4 @@ const api: LyntarIpcApi = {
   },
 };
 
-contextBridge.exposeInMainWorld('lyntar', api);
+contextBridge.exposeInMainWorld('astra', api);

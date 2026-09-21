@@ -1,4 +1,4 @@
-# Lyntar Phase 2 Live Foundation Design
+# Astra Phase 2 Live Foundation Design
 
 ## Goal
 

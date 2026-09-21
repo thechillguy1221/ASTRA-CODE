@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyCommand } from '@lyntar/workspace';
+import { classifyCommand } from '@astra/workspace';
 
 describe('command policy', () => {
   it('classifies reset, clean, and download-and-execute commands as prohibited', () => {

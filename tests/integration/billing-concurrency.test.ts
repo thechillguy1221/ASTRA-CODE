@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { InMemoryBillingStore } from '@lyntar/billing';
-import { BillingService } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { InMemoryBillingStore } from '@astra/billing';
+import { BillingService } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 function makeService() {
   const store = new InMemoryBillingStore();

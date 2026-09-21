@@ -1,5 +1,5 @@
 import type { Pool } from 'pg';
-import { DeviceSessionSchema, type AuthProvider, type DeviceSession } from '@lyntar/contracts';
+import { DeviceSessionSchema, type AuthProvider, type DeviceSession } from '@astra/contracts';
 import type {
   AuthStore,
   EmailOtpRecord,
@@ -8,7 +8,7 @@ import type {
   PasswordResetRecord,
   StoredSession,
   StoredUser,
-} from '@lyntar/auth';
+} from '@astra/auth';
 
 function mapUser(row: Record<string, unknown>): StoredUser {
   return {

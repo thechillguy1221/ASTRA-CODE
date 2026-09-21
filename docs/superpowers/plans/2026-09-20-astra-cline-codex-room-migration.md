@@ -150,7 +150,7 @@ The actual wire messages and launch arguments are derived from the pinned Codex 
 
   Run: `npm.cmd test -- tests/integration/codex-supervisor.test.ts tests/unit/codex-protocol.test.ts`
 
-  Expected: FAIL because `@lyntar/codex-runtime` and the supervisor do not exist.
+  Expected: FAIL because `@astra/codex-runtime` and the supervisor do not exist.
 
 - [ ] **Step 3: Build the actual pinned Codex runtime**
 
@@ -346,7 +346,7 @@ export function AstraWorkspaceShell(props: {
 
 - [ ] **Step 5: Run focused, renderer build, and branding checks**
 
-  Run the focused tests, `npm.cmd run build --workspace @lyntar/desktop`, and `rg -ni 'Cline|OpenAI API key|Anthropic API key|OpenRouter|BYOK' apps/desktop packages/cline-workspace-ui`. Any remaining Cline match must be legal provenance or a deliberately excluded source path, not user-facing product/provider configuration.
+  Run the focused tests, `npm.cmd run build --workspace @astra/desktop`, and `rg -ni 'Cline|OpenAI API key|Anthropic API key|OpenRouter|BYOK' apps/desktop packages/cline-workspace-ui`. Any remaining Cline match must be legal provenance or a deliberately excluded source path, not user-facing product/provider configuration.
 
 - [ ] **Step 6: Commit the Cline UI boundary**
 
@@ -699,7 +699,7 @@ export interface RoomWorkspaceViewModel {
 
 - [ ] **Step 5: Run desktop build and focused UI tests**
 
-  Run the focused test and `npm.cmd run build --workspace @lyntar/desktop`. Verify no public website route is loaded by the desktop coding entry.
+  Run the focused test and `npm.cmd run build --workspace @astra/desktop`. Verify no public website route is loaded by the desktop coding entry.
 
 - [ ] **Step 6: Commit Room UI integration**
 

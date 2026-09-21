@@ -1,4 +1,4 @@
-import { PlanSchema, type BillingMode, type Plan } from '@lyntar/contracts';
+import { PlanSchema, type BillingMode, type Plan } from '@astra/contracts';
 
 export * from './pricing.js';
 

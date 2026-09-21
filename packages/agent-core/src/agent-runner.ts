@@ -6,7 +6,7 @@ import {
   type TaskState,
   type UsageReceipt,
   type UsageSummary,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import { BudgetExceededError, BudgetTracker } from './budget.js';
 import { CancellationToken, waitForCancellation } from './cancellation.js';
 import { createAgentEvent } from './events.js';
@@ -19,7 +19,7 @@ import {
 } from './ports.js';
 import { TaskStateController } from './state.js';
 import { RunawayAgentError, RunawayLoopGuard } from './runaway.js';
-import { addCredits, creditsFromUsd } from '@lyntar/billing';
+import { addCredits, creditsFromUsd } from '@astra/billing';
 import type { AgentSessionStatus, StructuredTaskState } from './session.js';
 
 interface ActiveTask {

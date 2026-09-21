@@ -1,6 +1,6 @@
-import { AUTO_MODEL_ID, type ModelCatalogEntry, type Wallet } from '@lyntar/contracts';
-import type { ModelCatalogStore } from '@lyntar/db';
-import { chooseAutoModel } from '@lyntar/model-gateway';
+import { AUTO_MODEL_ID, type ModelCatalogEntry, type Wallet } from '@astra/contracts';
+import type { ModelCatalogStore } from '@astra/db';
+import { chooseAutoModel } from '@astra/model-gateway';
 
 export interface RequestedModelInput {
   requestedModelId: string;

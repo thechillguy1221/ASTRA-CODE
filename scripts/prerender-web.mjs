@@ -5,9 +5,10 @@ const repositoryRoot = resolve(import.meta.dirname, '..');
 const distRoot = resolve(repositoryRoot, 'apps/web/dist');
 const source = await readFile(resolve(distRoot, 'index.html'), 'utf8');
 const { publicRoutes } = await import('../apps/web/src/routes.ts');
-const siteUrl = (
-  globalThis.process?.env.VITE_ASTRA_PUBLIC_SITE_URL ?? 'https://lyntar.dev'
-).replace(/\/$/, '');
+const siteUrl = (globalThis.process?.env.VITE_ASTRA_PUBLIC_SITE_URL ?? 'https://astra.dev').replace(
+  /\/$/,
+  '',
+);
 
 function escapeHtml(value) {
   return value

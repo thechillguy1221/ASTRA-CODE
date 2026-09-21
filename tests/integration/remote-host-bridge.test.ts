@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { RemoteHostBridge, type RemoteHostTransport } from '@lyntar/remote-protocol';
-import type { RemoteMessage } from '@lyntar/remote-protocol';
+import { RemoteHostBridge, type RemoteHostTransport } from '@astra/remote-protocol';
+import type { RemoteMessage } from '@astra/remote-protocol';
 
 function message<T extends RemoteMessage['type']>(type: T, payload: unknown): RemoteMessage {
   return {

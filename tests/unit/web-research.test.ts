@@ -5,7 +5,7 @@ import {
   WebResearchService,
   type WebResearchContext,
   type WebSearchProvider,
-} from '@lyntar/web-research';
+} from '@astra/web-research';
 
 const context: WebResearchContext = {
   taskId: 'task-web-1',

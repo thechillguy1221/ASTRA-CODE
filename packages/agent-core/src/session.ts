@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { TaskState } from '@lyntar/contracts';
+import type { TaskState } from '@astra/contracts';
 
 // ─── Session Status ────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
-import type { PlanCatalog } from '@lyntar/plans';
+import type { PlanCatalog } from '@astra/plans';
 import type { BillingService } from './service.js';
 import type { OrganizationBillingService } from './organization-service.js';
 import { TOP_UP_250, getConfiguredCreditPack, topUpExpiresAt } from './buckets.js';

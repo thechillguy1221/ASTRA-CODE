@@ -6,8 +6,8 @@ import {
   InMemoryBillingStore,
   InMemoryOrganizationBillingStore,
   OrganizationBillingService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 import { createHmac } from 'node:crypto';
 
 const SECRET = 'test-webhook-secret';

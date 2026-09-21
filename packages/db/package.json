@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/db",
+  "name": "@astra/db",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -17,12 +17,12 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@lyntar/contracts": "0.1.0",
-    "@lyntar/auth": "0.1.0",
-    "@lyntar/billing": "0.1.0",
-    "@lyntar/plans": "0.1.0",
-    "@lyntar/email": "0.1.0",
-    "@lyntar/remote-protocol": "0.1.0",
+    "@astra/contracts": "0.1.0",
+    "@astra/auth": "0.1.0",
+    "@astra/billing": "0.1.0",
+    "@astra/plans": "0.1.0",
+    "@astra/email": "0.1.0",
+    "@astra/remote-protocol": "0.1.0",
     "pg": "^8.13.3"
   }
 }

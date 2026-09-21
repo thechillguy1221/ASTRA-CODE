@@ -19,7 +19,7 @@ async function git(root, ...args) {
 }
 
 async function runGoldenPath() {
-  const temporaryRoot = await mkdtemp(join(tmpdir(), 'lyntar-golden-command-'));
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'astra-golden-command-'));
   const repository = join(temporaryRoot, 'broken-node-app');
   try {
     await mkdir(repository);
@@ -27,8 +27,8 @@ async function runGoldenPath() {
       recursive: true,
     });
     await git(repository, 'init');
-    await git(repository, 'config', 'user.email', 'test@lyntar.local');
-    await git(repository, 'config', 'user.name', 'Lyntar Test');
+    await git(repository, 'config', 'user.email', 'test@astra.local');
+    await git(repository, 'config', 'user.name', 'Astra Test');
     await git(repository, 'add', '.');
     await git(repository, 'commit', '-m', 'fixture');
     await writeFile(join(repository, 'README.md'), 'pre-existing note\n');
@@ -128,7 +128,7 @@ try {
     state: result.state,
     summary: result.summary,
     changedFiles: {
-      lyntar: result.gitDiff.lyntarPaths,
+      astra: result.gitDiff.astraPaths,
       preExisting: result.gitDiff.preExistingPaths,
       mixed: result.gitDiff.mixedPaths,
     },

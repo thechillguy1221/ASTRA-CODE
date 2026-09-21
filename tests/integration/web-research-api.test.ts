@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
-import { buildApi } from '@lyntar/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
+import { buildApi } from '@astra/api';
 import {
   InMemoryWebResearchUsageStore,
   WebResearchService,
   type WebSearchProvider,
-} from '@lyntar/web-research';
+} from '@astra/web-research';
 
 async function registerAndLogin(app: ReturnType<typeof buildApi>, email: string): Promise<string> {
   const registered = await app.inject({

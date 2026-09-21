@@ -1,4 +1,4 @@
-import { assertTaskTransition, type TaskState } from '@lyntar/contracts';
+import { assertTaskTransition, type TaskState } from '@astra/contracts';
 
 export class TaskStateController {
   public current: TaskState = 'CREATED';

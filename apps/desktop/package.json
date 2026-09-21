@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/desktop",
+  "name": "@astra/desktop",
   "productName": "Astra Code",
   "description": "Astra Code Windows desktop coding workspace.",
   "author": "Astra Code",
@@ -18,15 +18,15 @@
     "dev": "vite --host 127.0.0.1"
   },
   "dependencies": {
-    "@lyntar/agent-core": "0.1.0",
-    "@lyntar/billing": "0.1.0",
-    "@lyntar/config": "0.1.0",
-    "@lyntar/contracts": "0.1.0",
-    "@lyntar/codex-runtime": "0.1.0",
-    "@lyntar/model-gateway": "0.1.0",
-    "@lyntar/modes": "0.1.0",
-    "@lyntar/remote-protocol": "0.1.0",
-    "@lyntar/workspace": "0.1.0",
+    "@astra/agent-core": "0.1.0",
+    "@astra/billing": "0.1.0",
+    "@astra/config": "0.1.0",
+    "@astra/contracts": "0.1.0",
+    "@astra/codex-runtime": "0.1.0",
+    "@astra/model-gateway": "0.1.0",
+    "@astra/modes": "0.1.0",
+    "@astra/remote-protocol": "0.1.0",
+    "@astra/workspace": "0.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

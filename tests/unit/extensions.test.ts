@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { createEssentialsRegistry, SkillRouter } from '@lyntar/skills';
-import { McpManager } from '@lyntar/mcp';
-import { PluginManager } from '@lyntar/plugins';
-import { ApiIntegrationRegistry, UnifiedToolRegistry } from '@lyntar/integrations';
+import { createEssentialsRegistry, SkillRouter } from '@astra/skills';
+import { McpManager } from '@astra/mcp';
+import { PluginManager } from '@astra/plugins';
+import { ApiIntegrationRegistry, UnifiedToolRegistry } from '@astra/integrations';
 
 describe('extension boundaries', () => {
   it('routes only relevant built-in Skills and loads instructions progressively', () => {

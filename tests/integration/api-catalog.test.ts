@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog } from '@lyntar/api';
+import { buildApi, createMemoryCatalog } from '@astra/api';
 
 describe('model catalog API', () => {
   it('serves an enabled server catalog without desktop model constants', async () => {

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { GitBaselineSchema, type GitBaseline, type GitDiff } from '@lyntar/contracts';
+import { GitBaselineSchema, type GitBaseline, type GitDiff } from '@astra/contracts';
 
 const execFileAsync = promisify(execFile);
 
@@ -86,10 +86,10 @@ export class GitWorkspace {
     const afterSet = new Set(after);
     const preExistingPaths: string[] = [];
     const mixedPaths: string[] = [];
-    const lyntarPaths: string[] = [];
+    const astraPaths: string[] = [];
     for (const path of after) {
       if (!baselineSet.has(path)) {
-        lyntarPaths.push(path);
+        astraPaths.push(path);
       } else if (baseline.fileHashes[path] !== afterHashes[path]) {
         mixedPaths.push(path);
       } else {
@@ -100,13 +100,13 @@ export class GitWorkspace {
       if (!afterSet.has(path)) preExistingPaths.push(path);
     }
     const patchParts = await Promise.all(
-      lyntarPaths.map((path) =>
+      astraPaths.map((path) =>
         baselineSet.has(path)
           ? gitDiff(this.root, ['diff', '--binary', '--', path])
           : gitDiff(this.root, ['diff', '--binary', '--no-index', '--', '/dev/null', path]),
       ),
     );
     const patch = patchParts.join('');
-    return { lyntarPaths, preExistingPaths, mixedPaths, patch };
+    return { astraPaths, preExistingPaths, mixedPaths, patch };
   }
 }

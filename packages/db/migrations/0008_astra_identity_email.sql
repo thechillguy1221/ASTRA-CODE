@@ -1,5 +1,5 @@
 -- Astra identity, OTP, email preferences, delivery, and admin analytics foundation.
--- Existing Lyntar identifiers remain for migration compatibility.
+-- Existing Astra identifiers remain for migration compatibility.
 
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_chk;
 ALTER TABLE users ADD CONSTRAINT users_role_chk

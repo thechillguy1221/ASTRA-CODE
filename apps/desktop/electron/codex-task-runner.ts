@@ -9,7 +9,7 @@ import {
   type IpcTaskResult,
   type TaskBudget,
   type UsageReceipt,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import {
   ASTRA_CODEX_DYNAMIC_TOOLS,
   CodexAppServerClient,
@@ -18,14 +18,14 @@ import {
   type CodexRuntimeManifest,
   type CodexRuntimeSession,
   type CodexServerRequest,
-} from '@lyntar/codex-runtime';
+} from '@astra/codex-runtime';
 import {
   classifyCommand,
   GitWorkspace,
   LocalWorkspace,
   verifyProject,
   type CommandRequest,
-} from '@lyntar/workspace';
+} from '@astra/workspace';
 
 type PermissionResolution = (approved: boolean) => void;
 
@@ -308,7 +308,7 @@ export class CodexTaskRunner {
     if (!token) return [];
     const response = await fetch(
       `${this.options.apiBaseUrl}/v1/billing/tasks/${encodeURIComponent(taskId)}/receipts`,
-      { headers: { Authorization: `Bearer ${token}`, 'x-lyntar-reservation-id': reservationId } },
+      { headers: { Authorization: `Bearer ${token}`, 'x-astra-reservation-id': reservationId } },
     );
     if (!response.ok) return [];
     const body = (await response.json()) as { receipts?: unknown };

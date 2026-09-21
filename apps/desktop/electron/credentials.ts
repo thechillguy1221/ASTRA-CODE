@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { AuthSessionResultSchema, type AuthSessionResult } from '@lyntar/contracts';
+import { AuthSessionResultSchema, type AuthSessionResult } from '@astra/contracts';
 
 export interface DeviceIdentity {
   deviceId: string;
@@ -59,7 +59,7 @@ export class SecureCredentialStore implements CredentialStore {
   ) {}
 
   private get path(): string {
-    return join(this.options.userDataPath, 'lyntar-session.bin');
+    return join(this.options.userDataPath, 'astra-session.bin');
   }
 
   private get devicePath(): string {

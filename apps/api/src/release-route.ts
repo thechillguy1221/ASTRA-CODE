@@ -1,4 +1,4 @@
-import type { ReleaseManifest } from '@lyntar/releases';
+import type { ReleaseManifest } from '@astra/releases';
 import type { FastifyInstance } from 'fastify';
 
 export async function registerReleaseRoutes(

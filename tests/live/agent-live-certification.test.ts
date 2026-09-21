@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
-import { buildApi } from '@lyntar/api';
-import { applyFoundationMigration, createPostgresStores } from '@lyntar/db';
-import type { GatewayModelClient, GatewayRequest } from '@lyntar/model-gateway';
-import { VercelGatewayClient } from '@lyntar/model-gateway';
-import type { ModelStreamEvent } from '@lyntar/contracts';
+import { buildApi } from '@astra/api';
+import { applyFoundationMigration, createPostgresStores } from '@astra/db';
+import type { GatewayModelClient, GatewayRequest } from '@astra/model-gateway';
+import { VercelGatewayClient } from '@astra/model-gateway';
+import type { ModelStreamEvent } from '@astra/contracts';
 import { DesktopRuntime } from '../../apps/desktop/electron/desktop-runtime.js';
 import { resolveLiveConfiguration } from '../../scripts/certification.mjs';
 
@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 const liveConfiguration = resolveLiveConfiguration(process.env);
 const missing = [
   ...('missing' in liveConfiguration ? liveConfiguration.missing : []),
-  ...(process.env.LYNTAR_DATABASE_URL ? [] : ['LYNTAR_DATABASE_URL']),
+  ...(process.env.ASTRA_DATABASE_URL ? [] : ['ASTRA_DATABASE_URL']),
 ];
 const liveReady = missing.length === 0;
 const temporaryRoots: string[] = [];
@@ -31,14 +31,14 @@ async function git(root: string, ...args: string[]): Promise<void> {
 }
 
 async function createFixture(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'lyntar-live-agent-'));
+  const root = await mkdtemp(join(tmpdir(), 'astra-live-agent-'));
   temporaryRoots.push(root);
   const repository = join(root, 'broken-node-app');
   await mkdir(repository);
   await cp('tests/fixtures/broken-node-app', repository, { recursive: true });
   await git(repository, 'init');
-  await git(repository, 'config', 'user.email', 'test@lyntar.local');
-  await git(repository, 'config', 'user.name', 'Lyntar Test');
+  await git(repository, 'config', 'user.email', 'test@astra.local');
+  await git(repository, 'config', 'user.name', 'Astra Test');
   await git(repository, 'add', '.');
   await git(repository, 'commit', '-m', 'fixture');
   await writeFile(join(repository, 'README.md'), 'pre-existing note\n');
@@ -62,7 +62,7 @@ function makeObservedGateway(
 async function createLiveRuntime(onProviderStream?: () => void) {
   if (!liveReady) throw new Error('[BLOCKED] Live certification configuration is incomplete');
   const { apiKey, baseUrl, modelId } = liveConfiguration.credentials;
-  const stores = createPostgresStores(process.env.LYNTAR_DATABASE_URL as string);
+  const stores = createPostgresStores(process.env.ASTRA_DATABASE_URL as string);
   const client = await stores.pool.connect();
   try {
     await applyFoundationMigration(client);
@@ -108,7 +108,7 @@ async function createLiveRuntime(onProviderStream?: () => void) {
 
 function assertNoSecret(value: unknown): void {
   const serialized = JSON.stringify(value);
-  expect(serialized).not.toContain(process.env.LYNTAR_MODEL_GATEWAY_API_KEY ?? '__missing_key__');
+  expect(serialized).not.toContain(process.env.ASTRA_MODEL_GATEWAY_API_KEY ?? '__missing_key__');
 }
 
 function printReceiptReport(label: string, receipts: Array<Record<string, unknown>>): void {
@@ -161,7 +161,7 @@ describe('live agent certification', () => {
       });
       expect(result.state).toBe('COMPLETED');
       expect(result.verification.status).toBe('passed');
-      expect(result.gitDiff.lyntarPaths).toContain('src/validate.ts');
+      expect(result.gitDiff.astraPaths).toContain('src/validate.ts');
       expect(result.gitDiff.preExistingPaths).toContain('README.md');
       expect(result.usageReceipts.length).toBeGreaterThan(0);
       expect(result.usageSummary.actualCostUsd).not.toBeNull();

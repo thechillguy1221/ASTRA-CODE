@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseAutoModel } from '@lyntar/model-gateway';
+import { chooseAutoModel } from '@astra/model-gateway';
 
 const capabilities = {
   supportsTools: true,

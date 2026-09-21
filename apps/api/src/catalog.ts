@@ -1,1 +1,1 @@
-export { createMemoryCatalog, InMemoryModelCatalogStore } from '@lyntar/db';
+export { createMemoryCatalog, InMemoryModelCatalogStore } from '@astra/db';

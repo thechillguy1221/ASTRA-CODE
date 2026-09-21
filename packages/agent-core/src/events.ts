@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { AgentEventSchema, type AgentEvent } from '@lyntar/contracts';
+import { AgentEventSchema, type AgentEvent } from '@astra/contracts';
 
 export function createAgentEvent(
   taskId: string,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { publicRoutes, resolvePublicRoute } from '@lyntar/web';
-import { adminPermissions, NO_LIVE_DATA } from '@lyntar/admin';
+import { publicRoutes, resolvePublicRoute } from '@astra/web';
+import { adminPermissions, NO_LIVE_DATA } from '@astra/admin';
 
 describe('web and admin boundaries', () => {
   it('keeps the public route map explicit and resolves unknown routes safely', () => {

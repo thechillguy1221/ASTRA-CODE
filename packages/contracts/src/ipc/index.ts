@@ -224,7 +224,7 @@ export const IpcTaskResultSchema = z.object({
 });
 export type IpcTaskResult = z.infer<typeof IpcTaskResultSchema>;
 
-export interface LyntarIpcApi {
+export interface AstraIpcApi {
   workspace: {
     open(): Promise<WorkspaceDescriptor | null>;
     readFile(relativePath: string): Promise<string>;

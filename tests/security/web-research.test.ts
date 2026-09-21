@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { WebResearchService, type WebResearchContext } from '@lyntar/web-research';
+import { WebResearchService, type WebResearchContext } from '@astra/web-research';
 
 const context: WebResearchContext = {
   taskId: 'security-web-task',

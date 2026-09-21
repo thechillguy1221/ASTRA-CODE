@@ -1,4 +1,4 @@
-# Lyntar V1 Continuation Implementation Plan
+# Astra V1 Continuation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, npm workspaces, Fastify, Zod, PostgreSQL-compatible repositories, Electron/React/Vite, Vitest, fixed-point decimal accounting.
 
-**Spec:** `docs/superpowers/specs/2026-09-20-lyntar-v1-continuation-design.md`
+**Spec:** `docs/superpowers/specs/2026-09-20-astra-v1-continuation-design.md`
 
 ## Global Constraints
 

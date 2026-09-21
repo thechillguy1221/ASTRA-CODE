@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi } from '@lyntar/api';
+import { buildApi } from '@astra/api';
 
 describe('release manifest API', () => {
   it('serves only server-managed Windows release metadata', async () => {
@@ -9,7 +9,7 @@ describe('release manifest API', () => {
         channel: 'stable',
         platform: 'win32',
         arch: 'x64',
-        installerUrl: 'https://downloads.example.test/lyntar.exe',
+        installerUrl: 'https://downloads.example.test/astra.exe',
         sha256: 'a'.repeat(64),
         signature: 'sig:test',
         size: 1234,

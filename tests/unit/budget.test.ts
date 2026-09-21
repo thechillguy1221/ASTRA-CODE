@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BudgetExceededError, BudgetTracker } from '@lyntar/agent-core';
+import { BudgetExceededError, BudgetTracker } from '@astra/agent-core';
 
 const budget = {
   maxModelCalls: 3,

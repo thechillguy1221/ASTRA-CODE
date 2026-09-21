@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryCatalog, createMemoryReceiptStore } from '@lyntar/api';
+import { buildApi, createMemoryCatalog, createMemoryReceiptStore } from '@astra/api';
 
 describe('model request API', () => {
   it('normalizes a gateway decision and persists its actual usage receipt', async () => {

@@ -29,7 +29,7 @@ packages/agent-core
         └── packages/model-gateway   server-side provider adapter and receipts
 ```
 
-The Electron main process does not own the agent loop. It creates adapters and forwards capability calls to `AgentTaskRunner`. The renderer receives the compatibility-preserved `window.lyntar` capability surface only; it does not receive `fs`, `child_process`, a shell function, or raw `ipcRenderer`.
+The Electron main process does not own the agent loop. It creates adapters and forwards capability calls to `AgentTaskRunner`. The renderer receives the compatibility-preserved `window.astra` capability surface only; it does not receive `fs`, `child_process`, a shell function, or raw `ipcRenderer`.
 
 ## Monorepo responsibilities
 

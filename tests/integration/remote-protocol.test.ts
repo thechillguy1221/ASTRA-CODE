@@ -4,13 +4,13 @@ import {
   verifyPairingToken,
   deviceFingerprint,
   RemoteMessageSchema,
-} from '@lyntar/remote-protocol';
+} from '@astra/remote-protocol';
 import { randomUUID } from 'node:crypto';
 
-const RELAY_URL = 'wss://remote.lyntar.dev/relay';
+const RELAY_URL = 'wss://remote.astra.dev/relay';
 const PAIRING_SECRET = 'test-pairing-secret-32chars-long!';
 
-describe('Lyntar Remote pairing (spec §53, §54)', () => {
+describe('Astra Remote pairing (spec §53, §54)', () => {
   it('generates a signed pairing token with userId and relayUrl (test 33)', () => {
     const userId = 'user-remote-1';
     const { token, payload } = createPairingToken({ userId, relayUrl: RELAY_URL }, PAIRING_SECRET);

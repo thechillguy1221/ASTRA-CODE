@@ -5,8 +5,8 @@ import {
   BillingService,
   InMemoryPaymentStore,
   RazorpayWebhookService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 describe('Razorpay webhook boundary', () => {
   it('processes the same successful subscription webhook five times once', async () => {

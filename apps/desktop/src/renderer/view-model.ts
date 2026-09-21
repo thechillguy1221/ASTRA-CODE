@@ -1,4 +1,4 @@
-import type { AgentEvent } from '@lyntar/contracts';
+import type { AgentEvent } from '@astra/contracts';
 
 export interface ProgressRow {
   eventId: string;

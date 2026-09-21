@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseUsageReceipt } from '@lyntar/model-gateway';
+import { parseUsageReceipt } from '@astra/model-gateway';
 
 describe('usage receipts', () => {
   it('parses provider-supplied usage and preserves request correlation', () => {

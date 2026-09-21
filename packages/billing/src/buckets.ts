@@ -5,7 +5,7 @@ import {
   parseCredits,
   subtractCredits,
 } from './math.js';
-import { CREDIT_PACKS, getCreditPack, type CreditPack, type PricingRegion } from '@lyntar/plans';
+import { CREDIT_PACKS, getCreditPack, type CreditPack, type PricingRegion } from '@astra/plans';
 
 /**
  * Deprecated inbound Razorpay compatibility offer. New checkout must use the

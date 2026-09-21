@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ModelGatewayError, VercelGatewayClient } from '@lyntar/model-gateway';
+import { ModelGatewayError, VercelGatewayClient } from '@astra/model-gateway';
 
 afterEach(() => vi.unstubAllGlobals());
 

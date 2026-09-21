@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MarketplaceRegistry } from '@lyntar/marketplace';
+import { MarketplaceRegistry } from '@astra/marketplace';
 
 describe('marketplace trust boundary', () => {
   it('requires checksum/signature inspection and explicit permissions before install', () => {

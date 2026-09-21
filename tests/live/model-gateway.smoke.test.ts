@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { InMemoryUsageReceiptStore } from '@lyntar/db';
-import { VercelGatewayClient } from '@lyntar/model-gateway';
+import { InMemoryUsageReceiptStore } from '@astra/db';
+import { VercelGatewayClient } from '@astra/model-gateway';
 import { resolveLiveConfiguration } from '../../scripts/certification.mjs';
 
 const liveConfiguration = resolveLiveConfiguration(process.env);

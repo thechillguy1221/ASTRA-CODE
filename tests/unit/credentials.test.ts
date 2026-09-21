@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SecureCredentialStore } from '../../apps/desktop/electron/credentials.js';
-import type { AuthSessionResult } from '@lyntar/contracts';
+import type { AuthSessionResult } from '@astra/contracts';
 
 const roots: string[] = [];
 
@@ -13,7 +13,7 @@ afterEach(async () => {
 
 describe('desktop credential storage', () => {
   it('stores session material only through the OS-encryption adapter', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'lyntar-credentials-'));
+    const root = await mkdtemp(join(tmpdir(), 'astra-credentials-'));
     roots.push(root);
     const safeStorage = {
       isEncryptionAvailable: () => true,
@@ -39,7 +39,7 @@ describe('desktop credential storage', () => {
     };
     const store = new SecureCredentialStore({ userDataPath: root, safeStorage });
     await store.set(session);
-    expect((await readFile(join(root, 'lyntar-session.bin'), 'utf8')).toLowerCase()).not.toContain(
+    expect((await readFile(join(root, 'astra-session.bin'), 'utf8')).toLowerCase()).not.toContain(
       'private-access-token',
     );
     expect(await store.get()).toEqual(session);

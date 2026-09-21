@@ -2,9 +2,9 @@ import {
   IpcCommandSchema,
   type AgentEvent,
   type IpcCommand,
-  type LyntarIpcApi,
+  type AstraIpcApi,
   type WorkspaceDescriptor,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 import { DesktopRuntime } from './desktop-runtime.js';
 
 function parseCommand<T extends IpcCommand['type']>(
@@ -14,7 +14,7 @@ function parseCommand<T extends IpcCommand['type']>(
   return IpcCommandSchema.parse({ type, ...payload }) as Extract<IpcCommand, { type: T }>;
 }
 
-export function buildCapabilityApiForTest(): LyntarIpcApi {
+export function buildCapabilityApiForTest(): AstraIpcApi {
   const listeners = new Set<(event: AgentEvent) => void>();
   return {
     workspace: {

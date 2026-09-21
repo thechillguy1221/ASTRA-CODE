@@ -3,9 +3,9 @@ import type {
   CostEstimate,
   SpendingThresholds,
   CostWarningLevel,
-} from '@lyntar/contracts';
-import { calculateExpectedCostUsd } from '@lyntar/model-gateway';
-import { compareCredits, creditsFromUsd, formatCredits, parseCredits } from '@lyntar/billing';
+} from '@astra/contracts';
+import { calculateExpectedCostUsd } from '@astra/model-gateway';
+import { compareCredits, creditsFromUsd, formatCredits, parseCredits } from '@astra/billing';
 
 /**
  * Estimates the credit cost for a planned AI task before execution.

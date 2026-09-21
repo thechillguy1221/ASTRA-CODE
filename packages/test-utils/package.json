@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/test-utils",
+  "name": "@astra/test-utils",
   "version": "0.1.0",
   "private": true,
   "license": "UNLICENSED",
@@ -17,7 +17,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@lyntar/agent-core": "0.1.0",
-    "@lyntar/contracts": "0.1.0"
+    "@astra/agent-core": "0.1.0",
+    "@astra/contracts": "0.1.0"
   }
 }

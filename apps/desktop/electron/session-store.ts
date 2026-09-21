@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { AgentSession, SessionCheckpoint, SessionStore } from '@lyntar/agent-core';
+import type { AgentSession, SessionCheckpoint, SessionStore } from '@astra/agent-core';
 
 interface SessionFile {
   sessions: AgentSession[];

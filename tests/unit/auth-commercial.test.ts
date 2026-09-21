@@ -6,7 +6,7 @@ import {
   GoogleDesktopOAuthService,
   InMemoryAuthStore,
   InMemoryOAuthTransactionStore,
-} from '@lyntar/auth';
+} from '@astra/auth';
 
 const device = {
   label: 'Astra test desktop',

@@ -9,8 +9,8 @@ import {
   type ModelPort,
   type PermissionAction,
   type PermissionOutcome,
-} from '@lyntar/agent-core';
-import { HackathonService, LearnService, VivaService } from '@lyntar/modes';
+} from '@astra/agent-core';
+import { HackathonService, LearnService, VivaService } from '@astra/modes';
 import { MemoryCredentialStore, type CredentialStore, type DeviceIdentity } from './credentials.js';
 import { CodexTaskRunner } from './codex-task-runner.js';
 import {
@@ -47,16 +47,16 @@ import {
   type VivaQuestion,
   type VivaEvaluation,
   type TaskBudget,
-} from '@lyntar/contracts';
-import { assertSafeProjectRelativePath, extractRoomArchive } from '@lyntar/remote-protocol';
+} from '@astra/contracts';
+import { assertSafeProjectRelativePath, extractRoomArchive } from '@astra/remote-protocol';
 import {
   classifyCommand,
   GitWorkspace,
   LocalCommandRunner,
   LocalWorkspace,
   verifyProject,
-} from '@lyntar/workspace';
-import { creditsFromUsd, formatUsd, parseUsd } from '@lyntar/billing';
+} from '@astra/workspace';
+import { creditsFromUsd, formatUsd, parseUsd } from '@astra/billing';
 
 export interface DesktopRuntimeOptions {
   /** Production defaults to the pinned Codex runtime. Legacy mode is test-only. */
@@ -95,7 +95,7 @@ class ApiModelPort implements ModelPort {
     const token = this.accessToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     const reservation = this.reservationId(request.taskId);
-    if (reservation) headers['x-lyntar-reservation-id'] = reservation;
+    if (reservation) headers['x-astra-reservation-id'] = reservation;
     const response = await fetch(`${this.apiBaseUrl}/v1/model-requests`, {
       method: 'POST',
       headers,
@@ -253,7 +253,7 @@ export class DesktopRuntime {
   };
 
   constructor(
-    private readonly apiBaseUrl = process.env.LYNTAR_API_URL ?? 'http://127.0.0.1:4317',
+    private readonly apiBaseUrl = process.env.ASTRA_API_URL ?? 'http://127.0.0.1:4317',
     private readonly credentials: CredentialStore = new MemoryCredentialStore(),
     private readonly sessionStore: SessionStore = new InMemorySessionStore(),
     options: DesktopRuntimeOptions = {},

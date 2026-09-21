@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CancellationToken, waitForCancellation } from '@lyntar/agent-core';
+import { CancellationToken, waitForCancellation } from '@astra/agent-core';
 
 describe('task cancellation', () => {
   it('aborts a child operation after cancellation', async () => {

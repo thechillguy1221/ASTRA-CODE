@@ -1,13 +1,13 @@
 const LIVE_REQUIRED_KEYS = [
-  'LYNTAR_LIVE_TEST',
-  'LYNTAR_MODEL_GATEWAY_URL',
-  'LYNTAR_MODEL_GATEWAY_API_KEY',
-  'LYNTAR_MODEL_ID',
+  'ASTRA_LIVE_TEST',
+  'ASTRA_MODEL_GATEWAY_URL',
+  'ASTRA_MODEL_GATEWAY_API_KEY',
+  'ASTRA_MODEL_ID',
 ];
 
 export function resolveLiveConfiguration(environment = process.env) {
   const missing = LIVE_REQUIRED_KEYS.filter((key) => {
-    if (key === 'LYNTAR_LIVE_TEST') return environment[key] !== '1';
+    if (key === 'ASTRA_LIVE_TEST') return environment[key] !== '1';
     return !environment[key];
   });
   if (missing.length > 0) {
@@ -16,9 +16,9 @@ export function resolveLiveConfiguration(environment = process.env) {
   return {
     status: 'READY',
     credentials: {
-      baseUrl: environment.LYNTAR_MODEL_GATEWAY_URL,
-      apiKey: environment.LYNTAR_MODEL_GATEWAY_API_KEY,
-      modelId: environment.LYNTAR_MODEL_ID,
+      baseUrl: environment.ASTRA_MODEL_GATEWAY_URL,
+      apiKey: environment.ASTRA_MODEL_GATEWAY_API_KEY,
+      modelId: environment.ASTRA_MODEL_ID,
     },
   };
 }

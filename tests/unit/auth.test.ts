@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AuthError, AuthService, InMemoryAuthStore } from '@lyntar/auth';
+import { AuthError, AuthService, InMemoryAuthStore } from '@astra/auth';
 
 function createService() {
   return new AuthService({

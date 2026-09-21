@@ -1,5 +1,5 @@
 {
-  "name": "@lyntar/web",
+  "name": "@astra/web",
   "description": "Astra Code public website and account surface.",
   "version": "0.1.0",
   "private": true,

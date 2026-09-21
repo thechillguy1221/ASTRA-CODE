@@ -4,7 +4,7 @@ import {
   EmailService,
   InMemoryEmailCampaignStore,
   InMemoryEmailProvider,
-} from '@lyntar/email';
+} from '@astra/email';
 
 describe('email campaign safety', () => {
   it('filters opted-out users and makes retries idempotent', async () => {

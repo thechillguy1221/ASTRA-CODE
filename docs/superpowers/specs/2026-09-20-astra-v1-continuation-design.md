@@ -1,4 +1,4 @@
-# Lyntar V1 Continuation Design
+# Astra V1 Continuation Design
 
 ## Purpose
 
@@ -24,7 +24,7 @@ tests. Live database concurrency remains blocked until a real PostgreSQL
 instance is supplied.
 
 Extensions use metadata-first routing. Skills are instruction packages, MCP is
-an external tool transport, Plugins extend Lyntar itself, and direct API
+an external tool transport, Plugins extend Astra itself, and direct API
 integrations use secret handles. All extension tools pass through a unified
 capability/risk registry and cannot bypass native workspace security.
 
@@ -48,7 +48,7 @@ desktop/web/admin -> typed contracts -> Fastify services -> repositories
 Before an AI task, the billing service checks plan/model entitlement and
 creates an atomic reservation. Each usage receipt settles provider and
 customer cost separately, releases unused reservation, and appends immutable
-ledger entries. Provider cost may be absorbed for Lyntar-caused failures.
+ledger entries. Provider cost may be absorbed for Astra-caused failures.
 
 ## Deterministic certification
 

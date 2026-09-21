@@ -3,7 +3,7 @@ import type {
   ModelDecision,
   ModelRequest,
   ModelStreamEvent,
-} from '@lyntar/contracts';
+} from '@astra/contracts';
 
 export interface GatewayRequest extends ModelRequest {
   gatewayModelId: string;

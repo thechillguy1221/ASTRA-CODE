@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent, GitDiff, ModelDecision } from '@lyntar/contracts';
-import { AgentTaskRunner, type AgentPorts } from '@lyntar/agent-core';
+import type { AgentEvent, GitDiff, ModelDecision } from '@astra/contracts';
+import { AgentTaskRunner, type AgentPorts } from '@astra/agent-core';
 
 describe('agent cancellation', () => {
   it('cancels a running command and emits task.cancelled', async () => {
     const events: AgentEvent[] = [];
-    const diff: GitDiff = { lyntarPaths: [], preExistingPaths: [], mixedPaths: [], patch: '' };
+    const diff: GitDiff = { astraPaths: [], preExistingPaths: [], mixedPaths: [], patch: '' };
     let markCommandStarted!: () => void;
     const commandStarted = new Promise<void>((resolve) => {
       markCommandStarted = resolve;
@@ -166,7 +166,7 @@ describe('agent cancellation', () => {
           };
         },
         async diffFromBaseline() {
-          return { lyntarPaths: [], preExistingPaths: [], mixedPaths: [], patch: '' };
+          return { astraPaths: [], preExistingPaths: [], mixedPaths: [], patch: '' };
         },
       },
       verification: {

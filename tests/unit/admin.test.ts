@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AdminError, AdminService, InMemoryAdminAuditStore } from '@lyntar/billing';
-import { BillingService, InMemoryBillingStore } from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
+import { AdminError, AdminService, InMemoryAdminAuditStore } from '@astra/billing';
+import { BillingService, InMemoryBillingStore } from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
 
 describe('financial administration', () => {
   it('requires finance or super-admin role for wallet adjustments and records an audit entry', async () => {

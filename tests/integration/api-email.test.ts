@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi } from '@lyntar/api';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
+import { buildApi } from '@astra/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
 import {
   EmailCampaignService,
   EmailService,
   InMemoryEmailCampaignStore,
   InMemoryEmailProvider,
-} from '@lyntar/email';
+} from '@astra/email';
 
 describe('email administration API', () => {
   it('creates, previews, and sends a server-filtered campaign exactly once', async () => {

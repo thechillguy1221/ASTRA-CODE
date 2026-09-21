@@ -1,14 +1,14 @@
-import type { AuthService } from '@lyntar/auth';
+import type { AuthService } from '@astra/auth';
 import {
   BillingError,
   BillingService,
   OrganizationBillingService,
   formatUsd,
   parseUsd,
-} from '@lyntar/billing';
-import { AUTO_MODEL_ID, type BillingMode } from '@lyntar/contracts';
-import type { ModelCatalogStore } from '@lyntar/db';
-import type { UsageReceiptStore } from '@lyntar/db';
+} from '@astra/billing';
+import { AUTO_MODEL_ID, type BillingMode } from '@astra/contracts';
+import type { ModelCatalogStore } from '@astra/db';
+import type { UsageReceiptStore } from '@astra/db';
 import {
   getPlanRegionalPrice,
   listCreditPacks,
@@ -16,11 +16,11 @@ import {
   normalizeCountryCode,
   STANDARD_CREDIT_RATES,
   type PlanCatalog,
-} from '@lyntar/plans';
+} from '@astra/plans';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveRequestedModel } from './model-selection.js';
-import { RemoteAccessError, type RemoteAccessPort } from '@lyntar/remote-protocol';
+import { RemoteAccessError, type RemoteAccessPort } from '@astra/remote-protocol';
 
 const ReservationSchema = z.object({
   organizationId: z.string().min(1).optional(),
@@ -262,7 +262,7 @@ export async function registerBillingRoutes(
     async (request, reply) => {
       const identity = await requireUser(dependencies, request, reply);
       if (!identity) return;
-      const reservationId = request.headers['x-lyntar-reservation-id'];
+      const reservationId = request.headers['x-astra-reservation-id'];
       if (typeof reservationId !== 'string')
         return reply.code(400).send({ error: 'RESERVATION_REQUIRED' });
       const reservation =

@@ -1,4 +1,4 @@
--- Lyntar V1 plan catalog alignment: rename STUDENT→BUILDER, update pricing and credits.
+-- Astra V1 plan catalog alignment: rename STUDENT→BUILDER, update pricing and credits.
 -- Safe to re-run: all changes use IF EXISTS / ON CONFLICT.
 
 -- Insert new plans with V1 pricing (on conflict update)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi, createMemoryEventStore } from '@lyntar/api';
+import { buildApi, createMemoryEventStore } from '@astra/api';
 
 describe('agent event API', () => {
   it('persists an append-only safe event and deduplicates delivery', async () => {

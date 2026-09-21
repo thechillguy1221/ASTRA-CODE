@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { AuthProvider } from '@lyntar/contracts';
+import type { AuthProvider } from '@astra/contracts';
 import type { AuthService } from './service.js';
 import type { AuthSessionResult, DeviceInput } from './ports.js';
 

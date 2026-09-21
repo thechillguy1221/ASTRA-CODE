@@ -14,7 +14,7 @@ The deterministic local-agent track is the certification path for this phase. Li
 - Local Windows path canonicalization and escape checks covering traversal, alternate separators, case-insensitive containment, device paths, UNC paths, and resolved links/junctions.
 - Atomic file patch batches with checkpoints and rollback.
 - Command policy and child-process cancellation with safe/sensitive/destructive/prohibited classification.
-- Git baseline capture and Lyntar/pre-existing/mixed diff ownership.
+- Git baseline capture and Astra/pre-existing/mixed diff ownership.
 - Node/TypeScript project detection and separate verification port.
 - Bounded agent loop with explicit states, cancellation, permissions, model/repair/command/time/cost budgets, and concise append-only events.
 - Server-controlled model catalog, Vercel AI Gateway adapter boundary, PostgreSQL migration, and actual usage-receipt persistence.
@@ -22,25 +22,25 @@ The deterministic local-agent track is the certification path for this phase. Li
 
 ## Verification commands
 
-| Check                                       | Required interpretation                                                                                           |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `npm test -- --maxWorkers=1 --minWorkers=1` | All deterministic unit, integration, security, desktop-boundary, and golden-path tests pass                       |
-| `npm run golden-path`                       | Must print `COMPLETED`, a passed verification, `src/validate.ts` as Lyntar-owned, and `README.md` as pre-existing |
-| `npm run typecheck`                         | All TypeScript project references pass                                                                            |
-| `npm run build`                             | API, Electron main, renderer bundle, and packages build                                                           |
-| `npm run lint`                              | No lint errors                                                                                                    |
-| `npm run test:live`                         | Either a real receipt-backed pass, or explicit `BLOCKED`/`UNVERIFIED`; never a fabricated live pass               |
+| Check                                       | Required interpretation                                                                                          |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `npm test -- --maxWorkers=1 --minWorkers=1` | All deterministic unit, integration, security, desktop-boundary, and golden-path tests pass                      |
+| `npm run golden-path`                       | Must print `COMPLETED`, a passed verification, `src/validate.ts` as Astra-owned, and `README.md` as pre-existing |
+| `npm run typecheck`                         | All TypeScript project references pass                                                                           |
+| `npm run build`                             | API, Electron main, renderer bundle, and packages build                                                          |
+| `npm run lint`                              | No lint errors                                                                                                   |
+| `npm run test:live`                         | Either a real receipt-backed pass, or explicit `BLOCKED`/`UNVERIFIED`; never a fabricated live pass              |
 
 ## Current run
 
 - `npm.cmd test`: 73 test files and 203 tests passed.
-- `npm.cmd run golden-path`: `COMPLETED`; verification passed; `src/validate.ts` was Lyntar-owned and `README.md` was pre-existing.
+- `npm.cmd run golden-path`: `COMPLETED`; verification passed; `src/validate.ts` was Astra-owned and `README.md` was pre-existing.
 - `npm.cmd run typecheck`: passed.
 - `npm.cmd run build`: passed, including the renderer bundle, Electron main process, and sandboxed CommonJS preload.
 - `npm.cmd run lint`: passed.
 - `npm.cmd run format:check`: passed.
 - `npm.cmd run dev:api` plus `GET http://127.0.0.1:4317/health`: returned `{"status":"ok"}`.
-- `npm.cmd run test:live`: `BLOCKED`; `LYNTAR_LIVE_TEST`, Gateway URL, Gateway key, and model ID were absent, so the one live test was skipped rather than represented as a pass.
+- `npm.cmd run test:live`: `BLOCKED`; `ASTRA_LIVE_TEST`, Gateway URL, Gateway key, and model ID were absent, so the one live test was skipped rather than represented as a pass.
 - The built Electron shell launched and remained running without a load error until it was manually stopped after the launch check.
 - Browser smoke passed in Chromium, Firefox, and WebKit for public routes, CTA navigation, metadata, and responsive overflow checks.
 - `npm.cmd run package:win:unsigned` produced an unsigned x64 NSIS artifact with SHA-256

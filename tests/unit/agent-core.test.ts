@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent, GitDiff, ModelDecision, UsageReceipt } from '@lyntar/contracts';
-import { AgentTaskRunner, InMemorySessionStore, type AgentPorts } from '@lyntar/agent-core';
+import type { AgentEvent, GitDiff, ModelDecision, UsageReceipt } from '@astra/contracts';
+import { AgentTaskRunner, InMemorySessionStore, type AgentPorts } from '@astra/agent-core';
 
 function makePorts(
   decisions: ModelDecision[],
@@ -8,7 +8,7 @@ function makePorts(
 ): { ports: AgentPorts; events: AgentEvent[] } {
   const events: AgentEvent[] = [];
   const diff: GitDiff = {
-    lyntarPaths: ['src/file.ts'],
+    astraPaths: ['src/file.ts'],
     preExistingPaths: [],
     mixedPaths: [],
     patch: 'diff',

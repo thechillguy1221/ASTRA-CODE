@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { chooseAutoModel } from '@lyntar/model-gateway';
-import { AUTO_MODEL_ID } from '@lyntar/contracts';
-import type { ModelCatalogEntry } from '@lyntar/contracts';
+import { chooseAutoModel } from '@astra/model-gateway';
+import { AUTO_MODEL_ID } from '@astra/contracts';
+import type { ModelCatalogEntry } from '@astra/contracts';
 
 const makeModel = (id: string, options?: Partial<ModelCatalogEntry>): ModelCatalogEntry => ({
   modelId: id,

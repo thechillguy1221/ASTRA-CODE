@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryRateLimitStore, hashRateLimitIdentity } from '@lyntar/auth';
+import { InMemoryRateLimitStore, hashRateLimitIdentity } from '@astra/auth';
 
 describe('shared rate-limit contract', () => {
   it('enforces a fixed window and resets after the window', async () => {

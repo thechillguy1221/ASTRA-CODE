@@ -7,9 +7,9 @@ import {
   signReleaseManifest,
   verifyReleaseSignature,
   verifyWindowsUpdatePayload,
-} from '@lyntar/releases';
-import { EmailPolicy } from '@lyntar/email';
-import { RedactedLogger, SupportBundleBuilder } from '@lyntar/observability';
+} from '@astra/releases';
+import { EmailPolicy } from '@astra/email';
+import { RedactedLogger, SupportBundleBuilder } from '@astra/observability';
 
 describe('platform foundations', () => {
   it('validates server-managed Windows release metadata before install', () => {
@@ -18,7 +18,7 @@ describe('platform foundations', () => {
       channel: 'stable',
       platform: 'win32',
       arch: 'x64',
-      installerUrl: 'https://downloads.example.test/lyntar-0.2.0.exe',
+      installerUrl: 'https://downloads.example.test/astra-0.2.0.exe',
       sha256: 'a'.repeat(64),
       signature: 'sig:test',
       size: 1234,

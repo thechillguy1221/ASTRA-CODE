@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
-import type { PaymentRecord, PaymentStore, SubscriptionRecord } from '@lyntar/billing';
+import type { PaymentRecord, PaymentStore, SubscriptionRecord } from '@astra/billing';
 
 function requireUuid(value: string, label: string): string {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))
@@ -142,8 +142,8 @@ export class PostgresPaymentStore implements PaymentStore {
   }
 
   async saveRefund(
-    refund: import('@lyntar/billing').RefundRecord,
-  ): Promise<import('@lyntar/billing').RefundRecord> {
+    refund: import('@astra/billing').RefundRecord,
+  ): Promise<import('@astra/billing').RefundRecord> {
     await this.pool.query(
       `INSERT INTO payments
          (id, user_id, provider, provider_payment_id, amount_inr, status, refunded_at, created_at, updated_at)

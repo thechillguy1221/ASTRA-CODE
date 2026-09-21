@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { loadPlanCatalog } from '@lyntar/db';
-import { createDefaultPlanCatalog, PlanEntitlementError } from '@lyntar/plans';
+import { loadPlanCatalog } from '@astra/db';
+import { createDefaultPlanCatalog, PlanEntitlementError } from '@astra/plans';
 
 describe('server-controlled plans', () => {
   it('seeds the product plans without desktop constants', () => {

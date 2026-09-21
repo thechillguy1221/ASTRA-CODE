@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { buildApi } from '@lyntar/api';
-import { AuthService, InMemoryAuthStore } from '@lyntar/auth';
+import { buildApi } from '@astra/api';
+import { AuthService, InMemoryAuthStore } from '@astra/auth';
 import {
   BillingService,
   InMemoryBillingStore,
   InMemoryOrganizationBillingStore,
   OrganizationBillingService,
-} from '@lyntar/billing';
-import { createDefaultPlanCatalog } from '@lyntar/plans';
-import { createMemoryReceiptStore } from '@lyntar/db';
-import { RemoteAccessService } from '@lyntar/remote-protocol';
+} from '@astra/billing';
+import { createDefaultPlanCatalog } from '@astra/plans';
+import { createMemoryReceiptStore } from '@astra/db';
+import { RemoteAccessService } from '@astra/remote-protocol';
 
 describe('billing API', () => {
   it('returns server plans and reserves credits using the authenticated plan', async () => {

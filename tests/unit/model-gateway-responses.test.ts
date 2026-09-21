@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { VercelResponsesGatewayClient } from '@lyntar/model-gateway';
+import { VercelResponsesGatewayClient } from '@astra/model-gateway';
 
 describe('Astra Responses gateway transport', () => {
   it('streams normalized SSE events without exposing the provider client to desktop code', async () => {

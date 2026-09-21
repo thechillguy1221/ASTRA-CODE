@@ -1,10 +1,10 @@
-import type { AuthError, AuthService } from '@lyntar/auth';
+import type { AuthError, AuthService } from '@astra/auth';
 import {
   AdminService,
   type AdminAnalyticsPort,
   type AdminAuditStore,
   type AdminRole,
-} from '@lyntar/billing';
+} from '@astra/billing';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

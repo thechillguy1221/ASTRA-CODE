@@ -12,7 +12,7 @@ import {
   CodexRuntimeSupervisor,
   PINNED_CODEX_SOURCE_SHA,
   validateCodexRuntimeManifest,
-} from '@lyntar/codex-runtime';
+} from '@astra/codex-runtime';
 
 async function hash(path: string): Promise<string> {
   return createHash('sha256')
