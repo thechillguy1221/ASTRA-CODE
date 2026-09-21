@@ -13,7 +13,8 @@
     { "path": "../billing" },
     { "path": "../plans" },
     { "path": "../email" },
-    { "path": "../remote-protocol" }
+    { "path": "../remote-protocol" },
+    { "path": "../orchestration" }
   ],
   "include": ["src/**/*.ts"]
 }

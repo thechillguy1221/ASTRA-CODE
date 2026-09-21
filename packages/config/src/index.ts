@@ -6,6 +6,7 @@ const EnvironmentSchema = z.object({
   PORT: z.string().regex(/^\d+$/).optional(),
   ASTRA_API_HOST: z.string().min(1).optional(),
   ASTRA_DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.string().url().optional(),
   ASTRA_MODEL_GATEWAY_URL: z.string().url().optional(),
   ASTRA_MODEL_GATEWAY_API_KEY: z.string().min(1).optional(),
   ASTRA_RUNTIME_TOKEN_SECRET: z.string().min(32).optional(),
@@ -17,6 +18,7 @@ const EnvironmentSchema = z.object({
   ASTRA_RESEND_API_KEY: z.string().min(1).optional(),
   ASTRA_EMAIL_FROM: z.string().min(3).optional(),
   ASTRA_PUBLIC_SITE_URL: z.string().url().optional(),
+  ASTRA_ALLOWED_ORIGINS: z.string().optional(),
   ASTRA_GOOGLE_CLIENT_ID: z.string().min(1).optional(),
   ASTRA_GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
   ASTRA_GOOGLE_REDIRECT_URI: z.string().url().optional(),
@@ -47,6 +49,7 @@ export interface AstraConfig {
   resendApiKey?: string;
   emailFrom?: string;
   publicSiteUrl?: string;
+  allowedOrigins: string[];
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUri?: string;
@@ -97,10 +100,11 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AstraC
   const port = parsed.ASTRA_API_PORT ?? parsed.PORT ?? '4317';
   const hostedDeployment = runtime === 'production' || parsed.PORT !== undefined;
   const host = parsed.ASTRA_API_HOST ?? (hostedDeployment ? '0.0.0.0' : '127.0.0.1');
+  const databaseUrl = parsed.ASTRA_DATABASE_URL ?? parsed.DATABASE_URL;
   return {
     apiPort: Number(port),
     apiHost: host,
-    ...(parsed.ASTRA_DATABASE_URL === undefined ? {} : { databaseUrl: parsed.ASTRA_DATABASE_URL }),
+    ...(databaseUrl === undefined ? {} : { databaseUrl }),
     ...(parsed.ASTRA_MODEL_GATEWAY_URL === undefined
       ? {}
       : { modelGatewayBaseUrl: parsed.ASTRA_MODEL_GATEWAY_URL }),
@@ -128,6 +132,11 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AstraC
     ...(parsed.ASTRA_PUBLIC_SITE_URL === undefined
       ? {}
       : { publicSiteUrl: parsed.ASTRA_PUBLIC_SITE_URL }),
+    allowedOrigins: parsed.ASTRA_ALLOWED_ORIGINS
+      ? parsed.ASTRA_ALLOWED_ORIGINS.split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean)
+      : [],
     ...(parsed.ASTRA_GOOGLE_CLIENT_ID === undefined
       ? {}
       : { googleClientId: parsed.ASTRA_GOOGLE_CLIENT_ID }),

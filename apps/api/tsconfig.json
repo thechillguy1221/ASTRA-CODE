@@ -14,6 +14,7 @@
     { "path": "../../packages/db" },
     { "path": "../../packages/email" },
     { "path": "../../packages/model-gateway" },
+    { "path": "../../packages/orchestration" },
     { "path": "../../packages/plans" },
     { "path": "../../packages/releases" },
     { "path": "../../packages/remote-protocol" },

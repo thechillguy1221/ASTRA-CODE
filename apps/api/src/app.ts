@@ -55,6 +55,8 @@ import {
 import { registerWebResearchRoutes } from './web-research-route.js';
 import { CodexRuntimeTokenService } from './codex-runtime-auth.js';
 import { registerCodexRuntimeRoutes } from './codex-runtime-route.js';
+import { registerOrchestrationRoutes } from './orchestration-route.js';
+import type { PlatformOrchestrationService } from '@astra/orchestration';
 
 export interface ApiDependencies {
   catalog?: ModelCatalogStore;
@@ -78,6 +80,7 @@ export interface ApiDependencies {
   releaseManifest?: ReleaseManifest;
   email?: EmailService;
   publicSiteUrl?: string;
+  allowedOrigins?: string[];
   googleOAuth?: GoogleDesktopOAuthService;
   secureCookies?: boolean;
   campaigns?: EmailCampaignService;
@@ -88,6 +91,8 @@ export interface ApiDependencies {
   relaySecret?: string;
   relayBroker?: RemoteRelayBroker;
   webResearch?: WebResearchServiceType;
+  orchestration?: PlatformOrchestrationService;
+  readiness?: () => Promise<{ database: 'ready' | 'unconfigured' | 'failed' }>;
 }
 
 const unavailableGateway: GatewayModelClient = {
@@ -107,6 +112,30 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     const body = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
     (request as FastifyRequest & { rawBody?: string }).rawBody = body;
     defaultJsonParser(request, body, done);
+  });
+  const allowedOrigins = new Set(
+    [
+      ...(dependencies.allowedOrigins ?? []),
+      ...(dependencies.publicSiteUrl ? [dependencies.publicSiteUrl] : []),
+    ]
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+  );
+  app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (!origin) return;
+    if (!allowedOrigins.has(origin)) {
+      if (request.method === 'OPTIONS')
+        return reply.code(403).send({ error: 'CORS_ORIGIN_DENIED' });
+      return;
+    }
+    reply
+      .header('Access-Control-Allow-Origin', origin)
+      .header('Access-Control-Allow-Credentials', 'true')
+      .header('Access-Control-Allow-Methods', 'GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Authorization,Content-Type,Idempotency-Key')
+      .header('Vary', 'Origin');
+    if (request.method === 'OPTIONS') return reply.code(204).send();
   });
   if (dependencies.rateLimiter) {
     const limits: Record<string, { limit: number; windowMs: number }> = {
@@ -180,6 +209,17 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       randomBytes(32).toString('hex'),
   );
   app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/ready', async (_request, reply) => {
+    if (!dependencies.readiness) return reply.send({ status: 'ready', database: 'unconfigured' });
+    try {
+      const checks = await dependencies.readiness();
+      if (checks.database !== 'ready')
+        return reply.code(503).send({ status: 'not_ready', ...checks });
+      return reply.send({ status: 'ready', ...checks });
+    } catch {
+      return reply.code(503).send({ status: 'not_ready', database: 'failed' });
+    }
+  });
   void registerModelRoutes(app, {
     catalog,
     receipts,
@@ -269,6 +309,11 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       runtimeTokens,
       ...(dependencies.responsesGateway ? { responsesGateway: dependencies.responsesGateway } : {}),
     });
+    if (dependencies.orchestration)
+      void registerOrchestrationRoutes(app, {
+        auth: dependencies.auth,
+        orchestration: dependencies.orchestration,
+      });
   }
   return app;
 }

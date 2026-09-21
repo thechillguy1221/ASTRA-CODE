@@ -25,6 +25,7 @@
     "@astra/db": "0.1.0",
     "@astra/email": "0.1.0",
     "@astra/model-gateway": "0.1.0",
+    "@astra/orchestration": "0.1.0",
     "@astra/plans": "0.1.0",
     "@astra/releases": "0.1.0",
     "@astra/remote-protocol": "0.1.0",

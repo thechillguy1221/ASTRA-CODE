@@ -35,6 +35,7 @@ import {
   RemoteRelayBroker,
   WebSocketRelayServer,
 } from '@astra/remote-protocol';
+import { InMemoryPlatformRecordStore, PlatformOrchestrationService } from '@astra/orchestration';
 import { buildApi } from './app.js';
 import {
   EmailCampaignService,
@@ -120,6 +121,9 @@ const policy = postgres
       invalidationBus: postgres.controlPlaneInvalidation,
     })
   : undefined;
+const orchestration = new PlatformOrchestrationService({
+  store: postgres?.orchestration ?? new InMemoryPlatformRecordStore(),
+});
 const billing = new BillingService({
   store: postgres?.billing ?? new InMemoryBillingStore(),
   plans,
@@ -232,9 +236,16 @@ const app = buildApi({
   ...(controlPlane ? { controlPlane } : {}),
   ...(commercial ? { commercial } : {}),
   ...(policy ? { policy } : {}),
+  orchestration,
+  readiness: async () => {
+    if (!postgres) return { database: 'unconfigured' as const };
+    await postgres.pool.query('SELECT 1');
+    return { database: 'ready' as const };
+  },
   ...(razorpay ? { razorpay } : {}),
   ...(email ? { email } : {}),
   ...(config.publicSiteUrl ? { publicSiteUrl: config.publicSiteUrl } : {}),
+  allowedOrigins: config.allowedOrigins,
   secureCookies: config.secureCookies,
   ...(campaigns ? { campaigns } : {}),
   ...(postgres

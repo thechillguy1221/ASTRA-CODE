@@ -6,6 +6,7 @@
     { "path": "./apps/web" },
     { "path": "./apps/admin" },
     { "path": "./packages/agent-core" },
+    { "path": "./packages/orchestration" },
     { "path": "./packages/auth" },
     { "path": "./packages/billing" },
     { "path": "./packages/config" },

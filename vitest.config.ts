@@ -30,6 +30,7 @@ const sourceAliases = {
   '@astra/workspace': resolve(repositoryRoot, 'packages/workspace/src/index.ts'),
   '@astra/codex-runtime': resolve(repositoryRoot, 'packages/codex-runtime/src/index.ts'),
   '@astra/web-research': resolve(repositoryRoot, 'packages/web-research/src/index.ts'),
+  '@astra/orchestration': resolve(repositoryRoot, 'packages/orchestration/src/index.ts'),
 };
 
 export default defineConfig({

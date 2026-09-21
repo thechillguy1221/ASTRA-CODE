@@ -34,6 +34,7 @@ import {
 } from './postgres-control-plane.js';
 import { PostgresCommercialRepository } from './postgres-commercial.js';
 import { PostgresPlatformPolicyRepository } from './postgres-policy.js';
+import { PostgresOrchestrationStore } from './postgres-orchestration.js';
 import type { CommercialRepository } from '@astra/control-plane';
 import type { ControlPlaneRepository, InvalidationBus } from '@astra/control-plane';
 
@@ -58,6 +59,7 @@ export interface PostgresStores {
   controlPlaneInvalidation: InvalidationBus;
   commercial: CommercialRepository;
   policy: import('@astra/control-plane').PlatformPolicyRepository;
+  orchestration: import('@astra/orchestration').PlatformRecordStore;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -254,6 +256,7 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     controlPlaneInvalidation: new PostgresInvalidationBus(pool),
     commercial: new PostgresCommercialRepository(pool),
     policy: new PostgresPlatformPolicyRepository(pool),
+    orchestration: new PostgresOrchestrationStore(pool),
   };
 }
 
@@ -282,6 +285,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
       version: '0019_pricing_snapshot_reservations',
       file: '0019_pricing_snapshot_reservations.sql',
     },
+    { version: '0020_orchestration_platform', file: '0020_orchestration_platform.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
