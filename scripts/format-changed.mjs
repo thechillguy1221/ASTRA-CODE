@@ -18,11 +18,9 @@ const supported = new Set([
   '.yaml',
   '.html',
 ]);
-const changed = execFileSync(
-  'git',
-  ['diff', '--name-only', '--diff-filter=ACMR', base, '--'],
-  { encoding: 'utf8' },
-)
+const changed = execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', base, '--'], {
+  encoding: 'utf8',
+})
   .split(/\r?\n/)
   .map((file) => file.trim())
   .filter(
