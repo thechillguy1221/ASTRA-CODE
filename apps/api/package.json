@@ -20,6 +20,7 @@
     "@astra/config": "0.1.0",
     "@astra/auth": "0.1.0",
     "@astra/billing": "0.1.0",
+    "@astra/control-plane": "0.1.0",
     "@astra/contracts": "0.1.0",
     "@astra/db": "0.1.0",
     "@astra/email": "0.1.0",

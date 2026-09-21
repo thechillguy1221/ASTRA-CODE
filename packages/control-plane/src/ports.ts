@@ -29,5 +29,6 @@ export interface ControlPlaneRepository extends ControlPlaneReadPort {
 export interface InvalidationBus {
   publish(message: InvalidationMessage): Promise<void>;
   subscribe(listener: (message: InvalidationMessage) => void): () => void;
+  start?(): Promise<void>;
   close?(): Promise<void>;
 }

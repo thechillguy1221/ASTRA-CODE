@@ -25,7 +25,7 @@ const permissionsByRole: Record<ControlPlaneAdminRole, AdminPermission[]> = {
 };
 
 export function resolveAdminPermissions(role: ControlPlaneAdminRole): AdminPermission[] {
-  return [...permissionsByRole[role]];
+  return [...(permissionsByRole[role] ?? [])];
 }
 
 export function hasAdminPermission(

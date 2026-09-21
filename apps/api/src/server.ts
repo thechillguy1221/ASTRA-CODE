@@ -1,11 +1,13 @@
 import { assertProductionConfiguration, loadConfig } from '@astra/config';
 import {
   applyFoundationMigration,
+  bootstrapControlPlane,
   createPostgresStores,
   listPostgresCampaignUsers,
   loadPlanCatalog,
   PostgresPaymentStore,
 } from '@astra/db';
+import { ControlPlaneService } from '@astra/control-plane';
 import { VercelGatewayClient, VercelResponsesGatewayClient } from '@astra/model-gateway';
 import {
   AuthService,
@@ -48,6 +50,8 @@ if (postgres) {
   } finally {
     client.release();
   }
+  await bootstrapControlPlane(postgres.pool);
+  await postgres.controlPlaneInvalidation.start?.();
 }
 const plans = postgres
   ? await loadPlanCatalog(postgres.pool, createDefaultPlanCatalog())
@@ -102,6 +106,12 @@ const organizationBilling = new OrganizationBillingService({
   store: postgres?.organizationBilling ?? new InMemoryOrganizationBillingStore(),
   plans,
 });
+const controlPlane = postgres
+  ? new ControlPlaneService({
+      repository: postgres.controlPlane,
+      invalidationBus: postgres.controlPlaneInvalidation,
+    })
+  : undefined;
 const remote = postgres?.remote ?? new RemoteAccessService();
 const relayBroker = config.relaySecret ? new RemoteRelayBroker(config.relaySecret) : undefined;
 const payments = postgres ? new PostgresPaymentStore(postgres.pool) : new InMemoryPaymentStore();
@@ -200,6 +210,7 @@ const app = buildApi({
   billing,
   organizationBilling,
   plans,
+  ...(controlPlane ? { controlPlane } : {}),
   ...(razorpay ? { razorpay } : {}),
   ...(email ? { email } : {}),
   ...(config.publicSiteUrl ? { publicSiteUrl: config.publicSiteUrl } : {}),

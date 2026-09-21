@@ -36,6 +36,7 @@ import type { ReleaseManifest } from '@astra/releases';
 import type { EmailService } from '@astra/email';
 import type { GoogleDesktopOAuthService } from '@astra/auth';
 import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@astra/email';
+import type { ControlPlaneService } from '@astra/control-plane';
 import {
   RemoteAccessService,
   type RemoteAccessPort,
@@ -65,6 +66,7 @@ export interface ApiDependencies {
   plans?: PlanCatalog;
   admin?: AdminService;
   audit?: AdminAuditStore;
+  controlPlane?: ControlPlaneService;
   razorpay?: RazorpayWebhookService;
   developmentEntitlement?: boolean;
   releaseManifest?: ReleaseManifest;
@@ -198,6 +200,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
     admin,
     audit,
+    ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
     ...(dependencies.analytics ? { analytics: dependencies.analytics } : {}),
   });
   void registerEmailRoutes(app, {
