@@ -193,9 +193,7 @@ const app = buildApi({
     : {}),
   ...(gateway ? { gateway } : {}),
   ...(responsesGateway ? { responsesGateway } : {}),
-  ...(process.env.ASTRA_RUNTIME_TOKEN_SECRET
-    ? { runtimeTokenSecret: process.env.ASTRA_RUNTIME_TOKEN_SECRET }
-    : {}),
+  ...(config.runtimeTokenSecret ? { runtimeTokenSecret: config.runtimeTokenSecret } : {}),
   auth,
   billing,
   organizationBilling,

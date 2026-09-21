@@ -6,8 +6,11 @@ const EnvironmentSchema = z.object({
   LYNTAR_DATABASE_URL: z.string().url().optional(),
   LYNTAR_MODEL_GATEWAY_URL: z.string().url().optional(),
   LYNTAR_MODEL_GATEWAY_API_KEY: z.string().min(1).optional(),
+  LYNTAR_RUNTIME_TOKEN_SECRET: z.string().min(32).optional(),
   LYNTAR_LIVE_TEST: z.enum(['0', '1']).default('0'),
   LYNTAR_MODEL_ID: z.string().min(1).optional(),
+  LYNTAR_RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  LYNTAR_RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
   LYNTAR_RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
   LYNTAR_DEVELOPMENT_ENTITLEMENT: z.enum(['0', '1']).default('0'),
   LYNTAR_RESEND_API_KEY: z.string().min(1).optional(),
@@ -33,8 +36,11 @@ export interface LyntarConfig {
   databaseUrl?: string;
   modelGatewayBaseUrl?: string;
   modelGatewayApiKey?: string;
+  runtimeTokenSecret?: string;
   liveTestsEnabled: boolean;
   modelId?: string;
+  razorpayKeyId?: string;
+  razorpayKeySecret?: string;
   razorpayWebhookSecret?: string;
   developmentEntitlement: boolean;
   resendApiKey?: string;
@@ -67,8 +73,19 @@ export function assertProductionConfiguration(
   if (!config.databaseUrl) missing.push('LYNTAR_DATABASE_URL');
   if (!config.modelGatewayBaseUrl) missing.push('LYNTAR_MODEL_GATEWAY_URL');
   if (!config.modelGatewayApiKey) missing.push('LYNTAR_MODEL_GATEWAY_API_KEY');
+  if (!config.runtimeTokenSecret) missing.push('LYNTAR_RUNTIME_TOKEN_SECRET');
   if (!config.secureCookies) missing.push('LYNTAR_SECURE_COOKIES=1');
   if (config.developmentEntitlement) missing.push('LYNTAR_DEVELOPMENT_ENTITLEMENT=0');
+  if (!config.razorpayKeyId) missing.push('LYNTAR_RAZORPAY_KEY_ID');
+  if (!config.razorpayKeySecret) missing.push('LYNTAR_RAZORPAY_KEY_SECRET');
+  if (!config.razorpayWebhookSecret) missing.push('LYNTAR_RAZORPAY_WEBHOOK_SECRET');
+  if (!config.resendApiKey) missing.push('LYNTAR_RESEND_API_KEY');
+  if (!config.emailFrom) missing.push('LYNTAR_EMAIL_FROM');
+  if (!config.publicSiteUrl) missing.push('LYNTAR_PUBLIC_SITE_URL');
+  if (!config.googleClientId) missing.push('LYNTAR_GOOGLE_CLIENT_ID');
+  if (!config.googleClientSecret) missing.push('LYNTAR_GOOGLE_CLIENT_SECRET');
+  if (!config.googleRedirectUri) missing.push('LYNTAR_GOOGLE_REDIRECT_URI');
+  if (!config.relaySecret) missing.push('LYNTAR_RELAY_SECRET');
   if (missing.length > 0)
     throw new Error(`Production configuration is incomplete: ${missing.join(', ')}`);
 }
@@ -86,8 +103,17 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Lyntar
     ...(parsed.LYNTAR_MODEL_GATEWAY_API_KEY === undefined
       ? {}
       : { modelGatewayApiKey: parsed.LYNTAR_MODEL_GATEWAY_API_KEY }),
+    ...(parsed.LYNTAR_RUNTIME_TOKEN_SECRET === undefined
+      ? {}
+      : { runtimeTokenSecret: parsed.LYNTAR_RUNTIME_TOKEN_SECRET }),
     liveTestsEnabled: parsed.LYNTAR_LIVE_TEST === '1',
     ...(parsed.LYNTAR_MODEL_ID === undefined ? {} : { modelId: parsed.LYNTAR_MODEL_ID }),
+    ...(parsed.LYNTAR_RAZORPAY_KEY_ID === undefined
+      ? {}
+      : { razorpayKeyId: parsed.LYNTAR_RAZORPAY_KEY_ID }),
+    ...(parsed.LYNTAR_RAZORPAY_KEY_SECRET === undefined
+      ? {}
+      : { razorpayKeySecret: parsed.LYNTAR_RAZORPAY_KEY_SECRET }),
     ...(parsed.LYNTAR_RAZORPAY_WEBHOOK_SECRET === undefined
       ? {}
       : { razorpayWebhookSecret: parsed.LYNTAR_RAZORPAY_WEBHOOK_SECRET }),
