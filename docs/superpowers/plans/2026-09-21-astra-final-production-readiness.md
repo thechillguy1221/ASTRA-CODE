@@ -109,6 +109,6 @@
 - Modify: `.env.example`
 
 - [ ] Re-run the full deterministic suite, typecheck, lint, format, provenance, package/build, audit, and Codex artifact checks.
-- [ ] Re-scan tracked production files for obsolete Lyntar identity and `ASTRA_MODEL_ID`.
+- [ ] Re-scan tracked production files for obsolete legacy identity and `ASTRA_MODEL_ID`.
 - [ ] Recompute current commit/artifact facts from command output.
 - [ ] Update the report with only fresh evidence and exact remaining external blockers.
