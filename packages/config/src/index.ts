@@ -2,7 +2,9 @@ import { z } from 'zod';
 export * from './flags.js';
 
 const EnvironmentSchema = z.object({
-  ASTRA_API_PORT: z.string().regex(/^\d+$/).default('4317'),
+  ASTRA_API_PORT: z.string().regex(/^\d+$/).optional(),
+  PORT: z.string().regex(/^\d+$/).optional(),
+  ASTRA_API_HOST: z.string().min(1).optional(),
   ASTRA_DATABASE_URL: z.string().url().optional(),
   ASTRA_MODEL_GATEWAY_URL: z.string().url().optional(),
   ASTRA_MODEL_GATEWAY_API_KEY: z.string().min(1).optional(),
@@ -32,6 +34,7 @@ const EnvironmentSchema = z.object({
 
 export interface AstraConfig {
   apiPort: number;
+  apiHost: string;
   databaseUrl?: string;
   modelGatewayBaseUrl?: string;
   modelGatewayApiKey?: string;
@@ -90,8 +93,13 @@ export function assertProductionConfiguration(
 
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): AstraConfig {
   const parsed = EnvironmentSchema.parse(environment);
+  const runtime = environment.ASTRA_RUNTIME_ENV ?? environment.NODE_ENV ?? 'development';
+  const port = parsed.ASTRA_API_PORT ?? parsed.PORT ?? '4317';
+  const hostedDeployment = runtime === 'production' || parsed.PORT !== undefined;
+  const host = parsed.ASTRA_API_HOST ?? (hostedDeployment ? '0.0.0.0' : '127.0.0.1');
   return {
-    apiPort: Number(parsed.ASTRA_API_PORT),
+    apiPort: Number(port),
+    apiHost: host,
     ...(parsed.ASTRA_DATABASE_URL === undefined ? {} : { databaseUrl: parsed.ASTRA_DATABASE_URL }),
     ...(parsed.ASTRA_MODEL_GATEWAY_URL === undefined
       ? {}

@@ -61,4 +61,24 @@ describe('production configuration guard', () => {
     const config = loadConfig(environment);
     expect(() => assertProductionConfiguration(config, environment)).not.toThrow();
   });
+
+  it('uses the platform PORT and public production bind host when Astra overrides are absent', () => {
+    const config = loadConfig({ NODE_ENV: 'production', PORT: '10000' });
+
+    expect(config.apiPort).toBe(10000);
+    expect(config.apiHost).toBe('0.0.0.0');
+  });
+
+  it('treats a platform-provided PORT as a hosted deployment even without NODE_ENV', () => {
+    const config = loadConfig({ PORT: '10000' });
+
+    expect(config.apiHost).toBe('0.0.0.0');
+  });
+
+  it('keeps local development bound to loopback by default', () => {
+    const config = loadConfig({ NODE_ENV: 'development' });
+
+    expect(config.apiPort).toBe(4317);
+    expect(config.apiHost).toBe('127.0.0.1');
+  });
 });

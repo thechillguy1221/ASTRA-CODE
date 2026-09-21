@@ -228,4 +228,4 @@ const relay = config.relaySecret
 if (relay) relay.attach(app.server);
 if (postgres) app.addHook('onClose', async () => postgres.pool.end());
 if (relay) app.addHook('onClose', async () => relay.close());
-await app.listen({ port: config.apiPort, host: '127.0.0.1' });
+await app.listen({ port: config.apiPort, host: config.apiHost });
