@@ -316,4 +316,92 @@ describe('Astra orchestration platform', () => {
       }),
     ).toMatchObject({ reservationId: 'reservation-3' });
   });
+
+  it('protects review, verification, and checkpoint writes at the service boundary', async () => {
+    const platform = service();
+    const spec = await platform.createSpec({
+      ownerId: 'owner-1',
+      title: 'Owned',
+      slug: 'owned',
+      objective: 'Protect writes',
+    });
+    await expect(
+      platform.createCheckpoint({
+        specId: spec.id,
+        taskId: null,
+        reason: 'intruder',
+        revision: null,
+        worktreeId: null,
+        state: {},
+        actorId: 'other-1',
+      }),
+    ).rejects.toThrow('owner');
+    await expect(
+      platform.recordReview({
+        specId: spec.id,
+        taskId: null,
+        reviewerRole: 'REVIEWER',
+        severity: 'LOW',
+        title: 'intruder',
+        evidence: 'evidence',
+        affectedCode: [],
+        remediation: 'none',
+        status: 'OPEN',
+        actorId: 'other-1',
+      }),
+    ).rejects.toThrow('owner');
+    await expect(
+      platform.recordVerification({
+        specId: spec.id,
+        taskId: null,
+        category: 'UNIT',
+        command: 'npm test',
+        status: 'PASS',
+        summary: 'intruder',
+        output: '',
+        correlationId: 'correlation-1',
+        actorId: 'other-1',
+      }),
+    ).rejects.toThrow('owner');
+  });
+
+  it('rolls back a task graph when the Spec snapshot cannot be committed', async () => {
+    class FailingStore extends InMemoryPlatformRecordStore {
+      override async put(
+        record: Parameters<InMemoryPlatformRecordStore['put']>[0],
+        expectedVersion: number | null,
+      ) {
+        if (record.kind === 'SPEC' && expectedVersion !== null)
+          throw new Error('snapshot write failed');
+        return super.put(record, expectedVersion);
+      }
+    }
+    const store = new FailingStore();
+    const platform = new PlatformOrchestrationService({ store });
+    const spec = await platform.createSpec({
+      ownerId: 'owner-1',
+      title: 'Atomic',
+      slug: 'atomic',
+      objective: 'Atomic graph',
+    });
+    await expect(
+      platform.addTasks({
+        specId: spec.id,
+        actorId: 'owner-1',
+        tasks: [
+          {
+            id: 'task-a',
+            title: 'A',
+            description: '',
+            ownerAgentRole: 'BACKEND',
+            dependencies: [],
+            affectedAreas: [],
+            complexity: 'LOW',
+            budget,
+          },
+        ],
+      }),
+    ).rejects.toThrow('snapshot write failed');
+    expect(await platform.listTasks(spec.id)).toEqual([]);
+  });
 });

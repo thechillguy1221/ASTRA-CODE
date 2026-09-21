@@ -1,4 +1,4 @@
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import {
   PlatformConcurrencyError,
   PlatformEntityKindSchema,
@@ -35,10 +35,13 @@ function mapEvent(row: Record<string, unknown>): PlatformEvent {
 }
 
 export class PostgresOrchestrationStore implements PlatformRecordStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly executor: Pool | PoolClient,
+    private readonly pool?: Pool,
+  ) {}
 
   async get(kind: PlatformEntityKind, id: string): Promise<PlatformRecord | undefined> {
-    const result = await this.pool.query(
+    const result = await this.executor.query(
       'SELECT kind, record_id, owner_id, version, status, payload, created_at, updated_at FROM astra_platform_records WHERE kind = $1 AND record_id = $2',
       [kind, id],
     );
@@ -47,11 +50,11 @@ export class PostgresOrchestrationStore implements PlatformRecordStore {
 
   async list(kind: PlatformEntityKind, ownerId?: string): Promise<PlatformRecord[]> {
     const result = ownerId
-      ? await this.pool.query(
+      ? await this.executor.query(
           'SELECT kind, record_id, owner_id, version, status, payload, created_at, updated_at FROM astra_platform_records WHERE kind = $1 AND owner_id = $2 ORDER BY updated_at DESC',
           [kind, ownerId],
         )
-      : await this.pool.query(
+      : await this.executor.query(
           'SELECT kind, record_id, owner_id, version, status, payload, created_at, updated_at FROM astra_platform_records WHERE kind = $1 ORDER BY updated_at DESC',
           [kind],
         );
@@ -70,7 +73,7 @@ export class PostgresOrchestrationStore implements PlatformRecordStore {
       record.updatedAt,
     ];
     if (expectedVersion === null) {
-      const result = await this.pool.query(
+      const result = await this.executor.query(
         `INSERT INTO astra_platform_records
           (kind, record_id, owner_id, version, status, payload, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -81,7 +84,7 @@ export class PostgresOrchestrationStore implements PlatformRecordStore {
       if (!result.rowCount) throw new PlatformConcurrencyError('Platform record already exists');
       return mapRecord(result.rows[0]);
     }
-    const result = await this.pool.query(
+    const result = await this.executor.query(
       `UPDATE astra_platform_records
           SET owner_id = $3, version = $4, status = $5, payload = $6, updated_at = $8
         WHERE kind = $1 AND record_id = $2 AND version = $9
@@ -94,7 +97,7 @@ export class PostgresOrchestrationStore implements PlatformRecordStore {
 
   async appendEvent(event: PlatformEvent): Promise<void> {
     const parsed = PlatformEventSchema.parse(event);
-    await this.pool.query(
+    await this.executor.query(
       `INSERT INTO astra_platform_events
         (event_id, kind, entity_id, actor_id, correlation_id, payload, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -112,12 +115,28 @@ export class PostgresOrchestrationStore implements PlatformRecordStore {
   }
 
   async listEvents(entityId: string, limit = 200): Promise<PlatformEvent[]> {
-    const result = await this.pool.query(
+    const result = await this.executor.query(
       `SELECT event_id, kind, entity_id, actor_id, correlation_id, payload, created_at
          FROM astra_platform_events WHERE entity_id = $1
         ORDER BY created_at ASC, event_id ASC LIMIT $2`,
       [entityId, Math.max(1, Math.min(limit, 1000))],
     );
     return result.rows.map((row) => mapEvent(row));
+  }
+
+  async transaction<T>(operation: (store: PlatformRecordStore) => Promise<T>): Promise<T> {
+    if (!this.pool) return operation(this);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await operation(new PostgresOrchestrationStore(client));
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

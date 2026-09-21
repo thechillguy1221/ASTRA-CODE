@@ -13,6 +13,7 @@ export interface PlatformRecordStore {
   put(record: PlatformRecord, expectedVersion: number | null): Promise<PlatformRecord>;
   appendEvent(event: PlatformEvent): Promise<void>;
   listEvents(entityId: string, limit?: number): Promise<PlatformEvent[]>;
+  transaction<T>(operation: (store: PlatformRecordStore) => Promise<T>): Promise<T>;
 }
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -48,6 +49,18 @@ export class InMemoryPlatformRecordStore implements PlatformRecordStore {
       .filter((event) => event.entityId === entityId)
       .slice(-Math.max(1, Math.min(limit, 1000)))
       .map(clone);
+  }
+  async transaction<T>(operation: (store: PlatformRecordStore) => Promise<T>): Promise<T> {
+    const records = clone([...this.records.entries()]);
+    const events = clone(this.events);
+    try {
+      return await operation(this);
+    } catch (error) {
+      this.records.clear();
+      for (const [key, record] of records) this.records.set(key, record);
+      this.events.splice(0, this.events.length, ...events);
+      throw error;
+    }
   }
 }
 export function platformRecord(

@@ -162,8 +162,7 @@ export class PlatformOrchestrationService {
     correlationId?: string;
   }): Promise<Spec> {
     const record = await this.require('SPEC', input.specId);
-    const current = payload(record, SpecSchema);
-    if (current.ownerId !== input.actorId) throw new Error('Spec owner authorization required');
+    const current = await this.requireOwnedSpec(input.specId, input.actorId);
     const next = SpecSchema.parse({
       ...current,
       ...(input.requirements ? { requirements: input.requirements } : {}),
@@ -202,8 +201,7 @@ export class PlatformOrchestrationService {
     correlationId?: string;
   }): Promise<SpecTask[]> {
     const specRecord = await this.require('SPEC', input.specId);
-    const spec = payload(specRecord, SpecSchema);
-    if (spec.ownerId !== input.actorId) throw new Error('Spec owner authorization required');
+    const spec = await this.requireOwnedSpec(input.specId, input.actorId);
     const now = this.now();
     const existing = await this.listTasks(input.specId);
     const created = input.tasks.map((task) =>
@@ -227,14 +225,23 @@ export class PlatformOrchestrationService {
       version: spec.version + 1,
       updatedAt: now,
     });
-    for (const task of created)
-      await this.store.put(platformRecord('TASK', task.id, spec.ownerId, task, now), null);
-    await this.store.put(
-      { ...specRecord, version: specRecord.version + 1, payload: nextSpec, updatedAt: now },
-      specRecord.version,
-    );
-    await this.emit('task.graph.updated', input.specId, input.actorId, input.correlationId, {
-      added: created.map((task) => task.id),
+    await this.store.transaction(async (transaction) => {
+      for (const task of created)
+        await transaction.put(platformRecord('TASK', task.id, spec.ownerId, task, now), null);
+      await transaction.put(
+        { ...specRecord, version: specRecord.version + 1, payload: nextSpec, updatedAt: now },
+        specRecord.version,
+      );
+      await transaction.appendEvent(
+        platformEvent(
+          'task.graph.updated',
+          input.specId,
+          input.actorId,
+          input.correlationId ?? randomUUID(),
+          { added: created.map((task) => task.id) },
+          now,
+        ),
+      );
     });
     return created;
   }
@@ -383,6 +390,7 @@ export class PlatformOrchestrationService {
   async createCheckpoint(
     input: Omit<Checkpoint, 'id' | 'createdAt'> & { actorId: string; correlationId?: string },
   ): Promise<Checkpoint> {
+    await this.requireOwnedSpec(input.specId, input.actorId);
     const checkpoint = CheckpointSchema.parse({
       ...input,
       id: `checkpoint_${randomUUID()}`,
@@ -404,6 +412,7 @@ export class PlatformOrchestrationService {
       correlationId?: string;
     },
   ): Promise<ReviewFinding> {
+    await this.requireOwnedSpec(input.specId, input.actorId);
     const finding = ReviewFindingSchema.parse({
       ...input,
       id: `finding_${randomUUID()}`,
@@ -424,6 +433,7 @@ export class PlatformOrchestrationService {
   async recordVerification(
     input: Omit<VerificationEvidence, 'id' | 'createdAt'> & { actorId: string },
   ): Promise<VerificationEvidence> {
+    await this.requireOwnedSpec(input.specId, input.actorId);
     const evidence = VerificationEvidenceSchema.parse({
       ...input,
       id: `verification_${randomUUID()}`,
@@ -602,6 +612,11 @@ export class PlatformOrchestrationService {
     const record = await this.store.get(kind, id);
     if (!record) throw new Error(`${kind} not found: ${id}`);
     return record;
+  }
+  private async requireOwnedSpec(specId: string, actorId: string): Promise<Spec> {
+    const spec = await this.getSpec(specId);
+    if (spec.ownerId !== actorId) throw new Error('Spec owner authorization required');
+    return spec;
   }
   private async emit(
     kind: string,
