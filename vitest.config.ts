@@ -21,6 +21,7 @@ const sourceAliases = {
   '@astra/observability': resolve(repositoryRoot, 'packages/observability/src/index.ts'),
   '@astra/marketplace': resolve(repositoryRoot, 'packages/marketplace/src/index.ts'),
   '@astra/config': resolve(repositoryRoot, 'packages/config/src/index.ts'),
+  '@astra/control-plane': resolve(repositoryRoot, 'packages/control-plane/src/index.ts'),
   '@astra/contracts': resolve(repositoryRoot, 'packages/contracts/src/index.ts'),
   '@astra/remote-protocol': resolve(repositoryRoot, 'packages/remote-protocol/src/index.ts'),
   '@astra/db': resolve(repositoryRoot, 'packages/db/src/index.ts'),

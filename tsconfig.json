@@ -9,6 +9,7 @@
     { "path": "./packages/auth" },
     { "path": "./packages/billing" },
     { "path": "./packages/config" },
+    { "path": "./packages/control-plane" },
     { "path": "./packages/contracts" },
     { "path": "./packages/db" },
     { "path": "./packages/model-gateway" },
