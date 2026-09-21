@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../contracts" },
+    { "path": "../control-plane" },
     { "path": "../auth" },
     { "path": "../billing" },
     { "path": "../plans" },

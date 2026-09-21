@@ -11,3 +11,4 @@ export * from './postgres-admin.js';
 export * from './postgres-rate-limit.js';
 export * from './postgres-remote.js';
 export * from './postgres-organization-billing.js';
+export * from './postgres-control-plane.js';

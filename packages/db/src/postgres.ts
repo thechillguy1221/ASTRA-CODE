@@ -28,6 +28,11 @@ import type { OrganizationBillingStore } from '@astra/billing';
 import { PostgresRateLimitStore } from './postgres-rate-limit.js';
 import { PostgresRemoteAccessService } from './postgres-remote.js';
 import type { RemoteAccessPort } from '@astra/remote-protocol';
+import {
+  PostgresControlPlaneRepository,
+  PostgresInvalidationBus,
+} from './postgres-control-plane.js';
+import type { ControlPlaneRepository, InvalidationBus } from '@astra/control-plane';
 
 export interface PostgresStores {
   pool: Pool;
@@ -46,6 +51,8 @@ export interface PostgresStores {
   analytics: PostgresAdminAnalytics;
   rateLimiter: PostgresRateLimitStore;
   remote: RemoteAccessPort;
+  controlPlane: ControlPlaneRepository;
+  controlPlaneInvalidation: InvalidationBus;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -238,6 +245,8 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     analytics: new PostgresAdminAnalytics(pool),
     rateLimiter: new PostgresRateLimitStore(pool),
     remote: new PostgresRemoteAccessService(pool),
+    controlPlane: new PostgresControlPlaneRepository(pool),
+    controlPlaneInvalidation: new PostgresInvalidationBus(pool),
   };
 }
 
@@ -256,6 +265,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0013_room_projects_files_security', file: '0013_room_projects_files_security.sql' },
     { version: '0014_room_memberships', file: '0014_room_memberships.sql' },
     { version: '0015_email_sender_identities', file: '0015_email_sender_identities.sql' },
+    { version: '0016_control_plane_foundation', file: '0016_control_plane_foundation.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

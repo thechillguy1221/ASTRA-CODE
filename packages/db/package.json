@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@astra/contracts": "0.1.0",
+    "@astra/control-plane": "0.1.0",
     "@astra/auth": "0.1.0",
     "@astra/billing": "0.1.0",
     "@astra/plans": "0.1.0",
