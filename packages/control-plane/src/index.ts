@@ -5,3 +5,4 @@ export * from './memory.js';
 export * from './permissions.js';
 export * from './ports.js';
 export * from './service.js';
+export * from './commercial.js';

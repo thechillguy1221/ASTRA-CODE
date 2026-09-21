@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
+import type { ControlPlaneModelSnapshot, ControlPlanePlanSnapshot } from '@astra/control-plane';
 import { adminPermissions, canAdmin, NO_LIVE_DATA, type AdminRole } from './access.js';
 import './app.css';
 
 const sections = [
-  'Overview',
-  'Users',
-  'Wallet',
-  'AI Usage',
-  'Models',
-  'Payments',
-  'Email',
-  'Audit',
+  { group: 'Control', items: ['Overview', 'Plans', 'Entitlements', 'Limits'] },
+  { group: 'Commercial', items: ['Pricing', 'Credits', 'Promotions', 'Payments'] },
+  {
+    group: 'Operations',
+    items: ['Users', 'Organizations', 'Rooms', 'Devices', 'Models', 'AI Usage'],
+  },
+  { group: 'Platform', items: ['Web Search', 'MCP', 'Plugins', 'Skills', 'Remote Access'] },
+  { group: 'System', items: ['Email', 'Security', 'Audit', 'Releases', 'Maintenance'] },
 ];
 
 interface AdminOverview {
@@ -42,6 +43,39 @@ interface AdminUser {
   role: string;
   planId: string;
   createdAt: string;
+}
+
+type ControlPlanePlan = ControlPlanePlanSnapshot;
+type ControlPlaneModel = ControlPlaneModelSnapshot;
+
+interface ControlPlaneAudit {
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  requestId: string;
+  createdAt: string;
+  actor: { userId: string; role: string };
+}
+
+interface PricingResponse {
+  region: string;
+  plans: Array<
+    ControlPlanePlan & {
+      regionalPrice?: {
+        currency: string;
+        amount: string;
+        yearlyAmount: string | null;
+        version: number;
+      } | null;
+    }
+  >;
+  creditPacks: Array<{
+    packageId: string;
+    displayName: string;
+    credits: string;
+    price?: { currency: string; amount: string };
+  }>;
 }
 
 type SenderKind = 'DEFAULT' | 'NOREPLY' | 'SUPPORT' | 'BILLING' | 'SECURITY';
@@ -79,6 +113,15 @@ export function App(): React.JSX.Element {
   const [senderKind, setSenderKind] = useState<SenderKind>('DEFAULT');
   const [senderFrom, setSenderFrom] = useState('');
   const [senderReplyTo, setSenderReplyTo] = useState('');
+  const [controlPlans, setControlPlans] = useState<ControlPlanePlan[]>([]);
+  const [controlModels, setControlModels] = useState<ControlPlaneModel[]>([]);
+  const [controlAudit, setControlAudit] = useState<ControlPlaneAudit[]>([]);
+  const [pricing, setPricing] = useState<PricingResponse | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [planName, setPlanName] = useState('');
+  const [changeReason, setChangeReason] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [modelStatus, setModelStatus] = useState('AVAILABLE');
 
   useEffect(() => {
     if (!token) return;
@@ -125,6 +168,35 @@ export function App(): React.JSX.Element {
           setSenderFrom(selected.fromAddress);
           setSenderReplyTo(selected.replyTo ?? '');
         }
+      }
+      if (section === 'Plans' || section === 'Entitlements' || section === 'Limits') {
+        const plansResponse = await fetch('/v1/admin/control-plane/plans', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!plansResponse.ok) throw new Error('Plan policy is unavailable.');
+        setControlPlans(((await plansResponse.json()) as { plans: ControlPlanePlan[] }).plans);
+      }
+      if (section === 'Models') {
+        const modelsResponse = await fetch('/v1/admin/control-plane/models', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!modelsResponse.ok) throw new Error('Model policy is unavailable.');
+        setControlModels(((await modelsResponse.json()) as { models: ControlPlaneModel[] }).models);
+      }
+      if (section === 'Pricing' || section === 'Credits' || section === 'Promotions') {
+        const pricingResponse = await fetch('/v1/pricing?country=IN', { credentials: 'include' });
+        if (!pricingResponse.ok) throw new Error('Commercial configuration is unavailable.');
+        setPricing((await pricingResponse.json()) as PricingResponse);
+      }
+      if (section === 'Audit' || section === 'Security') {
+        const auditResponse = await fetch('/v1/admin/control-plane/audit', {
+          credentials: 'include',
+          ...(headers ? { headers } : {}),
+        });
+        if (!auditResponse.ok) throw new Error('Audit history is unavailable.');
+        setControlAudit(((await auditResponse.json()) as { entries: ControlPlaneAudit[] }).entries);
       }
     };
     void load().catch((error: unknown) =>
@@ -292,6 +364,90 @@ export function App(): React.JSX.Element {
     setMessage(`${senderKind} sender identity saved.`);
   }
 
+  async function savePlan(): Promise<void> {
+    const plan = controlPlans.find((candidate) => candidate.id === selectedPlanId);
+    if (!plan || !changeReason.trim()) {
+      setMessage('Select a plan and enter a reason before saving.');
+      return;
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== 'cookie-session') headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`/v1/admin/control-plane/plans/${plan.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        plan: {
+          ...plan,
+          displayName: planName.trim() || plan.displayName,
+          version: plan.version + 1,
+          updatedAt: new Date().toISOString(),
+        },
+        metadata: {
+          expectedVersion: plan.version,
+          reason: changeReason.trim(),
+          requestId: `admin-ui-${Date.now()}`,
+        },
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      plan?: ControlPlanePlan;
+      error?: string;
+    };
+    if (!response.ok || !body.plan) {
+      setMessage(body.error ?? 'Plan was not saved. Refresh and retry.');
+      return;
+    }
+    setControlPlans((current) =>
+      current.map((candidate) => (candidate.id === body.plan!.id ? body.plan! : candidate)),
+    );
+    setChangeReason('');
+    setMessage(`${body.plan.displayName} saved at version ${body.plan.version}.`);
+  }
+
+  async function saveModel(): Promise<void> {
+    const model = controlModels.find((candidate) => candidate.modelId === selectedModelId);
+    if (!model || !changeReason.trim()) {
+      setMessage('Select a model and enter a reason before saving.');
+      return;
+    }
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token !== 'cookie-session') headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(`/v1/admin/control-plane/models/${model.modelId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({
+        model: {
+          ...model,
+          version: model.version + 1,
+          status: modelStatus,
+          updatedAt: new Date().toISOString(),
+        },
+        metadata: {
+          expectedVersion: model.version,
+          reason: changeReason.trim(),
+          requestId: `admin-ui-${Date.now()}`,
+        },
+      }),
+    });
+    const body = (await response.json().catch(() => ({}))) as {
+      model?: ControlPlaneModel;
+      error?: string;
+    };
+    if (!response.ok || !body.model) {
+      setMessage(body.error ?? 'Model was not saved. Refresh and retry.');
+      return;
+    }
+    setControlModels((current) =>
+      current.map((candidate) =>
+        candidate.modelId === body.model!.modelId ? body.model! : candidate,
+      ),
+    );
+    setChangeReason('');
+    setMessage(`${body.model.displayName} saved at version ${body.model.version}.`);
+  }
+
   if (!token || !role) {
     return (
       <main className="admin-login">
@@ -365,14 +521,19 @@ export function App(): React.JSX.Element {
         </div>
         <p>Operational controls for accounts, models, money, and email.</p>
         <nav>
-          {sections.map((item) => (
-            <button
-              className={section === item ? 'active' : ''}
-              key={item}
-              onClick={() => setSection(item)}
-            >
-              {item}
-            </button>
+          {sections.map((group) => (
+            <div className="nav-group" key={group.group}>
+              <span className="nav-group-label">{group.group}</span>
+              {group.items.map((item) => (
+                <button
+                  className={section === item ? 'active' : ''}
+                  key={item}
+                  onClick={() => setSection(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
@@ -452,6 +613,219 @@ export function App(): React.JSX.Element {
                 </div>
               ))
             )}
+          </section>
+        ) : null}
+        {section === 'Plans' || section === 'Entitlements' || section === 'Limits' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>{section === 'Plans' ? 'Versioned plan policy' : section}</h2>
+              <span>{controlPlans.length} server snapshots</span>
+            </div>
+            {controlPlans.map((plan) => (
+              <div className="action-row" key={plan.id}>
+                <button
+                  className="resource-button"
+                  onClick={() => {
+                    setSelectedPlanId(plan.id);
+                    setPlanName(plan.displayName);
+                    setChangeReason('');
+                  }}
+                >
+                  <strong>{plan.displayName}</strong>
+                  <span>
+                    {plan.id} · v{plan.version}
+                  </span>
+                </button>
+                <span>
+                  {plan.status} · {plan.monthlyCredits} credits / month
+                </span>
+              </div>
+            ))}
+            {section === 'Entitlements' &&
+              controlPlans.map((plan) => (
+                <div className="policy-block" key={`${plan.id}-entitlements`}>
+                  <strong>{plan.displayName}</strong>
+                  <span>
+                    {Object.entries(plan.entitlements)
+                      .filter(([, enabled]) => enabled)
+                      .map(([key]) => key)
+                      .join(', ') || 'No enabled entitlements'}
+                  </span>
+                </div>
+              ))}
+            {section === 'Limits' &&
+              controlPlans.map((plan) => (
+                <div className="policy-block" key={`${plan.id}-limits`}>
+                  <strong>{plan.displayName}</strong>
+                  <span>{JSON.stringify(plan.limits)}</span>
+                </div>
+              ))}
+            {selectedPlanId && section === 'Plans' ? (
+              <div className="edit-drawer">
+                <div className="table-heading">
+                  <h3>Edit {selectedPlanId}</h3>
+                  <button className="text-button" onClick={() => setSelectedPlanId(null)}>
+                    Close
+                  </button>
+                </div>
+                <label>
+                  Display name
+                  <input value={planName} onChange={(event) => setPlanName(event.target.value)} />
+                </label>
+                <label>
+                  Reason for change
+                  <input
+                    value={changeReason}
+                    onChange={(event) => setChangeReason(event.target.value)}
+                    required
+                  />
+                </label>
+                <button className="primary-button" onClick={() => void savePlan()}>
+                  Save versioned plan
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+        {section === 'Pricing' || section === 'Credits' || section === 'Promotions' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>{section === 'Pricing' ? 'Regional commercial policy' : section}</h2>
+              <span>{pricing?.region ?? NO_LIVE_DATA}</span>
+            </div>
+            {section === 'Pricing' &&
+              pricing?.plans.map((plan) => (
+                <div className="action-row" key={plan.id}>
+                  <span>
+                    <strong>{plan.displayName}</strong> · v{plan.regionalPrice?.version ?? '—'}
+                  </span>
+                  <span>
+                    {plan.regionalPrice
+                      ? `${plan.regionalPrice.currency} ${plan.regionalPrice.amount}`
+                      : NO_LIVE_DATA}
+                  </span>
+                </div>
+              ))}
+            {section === 'Credits' &&
+              pricing?.creditPacks.map((pack) => (
+                <div className="action-row" key={pack.packageId}>
+                  <span>
+                    <strong>{pack.displayName}</strong> · {pack.credits} credits
+                  </span>
+                  <span>
+                    {pack.price ? `${pack.price.currency} ${pack.price.amount}` : NO_LIVE_DATA}
+                  </span>
+                </div>
+              ))}
+            {section === 'Promotions' ? (
+              <p className="form-note">
+                Promotions are server-managed through the commercial API. No client-side discount
+                calculation is performed here.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+        {section === 'Models' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Authoritative model catalog</h2>
+              <span>{controlModels.length} models</span>
+            </div>
+            {controlModels.map((model) => (
+              <div className="action-row" key={model.modelId}>
+                <button
+                  className="resource-button"
+                  onClick={() => {
+                    setSelectedModelId(model.modelId);
+                    setModelStatus(model.status);
+                    setChangeReason('');
+                  }}
+                >
+                  <strong>{model.displayName}</strong>
+                  <span>
+                    {model.provider} · {model.modelId} · v{model.version}
+                  </span>
+                </button>
+                <span className={`status status-${model.status.toLowerCase()}`}>
+                  {model.status}
+                </span>
+              </div>
+            ))}
+            {selectedModelId ? (
+              <div className="edit-drawer">
+                <div className="table-heading">
+                  <h3>Edit {selectedModelId}</h3>
+                  <button className="text-button" onClick={() => setSelectedModelId(null)}>
+                    Close
+                  </button>
+                </div>
+                <label>
+                  Lifecycle state
+                  <select
+                    value={modelStatus}
+                    onChange={(event) => setModelStatus(event.target.value)}
+                  >
+                    <option>AVAILABLE</option>
+                    <option>DEGRADED</option>
+                    <option>MAINTENANCE</option>
+                    <option>DISABLED</option>
+                  </select>
+                </label>
+                <label>
+                  Reason for change
+                  <input
+                    value={changeReason}
+                    onChange={(event) => setChangeReason(event.target.value)}
+                    required
+                  />
+                </label>
+                <button className="primary-button" onClick={() => void saveModel()}>
+                  Save model state
+                </button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+        {section === 'Audit' || section === 'Security' ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>Append-only control-plane history</h2>
+              <span>{controlAudit.length} events</span>
+            </div>
+            {controlAudit.map((entry) => (
+              <div className="action-row" key={`${entry.requestId}-${entry.createdAt}`}>
+                <span>
+                  <strong>{entry.action}</strong> · {entry.targetType}/{entry.targetId}
+                  <small>{entry.reason}</small>
+                </span>
+                <span>
+                  {entry.actor.role} · {new Date(entry.createdAt).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </section>
+        ) : null}
+        {[
+          'Organizations',
+          'Rooms',
+          'Devices',
+          'Web Search',
+          'MCP',
+          'Plugins',
+          'Skills',
+          'Remote Access',
+          'Releases',
+          'Maintenance',
+        ].includes(section) ? (
+          <section className="admin-table control-surface">
+            <div className="table-heading">
+              <h2>{section} policy</h2>
+              <span>Server boundary</span>
+            </div>
+            <p className="form-note">
+              This surface is reserved for the next policy adapter. Authorization remains
+              server-side; this console never treats a local toggle as permission.
+            </p>
           </section>
         ) : null}
         {section === 'Email' && canAdmin(role, 'manage_email') ? (

@@ -21,6 +21,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { resolveRequestedModel } from './model-selection.js';
 import { RemoteAccessError, type RemoteAccessPort } from '@astra/remote-protocol';
+import type { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
 
 const ReservationSchema = z.object({
   organizationId: z.string().min(1).optional(),
@@ -70,9 +71,13 @@ function sendBillingError(reply: FastifyReply, error: unknown) {
     const status =
       error.code === 'INSUFFICIENT_CREDITS'
         ? 402
-        : error.code === 'IDEMPOTENCY_CONFLICT'
-          ? 409
-          : 400;
+        : error.code === 'CONTROL_PLANE_UNAVAILABLE'
+          ? 503
+          : error.code === 'CONTROL_PLANE_POLICY_DENIED'
+            ? 403
+            : error.code === 'IDEMPOTENCY_CONFLICT'
+              ? 409
+              : 400;
     return reply.code(status).send({ error: error.code });
   }
   if (error instanceof Error && error.name === 'PlanEntitlementError')
@@ -89,6 +94,8 @@ export interface BillingRouteDependencies {
   catalog?: ModelCatalogStore;
   receipts?: UsageReceiptStore;
   remote: RemoteAccessPort;
+  commercial?: CommercialPolicyService;
+  controlPlane?: ControlPlaneService;
 }
 
 async function requireUser(
@@ -117,11 +124,70 @@ export async function registerBillingRoutes(
   app: FastifyInstance,
   dependencies: BillingRouteDependencies,
 ): Promise<void> {
-  app.get('/v1/plans', async (_request, reply) => reply.send({ plans: dependencies.plans.list() }));
+  app.get('/v1/plans', async (_request, reply) => {
+    if (dependencies.controlPlane) {
+      try {
+        return reply.send({ plans: await dependencies.controlPlane.listPlans() });
+      } catch {
+        return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+      }
+    }
+    return reply.send({ plans: dependencies.plans.list() });
+  });
 
   app.get('/v1/pricing', async (request, reply) => {
     const countryCode = countryHintFrom(request);
     const region = pricingRegionForCountryCode(countryCode);
+    if (dependencies.commercial) {
+      try {
+        const [plans, topUps] = await Promise.all([
+          Promise.all(
+            (dependencies.controlPlane
+              ? await dependencies.controlPlane.listPlans()
+              : dependencies.plans.list()
+            ).map(async (plan) => {
+              const price = await dependencies.commercial!.getPlanPrice(plan.id, region);
+              return {
+                ...plan,
+                regionalPrice: price
+                  ? {
+                      currency: price.currency,
+                      amount: price.monthlyAmount,
+                      taxIncluded: true,
+                      yearlyAmount: price.yearlyAmount,
+                      version: price.version,
+                    }
+                  : null,
+              };
+            }),
+          ),
+          dependencies.commercial.listTopUpPackages(),
+        ]);
+        return reply.send({
+          productName: 'Astra Code',
+          region,
+          countryCode,
+          plans,
+          creditPacks: topUps
+            .filter((pack) => pack.active && pack.prices[region])
+            .sort((left, right) => left.displayOrder - right.displayOrder)
+            .map((pack) => ({ ...pack, price: pack.prices[region] })),
+          standardCreditRate: STANDARD_CREDIT_RATES[region],
+          policy: {
+            additionalCreditsAvailable: true,
+            purchasedCreditValidityDays: 365,
+            subscriptionRolloverCycles: 1,
+            countryIsPricingSignal: true,
+            checkoutRequiresVerifiedBillingCountry: true,
+            source: 'control_plane',
+          },
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'ControlPlaneError')
+          return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+        return reply.code(500).send({ error: 'pricing_unavailable' });
+      }
+    }
     return reply.send({
       productName: 'Astra Code',
       region,
@@ -224,6 +290,20 @@ export async function registerBillingRoutes(
       if (dependencies.catalog && !resolved)
         return reply.code(404).send({ error: 'model_unavailable' });
       const selectedModelId = resolved?.model?.modelId ?? parsed.data.modelId;
+      if (dependencies.controlPlane) {
+        const policy = await dependencies.controlPlane.evaluateModelAccess({
+          planId: identity.user.planId,
+          modelId: selectedModelId,
+        });
+        if (!policy.allowed)
+          return reply.code(policy.reason === 'CONTROL_PLANE_UNAVAILABLE' ? 503 : 403).send({
+            error:
+              policy.reason === 'CONTROL_PLANE_UNAVAILABLE'
+                ? 'CONTROL_PLANE_UNAVAILABLE'
+                : 'MODEL_POLICY_DENIED',
+            reason: policy.reason,
+          });
+      }
       const reservation = organizationContext
         ? await dependencies.organizationBilling.reserveTask({
             organizationId: organizationContext.organizationId,

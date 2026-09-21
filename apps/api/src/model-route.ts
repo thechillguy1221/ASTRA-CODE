@@ -8,6 +8,7 @@ import type { AuthService } from '@astra/auth';
 import type { BillingService, OrganizationBillingService } from '@astra/billing';
 import type { ModelCatalogStore, UsageReceiptStore } from '@astra/db';
 import type { GatewayModelClient } from '@astra/model-gateway';
+import type { ControlPlaneService } from '@astra/control-plane';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { resolveRequestedModel } from './model-selection.js';
 
@@ -18,6 +19,7 @@ export interface ModelRouteDependencies {
   auth?: AuthService;
   billing?: BillingService;
   organizationBilling?: OrganizationBillingService;
+  controlPlane?: ControlPlaneService;
   developmentEntitlement: boolean;
 }
 
@@ -31,6 +33,17 @@ export async function registerModelRoutes(
   dependencies: ModelRouteDependencies,
 ): Promise<void> {
   app.get('/v1/models', async (_request, reply) => {
+    if (dependencies.controlPlane) {
+      try {
+        return reply.send({
+          models: (await dependencies.controlPlane.listModels()).filter(
+            (model) => model.enabled && model.visible !== false,
+          ),
+        });
+      } catch {
+        return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
+      }
+    }
     return reply.send({ models: await dependencies.catalog.listEnabled() });
   });
 
@@ -66,6 +79,20 @@ export async function registerModelRoutes(
       )
         return reply.code(409).send({ error: 'RESERVATION_INVALID' });
     }
+    if (dependencies.controlPlane && identity && parsed.data.modelId !== AUTO_MODEL_ID) {
+      const policy = await dependencies.controlPlane.evaluateModelAccess({
+        planId: identity.user.planId,
+        modelId: parsed.data.modelId,
+      });
+      if (!policy.allowed)
+        return reply.code(policy.reason === 'CONTROL_PLANE_UNAVAILABLE' ? 503 : 403).send({
+          error:
+            policy.reason === 'CONTROL_PLANE_UNAVAILABLE'
+              ? 'CONTROL_PLANE_UNAVAILABLE'
+              : 'MODEL_POLICY_DENIED',
+          reason: policy.reason,
+        });
+    }
     const reservedModel =
       reservation?.modelId && reservation.modelId !== AUTO_MODEL_ID
         ? await dependencies.catalog.getEnabled(reservation.modelId)
@@ -100,7 +127,22 @@ export async function registerModelRoutes(
         (parsed.data.modelId === AUTO_MODEL_ID && reservation.modelId !== resolved.model.modelId))
     )
       return reply.code(409).send({ error: 'RESERVATION_INVALID' });
-    const model = resolved.model;
+    let model = resolved.model;
+    if (dependencies.controlPlane && identity) {
+      const policy = await dependencies.controlPlane.evaluateModelAccess({
+        planId: identity.user.planId,
+        modelId: model.modelId,
+      });
+      if (!policy.allowed)
+        return reply.code(policy.reason === 'CONTROL_PLANE_UNAVAILABLE' ? 503 : 403).send({
+          error:
+            policy.reason === 'CONTROL_PLANE_UNAVAILABLE'
+              ? 'CONTROL_PLANE_UNAVAILABLE'
+              : 'MODEL_POLICY_DENIED',
+          reason: policy.reason,
+        });
+      if (policy.model) model = policy.model;
+    }
 
     const cancellation = new AbortController();
     request.raw.once('close', () => cancellation.abort('client disconnected'));

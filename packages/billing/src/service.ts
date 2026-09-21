@@ -7,6 +7,7 @@ import type {
   WalletBucket,
 } from '@astra/contracts';
 import type { PlanCatalog } from '@astra/plans';
+import { ControlPlaneError, type ControlPlaneService } from '@astra/control-plane';
 import { BillingError, InMemoryBillingStore } from './memory.js';
 import type {
   AdjustCreditsInput,
@@ -16,7 +17,13 @@ import type {
 } from './ports.js';
 
 export class BillingService {
-  constructor(private readonly options: { store: BillingStore; plans: PlanCatalog }) {}
+  constructor(
+    private readonly options: {
+      store: BillingStore;
+      plans: PlanCatalog;
+      controlPlane?: ControlPlaneService;
+    },
+  ) {}
 
   async grantCredits(input: GrantCreditsInput): Promise<WalletLedgerEntry> {
     return this.options.store.grantCredits(input);
@@ -36,6 +43,28 @@ export class BillingService {
   }): Promise<CreditReservation> {
     const activeJobs =
       input.activeJobs ?? (await this.options.store.countActiveReservations?.(input.userId)) ?? 0;
+    if (this.options.controlPlane) {
+      try {
+        await this.options.controlPlane.assertTaskAllowed({
+          planId: input.planId,
+          modelId: input.modelId,
+          mode: input.mode,
+          requestedCredits: input.amountCredits,
+          activeJobs,
+          ...(input.activeSeats === undefined ? {} : { activeSeats: input.activeSeats }),
+        });
+      } catch (error) {
+        if (error instanceof ControlPlaneError) {
+          throw new BillingError(
+            error.code === 'CONTROL_PLANE_UNAVAILABLE'
+              ? 'CONTROL_PLANE_UNAVAILABLE'
+              : 'CONTROL_PLANE_POLICY_DENIED',
+            error.message,
+          );
+        }
+        throw error;
+      }
+    }
     this.options.plans.assertTaskAllowed(input.planId, {
       modelId: input.modelId,
       ...(input.modelPlanAccess ? { modelPlanAccess: input.modelPlanAccess } : {}),

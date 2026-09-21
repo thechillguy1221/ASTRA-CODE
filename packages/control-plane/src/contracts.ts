@@ -88,7 +88,7 @@ export const AuditEventInputSchema = z.object({
 export type AuditEventInput = z.infer<typeof AuditEventInputSchema>;
 
 export const InvalidationMessageSchema = z.object({
-  domain: z.enum(['plans', 'models', 'entitlements', 'limits']),
+  domain: z.enum(['plans', 'models', 'entitlements', 'limits', 'commercial']),
   resourceId: z.string().min(1),
   version: z.number().int().positive(),
 });
@@ -105,3 +105,95 @@ export interface ModelWriteInput {
   expectedVersion: number;
   audit: AuditEventInput;
 }
+
+export const PricingRegionSchema = z.enum(['INDIA', 'GLOBAL']);
+export type PricingRegion = z.infer<typeof PricingRegionSchema>;
+
+export const PricingCurrencySchema = z.enum(['INR', 'USD']);
+export type PricingCurrency = z.infer<typeof PricingCurrencySchema>;
+
+const CommercialAmountSchema = z
+  .string()
+  .regex(/^\d+(?:\.\d{1,7})?$/, 'Amount must be a non-negative decimal');
+
+export const RegionalMoneySchema = z.object({
+  currency: PricingCurrencySchema,
+  amount: CommercialAmountSchema,
+  taxIncluded: z.boolean(),
+});
+export type RegionalMoney = z.infer<typeof RegionalMoneySchema>;
+
+export const CommercialVersionStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'RETIRED']);
+export type CommercialVersionStatus = z.infer<typeof CommercialVersionStatusSchema>;
+
+export const CommercialPlanPriceSnapshotSchema = z.object({
+  planId: z.string().min(1),
+  version: z.number().int().positive(),
+  region: PricingRegionSchema,
+  currency: PricingCurrencySchema,
+  monthlyAmount: CommercialAmountSchema,
+  yearlyAmount: CommercialAmountSchema.nullable(),
+  seatAmount: CommercialAmountSchema.nullable(),
+  includedMonthlyCredits: CommercialAmountSchema,
+  includedYearlyCredits: CommercialAmountSchema.nullable(),
+  effectiveFrom: z.string().datetime(),
+  effectiveTo: z.string().datetime().nullable(),
+  status: CommercialVersionStatusSchema,
+  updatedAt: z.string().datetime(),
+});
+export type CommercialPlanPriceSnapshot = z.infer<typeof CommercialPlanPriceSnapshotSchema>;
+
+export const TopUpPackageSnapshotSchema = z.object({
+  packageId: z.string().min(1),
+  version: z.number().int().positive(),
+  displayName: z.string().min(1),
+  credits: CommercialAmountSchema,
+  bonusCredits: CommercialAmountSchema,
+  validityDays: z.number().int().positive(),
+  prices: z.record(PricingRegionSchema, RegionalMoneySchema),
+  active: z.boolean(),
+  displayOrder: z.number().int().nonnegative(),
+  purchaseLimit: z.number().int().positive().nullable(),
+  effectiveFrom: z.string().datetime(),
+  effectiveTo: z.string().datetime().nullable(),
+  updatedAt: z.string().datetime(),
+});
+export type TopUpPackageSnapshot = z.infer<typeof TopUpPackageSnapshotSchema>;
+
+export const PromotionSnapshotSchema = z.object({
+  promotionId: z.string().min(1),
+  version: z.number().int().positive(),
+  code: z.string().trim().min(1).max(80),
+  kind: z.enum(['PERCENT', 'FIXED', 'BONUS_CREDITS']),
+  percentOff: z.number().min(0).max(100).nullable(),
+  fixedAmount: CommercialAmountSchema.nullable(),
+  fixedCurrency: PricingCurrencySchema.nullable(),
+  bonusCredits: CommercialAmountSchema,
+  planIds: z.array(z.string().min(1)),
+  regions: z.array(PricingRegionSchema),
+  maxRedemptions: z.number().int().positive().nullable(),
+  perUserRedemptionLimit: z.number().int().positive().nullable(),
+  validFrom: z.string().datetime(),
+  expiresAt: z.string().datetime().nullable(),
+  active: z.boolean(),
+  updatedAt: z.string().datetime(),
+});
+export type PromotionSnapshot = z.infer<typeof PromotionSnapshotSchema>;
+
+export const ModelConsumptionPricingSnapshotSchema = z.object({
+  modelId: z.string().min(1),
+  version: z.number().int().positive(),
+  region: PricingRegionSchema,
+  inputCreditsPer1k: CommercialAmountSchema,
+  outputCreditsPer1k: CommercialAmountSchema,
+  cachedInputCreditsPer1k: CommercialAmountSchema.nullable(),
+  reasoningCreditsPer1k: CommercialAmountSchema.nullable(),
+  imageCredits: CommercialAmountSchema.nullable(),
+  audioCredits: CommercialAmountSchema.nullable(),
+  minimumChargeCredits: CommercialAmountSchema,
+  effectiveFrom: z.string().datetime(),
+  effectiveTo: z.string().datetime().nullable(),
+  status: CommercialVersionStatusSchema,
+  updatedAt: z.string().datetime(),
+});
+export type ModelConsumptionPricingSnapshot = z.infer<typeof ModelConsumptionPricingSnapshotSchema>;

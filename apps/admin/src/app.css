@@ -90,6 +90,18 @@ nav {
   gap: 3px;
   margin-top: 36px;
 }
+.nav-group {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 18px;
+}
+.nav-group-label {
+  padding: 0 10px 5px;
+  color: #4e657c;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 nav button {
   padding: 10px;
   border-radius: 7px;
@@ -247,6 +259,65 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 15px;
+}
+.resource-button {
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  color: #c5d2df;
+  text-align: left;
+}
+.resource-button:hover strong {
+  color: #a4cefa;
+}
+.resource-button span,
+.action-row small {
+  color: #7d91a6;
+  font-size: 11px;
+}
+.action-row small {
+  display: block;
+  margin-top: 5px;
+}
+.control-surface {
+  margin-top: 18px;
+}
+.policy-block {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid #223446;
+  color: #c5d2df;
+  font-size: 12px;
+}
+.policy-block span {
+  color: #7d91a6;
+  line-height: 1.5;
+}
+.edit-drawer {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 18px;
+  border-left: 3px solid #75a9dc;
+  background: #0b141e;
+}
+.edit-drawer h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.status {
+  font-size: 11px;
+}
+.status-available {
+  color: #79c9a6;
+}
+.status-maintenance,
+.status-degraded {
+  color: #e7bb67;
+}
+.status-disabled {
+  color: #f0a5a5;
 }
 .table-heading {
   margin-bottom: 12px;

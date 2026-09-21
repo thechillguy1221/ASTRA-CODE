@@ -1,9 +1,14 @@
 import type { AuthError, AuthService } from '@astra/auth';
 import {
   ControlPlaneError,
+  CommercialPlanPriceSnapshotSchema,
+  CommercialPolicyService,
   ControlPlaneModelSnapshotSchema,
   ControlPlanePlanSnapshotSchema,
+  ModelConsumptionPricingSnapshotSchema,
   MutationMetadataSchema,
+  PromotionSnapshotSchema,
+  TopUpPackageSnapshotSchema,
   hasAdminPermission,
   resolveAdminPermissions,
   type ControlPlaneActor,
@@ -38,6 +43,34 @@ const ModelMutationSchema = z.object({
   metadata: MutationMetadataSchema,
 });
 
+const PlanPriceMutationSchema = z
+  .object({
+    snapshot: CommercialPlanPriceSnapshotSchema,
+    metadata: MutationMetadataSchema,
+  })
+  .strict();
+
+const TopUpMutationSchema = z
+  .object({
+    snapshot: TopUpPackageSnapshotSchema,
+    metadata: MutationMetadataSchema,
+  })
+  .strict();
+
+const PromotionMutationSchema = z
+  .object({
+    snapshot: PromotionSnapshotSchema,
+    metadata: MutationMetadataSchema,
+  })
+  .strict();
+
+const ModelPricingMutationSchema = z
+  .object({
+    snapshot: ModelConsumptionPricingSnapshotSchema,
+    metadata: MutationMetadataSchema,
+  })
+  .strict();
+
 function bearer(request: FastifyRequest): string | null {
   const value = request.headers.authorization;
   if (value?.startsWith('Bearer ')) return value.slice('Bearer '.length).trim() || null;
@@ -64,6 +97,7 @@ export interface AdminRouteDependencies {
   audit?: AdminAuditStore;
   analytics?: AdminAnalyticsPort;
   controlPlane?: ControlPlaneService;
+  commercial?: CommercialPolicyService;
 }
 
 function sendControlPlaneError(reply: FastifyReply, error: unknown) {
@@ -71,13 +105,15 @@ function sendControlPlaneError(reply: FastifyReply, error: unknown) {
     const status =
       error.code === 'CONTROL_PLANE_FORBIDDEN'
         ? 403
-        : error.code === 'CONTROL_PLANE_VERSION_CONFLICT'
-          ? 409
-          : error.code === 'CONTROL_PLANE_UNAVAILABLE'
-            ? 503
-            : error.code === 'CONTROL_PLANE_NOT_FOUND'
-              ? 404
-              : 400;
+        : error.code === 'CONTROL_PLANE_POLICY_DENIED'
+          ? 403
+          : error.code === 'CONTROL_PLANE_VERSION_CONFLICT'
+            ? 409
+            : error.code === 'CONTROL_PLANE_UNAVAILABLE'
+              ? 503
+              : error.code === 'CONTROL_PLANE_NOT_FOUND'
+                ? 404
+                : 400;
     return reply.code(status).send({ error: error.code });
   }
   return reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
@@ -93,7 +129,7 @@ async function requireControlPlaneActor(
   actor: ControlPlaneActor;
   context: { sessionId: string; deviceId: string; ipAddress: string; userAgent: string | null };
 } | null> {
-  if (!dependencies.auth || !dependencies.controlPlane) {
+  if (!dependencies.auth || (!dependencies.controlPlane && !dependencies.commercial)) {
     reply.code(503).send({ error: 'CONTROL_PLANE_UNAVAILABLE' });
     return null;
   }
@@ -117,7 +153,8 @@ async function requireControlPlaneActor(
         sessionId: identity.session.sessionId,
         deviceId: identity.device.deviceSessionId,
         ipAddress: request.ip,
-        userAgent: typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'] : null,
+        userAgent:
+          typeof request.headers['user-agent'] === 'string' ? request.headers['user-agent'] : null,
       },
     };
   } catch (error) {
@@ -324,7 +361,12 @@ export async function registerAdminRoutes(
       if (!dependencies.auth || !dependencies.admin)
         return reply.code(503).send({ error: 'admin_not_configured' });
       if (dependencies.controlPlane) {
-        const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+        const access = await requireControlPlaneActor(
+          request,
+          reply,
+          dependencies,
+          'admin.billing',
+        );
         if (!access) return;
         const parsedControlPlane = AdjustmentSchema.safeParse(request.body);
         if (!parsedControlPlane.success) return reply.code(400).send({ error: 'invalid_request' });
@@ -415,7 +457,11 @@ export async function registerAdminRoutes(
     const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
     if (!access) return;
     const parsed = PlanMutationSchema.safeParse(request.body);
-    if (!parsed.success || parsed.data.metadata.expectedVersion !== 0 || parsed.data.plan.version !== 1)
+    if (
+      !parsed.success ||
+      parsed.data.metadata.expectedVersion !== 0 ||
+      parsed.data.plan.version !== 1
+    )
       return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
     try {
       if (await dependencies.controlPlane!.getPlan(parsed.data.plan.id))
@@ -469,17 +515,22 @@ export async function registerAdminRoutes(
     },
   );
 
-  app.get<{ Params: { planId: string } }>('/v1/admin/control-plane/plans/:planId/versions', async (request, reply) => {
-    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
-    if (!access) return;
-    try {
-      if (!(await dependencies.controlPlane!.getPlan(request.params.planId)))
-        return reply.code(404).send({ error: 'CONTROL_PLANE_NOT_FOUND' });
-      return reply.send({ versions: await dependencies.controlPlane!.listPlanVersions(request.params.planId) });
-    } catch (error) {
-      return sendControlPlaneError(reply, error);
-    }
-  });
+  app.get<{ Params: { planId: string } }>(
+    '/v1/admin/control-plane/plans/:planId/versions',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
+      if (!access) return;
+      try {
+        if (!(await dependencies.controlPlane!.getPlan(request.params.planId)))
+          return reply.code(404).send({ error: 'CONTROL_PLANE_NOT_FOUND' });
+        return reply.send({
+          versions: await dependencies.controlPlane!.listPlanVersions(request.params.planId),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
 
   app.get('/v1/admin/control-plane/models', async (request, reply) => {
     const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.models');
@@ -495,7 +546,11 @@ export async function registerAdminRoutes(
     const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.models');
     if (!access) return;
     const parsed = ModelMutationSchema.safeParse(request.body);
-    if (!parsed.success || parsed.data.metadata.expectedVersion !== 0 || parsed.data.model.version !== 1)
+    if (
+      !parsed.success ||
+      parsed.data.metadata.expectedVersion !== 0 ||
+      parsed.data.model.version !== 1
+    )
       return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
     try {
       if (await dependencies.controlPlane!.getModel(parsed.data.model.modelId))
@@ -564,4 +619,148 @@ export async function registerAdminRoutes(
       return sendControlPlaneError(reply, error);
     }
   });
+
+  app.get<{ Params: { planId: string; region: string } }>(
+    '/v1/admin/commercial/plan-prices/:planId/:region',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
+      if (!access || !dependencies.commercial) return;
+      if (request.params.region !== 'INDIA' && request.params.region !== 'GLOBAL')
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        return reply.send({
+          versions: await dependencies.commercial.listPlanPriceVersions(
+            request.params.planId,
+            request.params.region,
+          ),
+        });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { planId: string; region: string } }>(
+    '/v1/admin/commercial/plan-prices/:planId/:region',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.plans');
+      if (!access || !dependencies.commercial) return;
+      const parsed = PlanPriceMutationSchema.safeParse(request.body);
+      if (
+        !parsed.success ||
+        parsed.data.snapshot.planId !== request.params.planId ||
+        parsed.data.snapshot.region !== request.params.region
+      )
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const snapshot = await dependencies.commercial.updatePlanPrice({
+          ...parsed.data,
+          actor: access.actor,
+          context: access.context,
+        });
+        return reply.send({ snapshot });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.get('/v1/admin/commercial/top-ups', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+    if (!access || !dependencies.commercial) return;
+    try {
+      return reply.send({ packages: await dependencies.commercial.listTopUpPackages() });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.put<{ Params: { packageId: string } }>(
+    '/v1/admin/commercial/top-ups/:packageId',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+      if (!access || !dependencies.commercial) return;
+      const parsed = TopUpMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.packageId !== request.params.packageId)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const snapshot = await dependencies.commercial.updateTopUpPackage({
+          ...parsed.data,
+          actor: access.actor,
+          context: access.context,
+        });
+        return reply.send({ snapshot });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.post('/v1/admin/commercial/promotions', async (request, reply) => {
+    const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+    if (!access || !dependencies.commercial) return;
+    const parsed = PromotionMutationSchema.safeParse(request.body);
+    if (
+      !parsed.success ||
+      parsed.data.snapshot.version !== 1 ||
+      parsed.data.metadata.expectedVersion !== 0
+    )
+      return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+    try {
+      const snapshot = await dependencies.commercial.createPromotion({
+        ...parsed.data,
+        actor: access.actor,
+        context: access.context,
+      });
+      return reply.code(201).send({ snapshot });
+    } catch (error) {
+      return sendControlPlaneError(reply, error);
+    }
+  });
+
+  app.put<{ Params: { promotionId: string } }>(
+    '/v1/admin/commercial/promotions/:promotionId',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.billing');
+      if (!access || !dependencies.commercial) return;
+      const parsed = PromotionMutationSchema.safeParse(request.body);
+      if (!parsed.success || parsed.data.snapshot.promotionId !== request.params.promotionId)
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const snapshot = await dependencies.commercial.createPromotion({
+          ...parsed.data,
+          actor: access.actor,
+          context: access.context,
+        });
+        return reply.send({ snapshot });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { modelId: string; region: string } }>(
+    '/v1/admin/commercial/model-pricing/:modelId/:region',
+    async (request, reply) => {
+      const access = await requireControlPlaneActor(request, reply, dependencies, 'admin.models');
+      if (!access || !dependencies.commercial) return;
+      const parsed = ModelPricingMutationSchema.safeParse(request.body);
+      if (
+        !parsed.success ||
+        parsed.data.snapshot.modelId !== request.params.modelId ||
+        parsed.data.snapshot.region !== request.params.region
+      )
+        return reply.code(400).send({ error: 'CONTROL_PLANE_INVALID' });
+      try {
+        const snapshot = await dependencies.commercial.updateModelPricing({
+          ...parsed.data,
+          actor: access.actor,
+          context: access.context,
+        });
+        return reply.send({ snapshot });
+      } catch (error) {
+        return sendControlPlaneError(reply, error);
+      }
+    },
+  );
 }

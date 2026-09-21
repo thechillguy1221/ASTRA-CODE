@@ -20,5 +20,19 @@ describe('control-plane foundation migration', () => {
     const source = await readFile(resolve(process.cwd(), 'packages/db/src/postgres.ts'), 'utf8');
     expect(source).toContain("version: '0016_control_plane_foundation'");
     expect(source).toContain("file: '0016_control_plane_foundation.sql'");
+    expect(source).toContain("version: '0017_commercial_control_plane'");
+    expect(source).toContain("file: '0017_commercial_control_plane.sql'");
+  });
+
+  it('defines versioned commercial pricing, top-up, promotion, and model pricing storage', async () => {
+    const migration = await readFile(
+      resolve(process.cwd(), 'packages/db/migrations/0017_commercial_control_plane.sql'),
+      'utf8',
+    );
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS control_plane_plan_price_versions');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS control_plane_top_up_package_versions');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS control_plane_promotions');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS control_plane_model_pricing_versions');
+    expect(migration).toContain('ON CONFLICT (package_id, version) DO NOTHING');
   });
 });

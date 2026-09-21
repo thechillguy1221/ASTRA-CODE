@@ -3,6 +3,7 @@ import type { GoogleDesktopOAuthService } from '@astra/auth';
 import type { EmailService } from '@astra/email';
 import type { BillingService } from '@astra/billing';
 import type { PlanCatalog } from '@astra/plans';
+import type { CommercialPolicyService } from '@astra/control-plane';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
@@ -130,6 +131,7 @@ export interface AuthRouteDependencies {
   exposeDevelopmentTokens?: boolean;
   billing?: BillingService;
   plans?: PlanCatalog;
+  commercial?: CommercialPolicyService;
   email?: EmailService;
   publicSiteUrl?: string;
   googleOAuth?: GoogleDesktopOAuthService;
@@ -152,10 +154,13 @@ export async function registerAuthRoutes(
         device: parsed.data.device as DeviceInput,
       });
       const freePlan = dependencies.plans?.get('FREE');
+      const configuredFreePrice = dependencies.commercial
+        ? await dependencies.commercial.getPlanPrice('FREE', 'GLOBAL')
+        : undefined;
       if (dependencies.billing && freePlan) {
         await dependencies.billing.grantCredits({
           userId: result.user.id,
-          amountCredits: freePlan.monthlyCredits,
+          amountCredits: configuredFreePrice?.includedMonthlyCredits ?? freePlan.monthlyCredits,
           transactionType: 'SUBSCRIPTION_GRANT',
           idempotencyKey: `signup:${result.user.id}:FREE`,
           reason: 'Initial Free plan entitlement',
@@ -426,10 +431,13 @@ export async function registerAuthRoutes(
     try {
       const session = await dependencies.googleOAuth.exchangeDesktopCode(parsed.data);
       const freePlan = dependencies.plans?.get('FREE');
+      const configuredFreePrice = dependencies.commercial
+        ? await dependencies.commercial.getPlanPrice('FREE', 'GLOBAL')
+        : undefined;
       if (dependencies.billing && freePlan) {
         await dependencies.billing.grantCredits({
           userId: session.user.id,
-          amountCredits: freePlan.monthlyCredits,
+          amountCredits: configuredFreePrice?.includedMonthlyCredits ?? freePlan.monthlyCredits,
           transactionType: 'SUBSCRIPTION_GRANT',
           idempotencyKey: `signup:${session.user.id}:FREE`,
           reason: 'Initial Free plan entitlement',

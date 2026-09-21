@@ -32,6 +32,8 @@ import {
   PostgresControlPlaneRepository,
   PostgresInvalidationBus,
 } from './postgres-control-plane.js';
+import { PostgresCommercialRepository } from './postgres-commercial.js';
+import type { CommercialRepository } from '@astra/control-plane';
 import type { ControlPlaneRepository, InvalidationBus } from '@astra/control-plane';
 
 export interface PostgresStores {
@@ -53,6 +55,7 @@ export interface PostgresStores {
   remote: RemoteAccessPort;
   controlPlane: ControlPlaneRepository;
   controlPlaneInvalidation: InvalidationBus;
+  commercial: CommercialRepository;
 }
 
 function mapCatalogRow(row: Record<string, unknown>): ModelCatalogEntry {
@@ -247,6 +250,7 @@ export function createPostgresStores(connectionString: string): PostgresStores {
     remote: new PostgresRemoteAccessService(pool),
     controlPlane: new PostgresControlPlaneRepository(pool),
     controlPlaneInvalidation: new PostgresInvalidationBus(pool),
+    commercial: new PostgresCommercialRepository(pool),
   };
 }
 
@@ -266,6 +270,7 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0014_room_memberships', file: '0014_room_memberships.sql' },
     { version: '0015_email_sender_identities', file: '0015_email_sender_identities.sql' },
     { version: '0016_control_plane_foundation', file: '0016_control_plane_foundation.sql' },
+    { version: '0017_commercial_control_plane', file: '0017_commercial_control_plane.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS astra_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

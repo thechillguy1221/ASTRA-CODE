@@ -4,6 +4,8 @@ import type { PlanCatalog } from '@astra/plans';
 import type { BillingService } from './service.js';
 import type { OrganizationBillingService } from './organization-service.js';
 import { TOP_UP_250, getConfiguredCreditPack, topUpExpiresAt } from './buckets.js';
+import { addCredits } from './math.js';
+import type { CommercialPolicyService } from '@astra/control-plane';
 
 export interface PaymentRecord {
   paymentId: string;
@@ -134,6 +136,7 @@ export class RazorpayWebhookService {
       billing: BillingService;
       organizationBilling?: OrganizationBillingService;
       plans: PlanCatalog;
+      commercial?: CommercialPolicyService;
       onPlanGranted?: (userId: string, planId: string, eventId: string) => Promise<void>;
       onSubscriptionCancelled?: (userId: string, planId: string, eventId: string) => Promise<void>;
       onSubscriptionHalted?: (userId: string, planId: string, eventId: string) => Promise<void>;
@@ -181,6 +184,11 @@ export class RazorpayWebhookService {
         const providerPaymentId = String(data.providerPaymentId);
         const periodStart = String(data.periodStart);
         const plan = this.options.plans.get(planId);
+        const pricingRegion = data.pricingRegion === 'GLOBAL' ? 'GLOBAL' : 'INDIA';
+        const configuredPrice = this.options.commercial
+          ? await this.options.commercial.getPlanPrice(planId, pricingRegion)
+          : undefined;
+        const monthlyCredits = configuredPrice?.includedMonthlyCredits ?? plan.monthlyCredits;
         const organizationId =
           typeof data.organizationId === 'string' && data.organizationId
             ? data.organizationId
@@ -191,7 +199,7 @@ export class RazorpayWebhookService {
           await this.options.organizationBilling.rolloverSubscriptionCredits({
             organizationId,
             actorUserId: userId,
-            monthlyAllocation: plan.monthlyCredits,
+            monthlyAllocation: monthlyCredits,
             periodStart,
             newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
             idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
@@ -200,7 +208,7 @@ export class RazorpayWebhookService {
         else if (!plan.pooledCredits)
           await this.options.billing.rolloverSubscriptionCredits({
             userId,
-            monthlyAllocation: plan.monthlyCredits,
+            monthlyAllocation: monthlyCredits,
             periodStart,
             newExpiresAt: typeof data.periodEnd === 'string' ? data.periodEnd : null,
             idempotencyKey: `subscription-rollover:${providerSubscriptionId}:${periodStart}`,
@@ -228,7 +236,7 @@ export class RazorpayWebhookService {
           await this.options.organizationBilling.grantCredits({
             organizationId,
             actorUserId: userId,
-            amountCredits: plan.monthlyCredits,
+            amountCredits: monthlyCredits,
             transactionType: 'SUBSCRIPTION_GRANT',
             idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
             reason: `${plan.displayName} organization subscription period grant`,
@@ -241,7 +249,7 @@ export class RazorpayWebhookService {
         } else {
           await this.options.billing.grantCredits({
             userId,
-            amountCredits: plan.monthlyCredits,
+            amountCredits: monthlyCredits,
             transactionType: 'SUBSCRIPTION_GRANT',
             idempotencyKey: `subscription-cycle:${providerSubscriptionId}:${periodStart}`,
             reason: `${plan.displayName} subscription period grant`,
@@ -342,23 +350,43 @@ export class RazorpayWebhookService {
               return null;
             }
           })();
-          const isCurrentIndiaTopUp =
-            configuredPack?.prices.INDIA.currency === 'INR' &&
-            configuredPack.prices.INDIA.amount === amountInr;
-          if (!isLegacyTopUp && !isCurrentIndiaTopUp)
+          const region = data.pricingRegion === 'GLOBAL' ? 'GLOBAL' : 'INDIA';
+          const configuredCommercialPack = this.options.commercial
+            ? await this.options.commercial.getTopUpPackage(topUpSkuId, region)
+            : undefined;
+          const paymentCurrency =
+            typeof data.currency === 'string' ? data.currency : region === 'INDIA' ? 'INR' : 'USD';
+          const paymentAmount = String(data.amount ?? amountInr);
+          const commercialPrice = configuredCommercialPack?.prices[region];
+          const isCatalogTopUp = configuredCommercialPack
+            ? commercialPrice !== undefined &&
+              commercialPrice.currency === paymentCurrency &&
+              commercialPrice.amount === paymentAmount
+            : configuredPack?.prices.INDIA.currency === 'INR' &&
+              configuredPack.prices.INDIA.amount === amountInr;
+          if (!isLegacyTopUp && !isCatalogTopUp)
             throw new Error('Top-up payment does not match the server catalog');
           const pack: { credits: string; displayName: string; validityDays: number } =
-            configuredPack
+            configuredCommercialPack
               ? {
-                  credits: configuredPack.credits,
-                  displayName: `${configuredPack.credits} credits`,
-                  validityDays: configuredPack.validityDays,
+                  credits: addCredits(
+                    configuredCommercialPack.credits,
+                    configuredCommercialPack.bonusCredits,
+                  ),
+                  displayName: configuredCommercialPack.displayName,
+                  validityDays: configuredCommercialPack.validityDays,
                 }
-              : {
-                  credits: TOP_UP_250.credits,
-                  displayName: TOP_UP_250.displayName,
-                  validityDays: TOP_UP_250.validityDays,
-                };
+              : configuredPack
+                ? {
+                    credits: configuredPack.credits,
+                    displayName: `${configuredPack.credits} credits`,
+                    validityDays: configuredPack.validityDays,
+                  }
+                : {
+                    credits: TOP_UP_250.credits,
+                    displayName: TOP_UP_250.displayName,
+                    validityDays: TOP_UP_250.validityDays,
+                  };
           const purchasedAt = new Date().toISOString();
           if (organizationId && this.options.organizationBilling) {
             await this.options.organizationBilling.grantCredits({

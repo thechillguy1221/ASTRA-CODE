@@ -11,6 +11,8 @@ describe('postgres control-plane adapter', () => {
     const payload = { domain: 'plans' as const, resourceId: 'PRO', version: 2 };
     expect(CONTROL_PLANE_NOTIFY_CHANNEL).toBe('astra_control_plane_changed');
     expect(parseInvalidationPayload(formatInvalidationPayload(payload))).toEqual(payload);
+    const commercial = { domain: 'commercial' as const, resourceId: 'PRO', version: 3 };
+    expect(parseInvalidationPayload(formatInvalidationPayload(commercial))).toEqual(commercial);
   });
 
   it('commits the mutation transaction and rolls back failed work', async () => {

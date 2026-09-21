@@ -36,7 +36,7 @@ import type { ReleaseManifest } from '@astra/releases';
 import type { EmailService } from '@astra/email';
 import type { GoogleDesktopOAuthService } from '@astra/auth';
 import type { EmailCampaignService, CampaignAudience, CampaignUser } from '@astra/email';
-import type { ControlPlaneService } from '@astra/control-plane';
+import type { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
 import {
   RemoteAccessService,
   type RemoteAccessPort,
@@ -67,6 +67,7 @@ export interface ApiDependencies {
   admin?: AdminService;
   audit?: AdminAuditStore;
   controlPlane?: ControlPlaneService;
+  commercial?: CommercialPolicyService;
   razorpay?: RazorpayWebhookService;
   developmentEntitlement?: boolean;
   releaseManifest?: ReleaseManifest;
@@ -149,10 +150,19 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
   const events = dependencies.events ?? createMemoryEventStore();
   const plans = dependencies.plans ?? createDefaultPlanCatalog();
   const billing =
-    dependencies.billing ?? new BillingService({ store: new InMemoryBillingStore(), plans });
+    dependencies.billing ??
+    new BillingService({
+      store: new InMemoryBillingStore(),
+      plans,
+      ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
+    });
   const organizationBilling =
     dependencies.organizationBilling ??
-    new OrganizationBillingService({ store: new InMemoryOrganizationBillingStore(), plans });
+    new OrganizationBillingService({
+      store: new InMemoryOrganizationBillingStore(),
+      plans,
+      ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
+    });
   const audit = dependencies.audit ?? new InMemoryAdminAuditStore();
   const admin = dependencies.admin ?? new AdminService({ billing, audit });
   const remote = dependencies.remote ?? new RemoteAccessService();
@@ -170,6 +180,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     receipts,
     gateway: dependencies.gateway ?? unavailableGateway,
     ...(dependencies.auth ? { auth: dependencies.auth } : {}),
+    ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
     billing,
     organizationBilling,
     developmentEntitlement: dependencies.developmentEntitlement ?? true,
@@ -182,6 +193,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
       : { exposeDevelopmentTokens: dependencies.exposeDevelopmentTokens }),
     billing,
     plans,
+    ...(dependencies.commercial ? { commercial: dependencies.commercial } : {}),
     ...(dependencies.email ? { email: dependencies.email } : {}),
     ...(dependencies.publicSiteUrl ? { publicSiteUrl: dependencies.publicSiteUrl } : {}),
     ...(dependencies.googleOAuth ? { googleOAuth: dependencies.googleOAuth } : {}),
@@ -193,6 +205,8 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     organizationBilling,
     plans,
     ...(dependencies.catalog ? { catalog } : {}),
+    ...(dependencies.commercial ? { commercial: dependencies.commercial } : {}),
+    ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
     remote,
     receipts,
   });
@@ -201,6 +215,7 @@ export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
     admin,
     audit,
     ...(dependencies.controlPlane ? { controlPlane: dependencies.controlPlane } : {}),
+    ...(dependencies.commercial ? { commercial: dependencies.commercial } : {}),
     ...(dependencies.analytics ? { analytics: dependencies.analytics } : {}),
   });
   void registerEmailRoutes(app, {

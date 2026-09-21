@@ -39,7 +39,9 @@ export class BillingError extends Error {
       | 'RESERVATION_ALREADY_SETTLED'
       | 'RESERVATION_EXCEEDED'
       | 'IDEMPOTENCY_CONFLICT'
-      | 'ADJUSTMENT_EXCEEDS_BALANCE',
+      | 'ADJUSTMENT_EXCEEDS_BALANCE'
+      | 'CONTROL_PLANE_UNAVAILABLE'
+      | 'CONTROL_PLANE_POLICY_DENIED',
     message: string,
   ) {
     super(message);

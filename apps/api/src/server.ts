@@ -7,7 +7,7 @@ import {
   loadPlanCatalog,
   PostgresPaymentStore,
 } from '@astra/db';
-import { ControlPlaneService } from '@astra/control-plane';
+import { CommercialPolicyService, ControlPlaneService } from '@astra/control-plane';
 import { VercelGatewayClient, VercelResponsesGatewayClient } from '@astra/model-gateway';
 import {
   AuthService,
@@ -98,20 +98,28 @@ const googleOAuth =
         desktopCallbackUri: config.googleDesktopCallbackUri,
       })
     : undefined;
-const billing = new BillingService({
-  store: postgres?.billing ?? new InMemoryBillingStore(),
-  plans,
-});
-const organizationBilling = new OrganizationBillingService({
-  store: postgres?.organizationBilling ?? new InMemoryOrganizationBillingStore(),
-  plans,
-});
 const controlPlane = postgres
   ? new ControlPlaneService({
       repository: postgres.controlPlane,
       invalidationBus: postgres.controlPlaneInvalidation,
     })
   : undefined;
+const commercial = postgres
+  ? new CommercialPolicyService({
+      repository: postgres.commercial,
+      invalidationBus: postgres.controlPlaneInvalidation,
+    })
+  : undefined;
+const billing = new BillingService({
+  store: postgres?.billing ?? new InMemoryBillingStore(),
+  plans,
+  ...(controlPlane ? { controlPlane } : {}),
+});
+const organizationBilling = new OrganizationBillingService({
+  store: postgres?.organizationBilling ?? new InMemoryOrganizationBillingStore(),
+  plans,
+  ...(controlPlane ? { controlPlane } : {}),
+});
 const remote = postgres?.remote ?? new RemoteAccessService();
 const relayBroker = config.relaySecret ? new RemoteRelayBroker(config.relaySecret) : undefined;
 const payments = postgres ? new PostgresPaymentStore(postgres.pool) : new InMemoryPaymentStore();
@@ -122,6 +130,7 @@ const razorpay = config.razorpayWebhookSecret
       billing,
       organizationBilling,
       plans,
+      ...(commercial ? { commercial } : {}),
       onOrganizationEntitlementChanged: async (
         organizationId,
         actorUserId,
@@ -211,6 +220,7 @@ const app = buildApi({
   organizationBilling,
   plans,
   ...(controlPlane ? { controlPlane } : {}),
+  ...(commercial ? { commercial } : {}),
   ...(razorpay ? { razorpay } : {}),
   ...(email ? { email } : {}),
   ...(config.publicSiteUrl ? { publicSiteUrl: config.publicSiteUrl } : {}),
