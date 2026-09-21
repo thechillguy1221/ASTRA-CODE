@@ -7,3 +7,5 @@
   separately.
 - Preserve existing user changes and fixture state. Never weaken or delete a
   failing test to obtain a green result.
+- Use `ASTRA_FORMAT_BASE=<base> npm run format:changed` to check only files
+  changed from a trusted baseline while historical formatter debt is remediated.

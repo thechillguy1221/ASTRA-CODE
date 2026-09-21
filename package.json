@@ -24,6 +24,7 @@
     "verify:source-provenance": "node scripts/verify-source-provenance.mjs",
     "lint": "eslint .",
     "format:check": "prettier --check \"apps/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"packages/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"scripts/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"tests/**/*.{ts,tsx,js,jsx,css,scss,md,json,mjs,cjs,yml,yaml,html}\" \"docs/**/*.{md,json,yml,yaml}\" \"*.{json,js,ts,mjs,cjs,md,yml,yaml}\"",
+    "format:changed": "node scripts/format-changed.mjs",
     "golden-path": "node --import tsx scripts/run-golden-path.mjs",
     "certify:postgres": "npm run build:packages && node --import tsx scripts/postgres-certification.mjs",
     "dev:api": "npm run build:packages && tsx apps/api/src/server.ts",
