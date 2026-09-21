@@ -38,6 +38,82 @@ export const DesktopDeviceSchema = z.object({
 });
 export type DesktopDevice = z.infer<typeof DesktopDeviceSchema>;
 
+export const DesktopRoomSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  hostUserId: z.string().uuid(),
+  hostDeviceId: z.string().uuid(),
+  name: z.string().min(1),
+  workspaceRootRelative: z.string().min(1),
+  projectId: z.string().uuid(),
+  workspaceFingerprint: z.string().nullable(),
+  hostAvailability: z.enum([
+    'ONLINE',
+    'OFFLINE',
+    'UNAVAILABLE',
+    'REVOKED',
+    'DISCONNECTED',
+    'UNKNOWN',
+  ]),
+  hostBindingVersion: z.number().int().positive(),
+  status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type DesktopRoom = z.infer<typeof DesktopRoomSchema>;
+
+export const DesktopRoomFileSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  roomId: z.string().uuid(),
+  uploaderUserId: z.string().uuid(),
+  originalName: z.string().min(1),
+  safeName: z.string().min(1),
+  contentType: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  checksumSha256: z.string().length(64),
+  intent: z.enum(['REFERENCE', 'ADD_TO_PROJECT']),
+  securityState: z.enum(['UPLOADED', 'VALIDATING', 'SAFE', 'REJECTED', 'DELETED']),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  deletedAt: z.string().datetime().nullable(),
+});
+export type DesktopRoomFile = z.infer<typeof DesktopRoomFileSchema>;
+
+const DesktopRoomFileImportEntrySchema = z.object({
+  path: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  checksumSha256: z.string().length(64),
+  action: z.enum(['CREATE', 'OVERWRITE', 'REJECTED']),
+  reason: z.string().optional(),
+});
+
+export const DesktopRoomFileImportSchema = z.object({
+  id: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  roomId: z.string().uuid(),
+  fileId: z.string().uuid(),
+  requestedBy: z.string().uuid(),
+  destinationRelative: z.string(),
+  status: z.enum(['PREVIEW', 'APPROVED', 'REJECTED', 'IMPORTED', 'FAILED']),
+  manifest: z.object({
+    sourceFileId: z.string().uuid(),
+    destinationRelative: z.string(),
+    entries: z.array(DesktopRoomFileImportEntrySchema),
+    createCount: z.number().int().nonnegative(),
+    overwriteCount: z.number().int().nonnegative(),
+    rejectedCount: z.number().int().nonnegative(),
+    totalBytes: z.number().int().nonnegative(),
+  }),
+  approvedBy: z.string().uuid().nullable(),
+  approvedAt: z.string().datetime().nullable(),
+  completedBy: z.string().uuid().nullable(),
+  completedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type DesktopRoomFileImport = z.infer<typeof DesktopRoomFileImportSchema>;
+
 export const IpcCommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('workspace.open') }),
   z.object({ type: z.literal('workspace.readFile'), relativePath: z.string().min(1) }),
@@ -47,6 +123,7 @@ export const IpcCommandSchema = z.discriminatedUnion('type', [
     taskId: z.string().min(1),
     prompt: z.string().min(1),
     modelId: z.string().min(1),
+    roomId: z.string().min(1).optional(),
     budget: TaskBudgetSchema,
   }),
   z.object({ type: z.literal('agent.cancelTask'), taskId: z.string().min(1) }),
@@ -61,6 +138,29 @@ export const IpcCommandSchema = z.discriminatedUnion('type', [
     requestId: z.string().min(1),
   }),
   z.object({ type: z.literal('models.list') }),
+  z.object({ type: z.literal('rooms.list') }),
+  z.object({ type: z.literal('rooms.files.list'), roomId: z.string().uuid() }),
+  z.object({
+    type: z.literal('rooms.files.upload'),
+    roomId: z.string().uuid(),
+    intent: z.enum(['REFERENCE', 'ADD_TO_PROJECT']),
+  }),
+  z.object({
+    type: z.literal('rooms.files.delete'),
+    roomId: z.string().uuid(),
+    fileId: z.string().uuid(),
+  }),
+  z.object({
+    type: z.literal('rooms.files.preview'),
+    roomId: z.string().uuid(),
+    fileId: z.string().uuid(),
+    destinationRelative: z.string().max(500),
+  }),
+  z.object({
+    type: z.literal('rooms.files.import'),
+    roomId: z.string().uuid(),
+    importId: z.string().uuid(),
+  }),
   z.object({
     type: z.literal('auth.login'),
     email: z.string().email(),
@@ -135,6 +235,7 @@ export interface LyntarIpcApi {
       taskId: string;
       prompt: string;
       modelId: string;
+      roomId?: string;
       budget: TaskBudget;
     }): Promise<IpcTaskResult>;
     cancelTask(taskId: string): Promise<void>;
@@ -171,6 +272,21 @@ export interface LyntarIpcApi {
     list(): Promise<DesktopDevice[]>;
     register(): Promise<DesktopDevice>;
     revoke(deviceId: string): Promise<void>;
+  };
+  rooms: {
+    list(): Promise<DesktopRoom[]>;
+    listFiles(roomId: string): Promise<DesktopRoomFile[]>;
+    uploadFile(input: {
+      roomId: string;
+      intent: 'REFERENCE' | 'ADD_TO_PROJECT';
+    }): Promise<DesktopRoomFile | null>;
+    deleteFile(roomId: string, fileId: string): Promise<void>;
+    previewImport(input: {
+      roomId: string;
+      fileId: string;
+      destinationRelative: string;
+    }): Promise<DesktopRoomFileImport>;
+    importFile(roomId: string, importId: string): Promise<DesktopRoomFileImport>;
   };
   events: { subscribe(listener: (event: AgentEvent) => void): () => void };
 }

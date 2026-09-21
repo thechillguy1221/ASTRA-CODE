@@ -1,0 +1,51 @@
+{
+  "product": "Astra Code",
+  "version": "0.1.0",
+  "release_candidate": "astra-code-v0.1.0-rc2",
+  "source_commit": "PENDING_FINAL_COMMIT",
+  "artifact_source_commit": "PENDING_ARTIFACT_SOURCE_COMMIT",
+  "cline": {
+    "repository": "https://github.com/cline/cline",
+    "commit": "9a2512bb9835869d74774da99708a7f9d80b0fe8",
+    "license": "Apache-2.0"
+  },
+  "codex": {
+    "repository": "https://github.com/openai/codex",
+    "commit": "5c5308fc9a9ee789049d646ef11e5400384b9c6f",
+    "protocol_fingerprint": "1b94b320c014fa02eb89bc613d7beef36b1a400d164eeeaad8dd716d6da81435",
+    "runtime": {
+      "path": "apps/desktop/resources/codex/codex-app-server.exe",
+      "sha256": "616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395",
+      "bytes": 245798704
+    }
+  },
+  "installer": {
+    "filename": "Astra-Code-0.1.0-win-x64-unsigned.exe",
+    "path": "apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe",
+    "bytes": 166058420,
+    "sha256": "F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169",
+    "signed": false
+  },
+  "tests": {
+    "files": 87,
+    "passed": 278,
+    "failed": 0
+  },
+  "production": {
+    "codex_runtime_launch": "PASS",
+    "gateway": "BLOCKED",
+    "models": "BLOCKED",
+    "web_search_deterministic": "PASS",
+    "web_search_live": "BLOCKED",
+    "postgres": "BLOCKED",
+    "razorpay": "BLOCKED",
+    "email": "BLOCKED",
+    "oauth": "BLOCKED",
+    "relay": "BLOCKED",
+    "room_codex": "BLOCKED",
+    "signing": "BLOCKED",
+    "updater": "BLOCKED",
+    "clean_windows_install": "BLOCKED"
+  },
+  "verdict": "NOT_PRODUCTION_READY"
+}

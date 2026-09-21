@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 
 import type {
   AgentEvent,
   DesktopDevice,
+  DesktopRoom,
+  DesktopRoomFile,
+  DesktopRoomFileImport,
   HackathonPlan,
   IpcTaskResult,
   LearnDepth,
@@ -93,10 +96,27 @@ export function App(): ReactElement {
   const [authPassword, setAuthPassword] = useState('');
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [devices, setDevices] = useState<DesktopDevice[]>([]);
+  const [rooms, setRooms] = useState<DesktopRoom[]>([]);
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [roomFiles, setRoomFiles] = useState<DesktopRoomFile[]>([]);
+  const [roomImport, setRoomImport] = useState<DesktopRoomFileImport | null>(null);
+  const [importDestinations, setImportDestinations] = useState<Record<string, string>>({});
   const [observedCredits, setObservedCredits] = useState('0');
   const progressRows = useMemo(() => deriveProgressRows(events), [events]);
   const selectedQuestion = vivaQuestions.find((question) => question.id === selectedQuestionId);
   const selectedModel = models.find((model) => model.modelId === selectedModelId);
+
+  useEffect(() => {
+    if (!selectedRoomId) {
+      setRoomFiles([]);
+      setRoomImport(null);
+      return;
+    }
+    void window.lyntar.rooms
+      .listFiles(selectedRoomId)
+      .then(setRoomFiles)
+      .catch((fileError: unknown) => setError(errorMessage(fileError)));
+  }, [selectedRoomId]);
 
   useEffect(() => {
     void window.lyntar.models
@@ -111,14 +131,20 @@ export function App(): ReactElement {
       .then((user) => {
         setAuthUser(user);
         if (user)
-          void Promise.all([window.lyntar.billing.wallet(), window.lyntar.devices.list()])
-            .then(([nextWallet, nextDevices]) => {
+          void Promise.all([
+            window.lyntar.billing.wallet(),
+            window.lyntar.devices.list(),
+            window.lyntar.rooms.list(),
+          ])
+            .then(([nextWallet, nextDevices, nextRooms]) => {
               setWallet(nextWallet);
               setDevices(nextDevices);
+              setRooms(nextRooms);
             })
             .catch(() => {
               setWallet(null);
               setDevices([]);
+              setRooms([]);
             });
       })
       .catch((authError: unknown) => setError(errorMessage(authError)));
@@ -136,11 +162,16 @@ export function App(): ReactElement {
         .googleComplete(code)
         .then((user) => {
           setAuthUser(user);
-          return Promise.all([window.lyntar.billing.wallet(), window.lyntar.devices.list()]);
+          return Promise.all([
+            window.lyntar.billing.wallet(),
+            window.lyntar.devices.list(),
+            window.lyntar.rooms.list(),
+          ]);
         })
-        .then(([nextWallet, nextDevices]) => {
+        .then(([nextWallet, nextDevices, nextRooms]) => {
           setWallet(nextWallet);
           setDevices(nextDevices);
+          setRooms(nextRooms);
         })
         .catch((authError: unknown) => setError(errorMessage(authError)));
     });
@@ -162,6 +193,7 @@ export function App(): ReactElement {
       setAuthUser(user);
       setWallet(await window.lyntar.billing.wallet());
       setDevices(await window.lyntar.devices.list());
+      setRooms(await window.lyntar.rooms.list());
       setAuthPassword('');
     } catch (authError) {
       setError(errorMessage(authError));
@@ -173,6 +205,10 @@ export function App(): ReactElement {
     setAuthUser(null);
     setWallet(null);
     setDevices([]);
+    setRooms([]);
+    setSelectedRoomId('');
+    setRoomFiles([]);
+    setRoomImport(null);
   }
 
   async function signInGoogle(): Promise<void> {
@@ -199,6 +235,21 @@ export function App(): ReactElement {
 
   async function startTask(): Promise<void> {
     if (!workspace || !prompt.trim() || !selectedModelId) return;
+    const selectedRoom = rooms.find((room) => room.id === selectedRoomId);
+    if (selectedRoom) {
+      if (selectedRoom.hostAvailability !== 'ONLINE') {
+        setError(
+          `Room host is ${selectedRoom.hostAvailability.toLowerCase()}. Select an online host before starting.`,
+        );
+        return;
+      }
+      if (!devices.some((device) => device.id === selectedRoom.hostDeviceId)) {
+        setError(
+          'This Room is hosted on another device. Remote host execution is not connected to this desktop session.',
+        );
+        return;
+      }
+    }
     const nextTaskId = crypto.randomUUID();
     setTaskId(nextTaskId);
     setResult(null);
@@ -210,6 +261,7 @@ export function App(): ReactElement {
         taskId: nextTaskId,
         prompt: prompt.trim(),
         modelId: selectedModelId,
+        ...(selectedRoomId ? { roomId: selectedRoomId } : {}),
         budget: defaultBudget,
       });
       setResult(taskResult);
@@ -218,6 +270,56 @@ export function App(): ReactElement {
     } finally {
       setTaskId(null);
       setPendingPermission(null);
+    }
+  }
+
+  async function uploadRoomFile(intent: 'REFERENCE' | 'ADD_TO_PROJECT'): Promise<void> {
+    if (!selectedRoomId) return;
+    try {
+      setError(null);
+      const file = await window.lyntar.rooms.uploadFile({ roomId: selectedRoomId, intent });
+      if (file) setRoomFiles((current) => [file, ...current.filter((item) => item.id !== file.id)]);
+    } catch (fileError) {
+      setError(errorMessage(fileError));
+    }
+  }
+
+  async function deleteRoomFile(fileId: string): Promise<void> {
+    if (!selectedRoomId) return;
+    try {
+      setError(null);
+      await window.lyntar.rooms.deleteFile(selectedRoomId, fileId);
+      setRoomFiles((current) => current.filter((file) => file.id !== fileId));
+    } catch (fileError) {
+      setError(errorMessage(fileError));
+    }
+  }
+
+  async function previewRoomImport(fileId: string, destinationRelative: string): Promise<void> {
+    if (!selectedRoomId) return;
+    try {
+      setError(null);
+      setRoomImport(
+        await window.lyntar.rooms.previewImport({
+          roomId: selectedRoomId,
+          fileId,
+          destinationRelative,
+        }),
+      );
+    } catch (importError) {
+      setError(errorMessage(importError));
+    }
+  }
+
+  async function importRoomFile(): Promise<void> {
+    if (!selectedRoomId || !roomImport) return;
+    try {
+      setError(null);
+      await window.lyntar.rooms.importFile(selectedRoomId, roomImport.id);
+      setRoomImport(null);
+      setRoomFiles(await window.lyntar.rooms.listFiles(selectedRoomId));
+    } catch (importError) {
+      setError(errorMessage(importError));
     }
   }
 
@@ -303,7 +405,7 @@ export function App(): ReactElement {
           <span className="brand-mark">A</span>
           <div>
             <span className="brand">
-              ASTRA <small>AI</small>
+              ASTRA <small>CODE</small>
             </span>
             <span className="brand-subtitle">Build it. Understand it. Ship it.</span>
           </div>
@@ -393,6 +495,9 @@ export function App(): ReactElement {
             prompt={prompt}
             setPrompt={setPrompt}
             workspace={workspace}
+            rooms={rooms}
+            selectedRoomId={selectedRoomId}
+            setSelectedRoomId={setSelectedRoomId}
             taskId={taskId}
             startTask={() => void startTask()}
             stopTask={() => void stopTask()}
@@ -401,6 +506,16 @@ export function App(): ReactElement {
             resolvePermission={(approved) => void resolvePermission(approved)}
             result={result}
             observedCredits={observedCredits}
+            roomFiles={roomFiles}
+            uploadRoomFile={(intent) => void uploadRoomFile(intent)}
+            deleteRoomFile={(fileId) => void deleteRoomFile(fileId)}
+            importDestinations={importDestinations}
+            setImportDestination={(fileId, destination) =>
+              setImportDestinations((current) => ({ ...current, [fileId]: destination }))
+            }
+            roomImport={roomImport}
+            previewRoomImport={(fileId, destination) => void previewRoomImport(fileId, destination)}
+            importRoomFile={() => void importRoomFile()}
           />
         )}
         {view === 'learn' && (
@@ -484,6 +599,9 @@ function BuildView(props: {
   prompt: string;
   setPrompt: (value: string) => void;
   workspace: WorkspaceDescriptor | null;
+  rooms: DesktopRoom[];
+  selectedRoomId: string;
+  setSelectedRoomId: (value: string) => void;
   taskId: string | null;
   startTask: () => void;
   stopTask: () => void;
@@ -492,6 +610,14 @@ function BuildView(props: {
   resolvePermission: (approved: boolean) => void;
   result: IpcTaskResult | null;
   observedCredits: string;
+  roomFiles: DesktopRoomFile[];
+  uploadRoomFile: (intent: 'REFERENCE' | 'ADD_TO_PROJECT') => void;
+  deleteRoomFile: (fileId: string) => void;
+  importDestinations: Record<string, string>;
+  setImportDestination: (fileId: string, destination: string) => void;
+  roomImport: DesktopRoomFileImport | null;
+  previewRoomImport: (fileId: string, destination: string) => void;
+  importRoomFile: () => void;
 }): ReactElement {
   return (
     <>
@@ -512,6 +638,20 @@ function BuildView(props: {
             </div>
             <span className="budget">8 calls · 2 repairs</span>
           </div>
+          <label className="field-label">
+            Billing context
+            <select
+              value={props.selectedRoomId}
+              onChange={(event) => props.setSelectedRoomId(event.target.value)}
+            >
+              <option value="">Personal project · personal credits</option>
+              {props.rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name} · Room credits · {room.hostAvailability.toLowerCase()}
+                </option>
+              ))}
+            </select>
+          </label>
           {props.models.length > 0 && (
             <label className="field-label">
               Model
@@ -611,8 +751,122 @@ function BuildView(props: {
           )}
         </div>
       </section>
+      {props.selectedRoomId && (
+        <RoomFilesPanel
+          files={props.roomFiles}
+          upload={(intent) => props.uploadRoomFile(intent)}
+          remove={(fileId) => props.deleteRoomFile(fileId)}
+          importDestinations={props.importDestinations}
+          setImportDestination={props.setImportDestination}
+          importPreview={props.roomImport}
+          previewImport={props.previewRoomImport}
+          importFile={props.importRoomFile}
+        />
+      )}
       {props.result && <ResultPanel result={props.result} />}
     </>
+  );
+}
+
+function RoomFilesPanel(props: {
+  files: DesktopRoomFile[];
+  upload: (intent: 'REFERENCE' | 'ADD_TO_PROJECT') => void;
+  remove: (fileId: string) => void;
+  importDestinations: Record<string, string>;
+  setImportDestination: (fileId: string, destination: string) => void;
+  importPreview: DesktopRoomFileImport | null;
+  previewImport: (fileId: string, destination: string) => void;
+  importFile: () => void;
+}): ReactElement {
+  return (
+    <section className="panel room-files-panel">
+      <div className="panel-heading">
+        <div>
+          <span className="panel-index">03</span>
+          <h2>Room files</h2>
+        </div>
+        <span className="live-label">CONTROLLED ROOM STORAGE</span>
+      </div>
+      <p className="muted">
+        Uploads stay outside the host project. Reference files can inform a task; project imports
+        require a validated preview and approval.
+      </p>
+      <div className="actions">
+        <button className="secondary" onClick={() => props.upload('REFERENCE')}>
+          Upload reference
+        </button>
+        <button className="secondary" onClick={() => props.upload('ADD_TO_PROJECT')}>
+          Propose project import
+        </button>
+      </div>
+      {props.files.length === 0 ? (
+        <p className="empty-state">No Room files uploaded yet.</p>
+      ) : (
+        <div className="room-file-list">
+          {props.files.map((file) => (
+            <div className="room-file-row" key={file.id}>
+              <div>
+                <strong>{file.originalName}</strong>
+                <span className="muted">
+                  {file.intent === 'REFERENCE' ? 'Reference' : 'Import proposal'} ·{' '}
+                  {file.contentType} · {file.sizeBytes.toLocaleString()} bytes ·{' '}
+                  {file.securityState.toLowerCase()}
+                </span>
+                {file.intent === 'ADD_TO_PROJECT' && (
+                  <div className="room-file-import-controls">
+                    <input
+                      aria-label={`Destination for ${file.originalName}`}
+                      value={props.importDestinations[file.id] ?? ''}
+                      onChange={(event) => props.setImportDestination(file.id, event.target.value)}
+                      placeholder="Destination, e.g. public/assets"
+                    />
+                    <button
+                      className="text-button"
+                      disabled={!props.importDestinations[file.id]?.trim()}
+                      onClick={() =>
+                        props.previewImport(
+                          file.id,
+                          props.importDestinations[file.id]?.trim() ?? '',
+                        )
+                      }
+                    >
+                      Preview import
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button className="text-button" onClick={() => props.remove(file.id)}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {props.importPreview && (
+        <div className="room-import-preview">
+          <strong>Import preview</strong>
+          <span className="muted">
+            Create {props.importPreview.manifest.createCount} · overwrite{' '}
+            {props.importPreview.manifest.overwriteCount} · rejected{' '}
+            {props.importPreview.manifest.rejectedCount}
+          </span>
+          <ul>
+            {props.importPreview.manifest.entries.map((entry) => (
+              <li key={entry.path}>
+                {entry.action.toLowerCase()}: {entry.path}
+              </li>
+            ))}
+          </ul>
+          <button
+            className="primary"
+            disabled={props.importPreview.manifest.rejectedCount > 0}
+            onClick={props.importFile}
+          >
+            Approve and write on host
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 

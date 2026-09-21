@@ -246,6 +246,9 @@ export async function applyFoundationMigration(client: PoolClient): Promise<void
     { version: '0009_oauth_transactions', file: '0009_oauth_transactions.sql' },
     { version: '0010_astra_commercial_matrix', file: '0010_astra_commercial_matrix.sql' },
     { version: '0011_organization_wallets', file: '0011_organization_wallets.sql' },
+    { version: '0012_astra_code_regional_pricing', file: '0012_astra_code_regional_pricing.sql' },
+    { version: '0013_room_projects_files_security', file: '0013_room_projects_files_security.sql' },
+    { version: '0014_room_memberships', file: '0014_room_memberships.sql' },
   ];
   await client.query(
     'CREATE TABLE IF NOT EXISTS lyntar_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',

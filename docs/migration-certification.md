@@ -2,316 +2,321 @@
 
 Certification date: 2026-09-21 (Asia/Calcutta)
 
+This report records the implementation and certification state after the Room/project, Room Files, import-security, membership, billing-context, and security-event implementation pass. A deterministic PASS means repository implementation and automated evidence passed; it does not turn a mock provider or in-memory store into live certification.
+
 ## A. Executive result
 
 # NOT PRODUCTION READY
 
-The repository now has a passing deterministic TypeScript/API/renderer build,
-an acquired and hash-verified official Codex Windows x64 runtime, a real
-initialize/session launch certification, and an unsigned Windows installer
-containing that runtime. It is still not production ready because live Astra
-model/Gateway execution and several launch-critical external and Room
-certifications remain unavailable or incomplete.
+The repository now contains the Room primary-project binding, explicit Room-scoped membership, Room Files and intent contracts, controlled import preview/approval, ZIP quarantine/inspection, host handoff path, deterministic security events/severity, authoritative Room billing-context resolution, and fresh runtime authorization checks. The deterministic suite has passed with 87 test files and 278 tests. The official pinned Windows Codex app-server is acquired, digest-verified, packaged, and proven through initialize and thread/start.
+
+The release is not production ready because live Astra Gateway/model-driven Codex turns and tools, live PostgreSQL, payment, mail, OAuth, relay/two-device execution, clean-machine certification, and trusted Windows signing remain unavailable or un-certified. These are launch-critical for a public release.
 
 ## B. Release identity
 
-| Field                                | Evidence                                                                                        |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Branch                               | `main`                                                                                          |
-| Starting SHA                         | `8fdaaa7c4e3eea761b9b8930ddf825caa77b3ea7`                                                      |
-| Final SHA                            | `b679597d3fe03efab9a6622de8f8c46468496131`                                                      |
-| Version                              | `0.1.0`                                                                                         |
-| Working tree                         | Clean; generated unsigned release output and the 245 MB Codex binary are intentionally ignored. |
-| Certified desktop artifact           | `apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe`                           |
-| Artifact size                        | 166,008,031 bytes                                                                               |
-| Artifact SHA-256                     | `D8A964B303AD982ECD49094B4602F34BE923B9DBA5C0EEA64106B1FF17F403B0`                              |
-| Bundled Codex runtime                | `resources/codex/codex-app-server.exe`, 245,798,704 bytes                                       |
-| Bundled Codex SHA-256                | `616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395`                              |
-| Runtime package status               | PASS — installer includes executable, manifest, Codex LICENSE/NOTICE, and Cline LICENSE         |
-| Code signing                         | BLOCKED — no signing credential was available; the artifact is unsigned.                        |
-| Web/API/relay deployment identifiers | None supplied or verified in this workspace.                                                    |
+| Field                                 | Evidence                                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Branch                                | main                                                                                                                |
+| Source base before this run           | 128990c70c1b235013e3d02462d600c7a233b1ea                                                                            |
+| Previous certified implementation SHA | b679597d3fe03efab9a6622de8f8c46468496131                                                                            |
+| Final implementation SHA              | Recorded in the release manifest after the implementation commit; artifact source SHA is recorded separately there. |
+| Release candidate                     | astra-code-v0.1.0-rc2                                                                                               |
+| Version                               | 0.1.0                                                                                                               |
+| Working tree at report drafting       | Dirty from implementation and certification changes; clean state is a release gate.                                 |
+| Installer                             | apps/desktop/release-unsigned/Astra-Code-0.1.0-win-x64-unsigned.exe                                                 |
+| Installer size                        | 166,058,420 bytes                                                                                                   |
+| Installer SHA-256                     | F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169                                                    |
+| Bundled Codex executable              | apps/desktop/release-unsigned/win-unpacked/resources/codex/codex-app-server.exe                                     |
+| Bundled Codex size                    | 245,798,704 bytes                                                                                                   |
+| Bundled Codex SHA-256                 | 616C4961D85C8FACCF0C1AE5DB3CE4DFD2DE18422F6A9A5C5EBADA9C96AD4395                                                    |
+| Code signing                          | BLOCKED — no legitimate Windows code-signing certificate/private key was available.                                 |
 
-## C. Architecture audit
+## C. Architecture and production path
 
-The existing architecture remains Electron 44 with a bundled React/Vite
-renderer, isolated preload, Fastify/TypeScript API, PostgreSQL adapters, and
-deterministic in-memory test stores. Astra continues to own authentication,
-billing, wallets, model catalogue, Rooms, devices, relay policy, MCP,
-Plugins, Skills, and authorization.
+The application remains an Electron 44 desktop shell with a bundled React/Vite renderer, isolated preload, Fastify/TypeScript API, PostgreSQL adapters, and deterministic in-memory stores for tests. Astra remains the authority for identity, plans, models, Gateway access, credits, wallets, Rooms, devices, relay authorization, MCP, Plugins, Skills, approvals, security, and audit.
 
-The new source path is designed as:
+The implemented path is:
 
-`Astra renderer -> Astra Workspace Bridge/main process -> Codex app-server -> Astra runtime API -> Vercel AI Gateway`.
+Astra renderer -> typed Workspace Bridge/preload -> Astra main process -> bundled pinned Codex app-server -> Astra runtime API -> server model/Gateway layer.
 
-The source-level cutover defaults `DesktopRuntime` to `CodexTaskRunner`; the
-legacy runner is available only through an explicit `legacy-test` test mode.
-The official Codex release artifact is bundled and the real process now passes
-initialize and `thread/start` through the Astra supervisor.
+Local project work remains host-local and is confined by Astra workspace policy. Room work resolves the Room, project, host, membership, permission, and organization wallet on the server. The client never chooses an arbitrary wallet as authority.
+
+The legacy Astra runner remains available only for explicit legacy-test compatibility tests. It is not the default production runner and there is no silent fallback when the Codex runtime is unavailable.
 
 ## D. Upstream source provenance
 
 ### Cline
 
-- Repository: `https://github.com/cline/cline`
-- Pinned SHA: `9a2512bb9835869d74774da99708a7f9d80b0fe8`
-- Tree: `79cd0f11e55ebbf11da424afa482f003b1e0bed2`
+- Repository: https://github.com/cline/cline
+- Pinned commit: 9a2512bb9835869d74774da99708a7f9d80b0fe8
+- Tree: 79cd0f11e55ebbf11da424afa482f003b1e0bed2
 - License: Apache-2.0
-- Selected upstream source: `sdk/packages/ui/components/agent-approval-card.*` and `sdk/packages/ui/components/session-status.*`
-- Astra destinations: `apps/desktop/src/renderer/cline/*` and `apps/desktop/src/renderer/cline-workspace.tsx`
-- Evidence: renderer build transformed 23 modules and the production `App.tsx` imports the Astra wrappers around those copied/adapted components.
-- Boundary: Cline runtime, provider authentication, account, and billing code is excluded.
+- Selected source: sdk/packages/ui/components/agent-approval-card.* and sdk/packages/ui/components/session-status.*
+- Astra destinations: apps/desktop/src/renderer/cline/* and apps/desktop/src/renderer/cline-workspace.tsx
+- Runtime/provider/account/billing code: excluded from Astra production.
+- Evidence: renderer imports Astra wrappers around the selected copied/adapted modules; provenance and renderer build checks pass.
 
 ### Codex
 
-- Repository: `https://github.com/openai/codex`
-- Pinned SHA: `5c5308fc9a9ee789049d646ef11e5400384b9c6f`
-- Tree: `4557e77bc256683fc29b6e2026b21dd72eb99674`
-- License: Apache-2.0; pinned NOTICE retained.
-- Protocol fingerprint: `1b94b320c014fa02eb89bc613d7beef36b1a400d164eeeaad8dd716d6da81435`
-- Runtime boundary: upstream `codex-rs/app-server`, `app-server-client`, and `app-server-protocol`, launched only through the Astra supervisor.
-- Astra adapter: `packages/codex-runtime/src/index.ts`.
-- Desktop adapter: `apps/desktop/electron/codex-task-runner.ts`.
-- Build result: official pinned Windows x64 app-server acquisition and SHA verification PASS. A local Cargo build remains BLOCKED by host allocation failures; the official release artifact is the selected production build input.
-- Runtime result: `npm.cmd run certify:codex-runtime` PASS — real executable initialize and `thread/start` from an Astra-controlled runtime home.
+- Repository: https://github.com/openai/codex
+- Pinned commit: 5c5308fc9a9ee789049d646ef11e5400384b9c6f
+- Tree: 4557e77bc256683fc29b6e2026b21dd72eb99674
+- License: Apache-2.0; required LICENSE and NOTICE are retained.
+- Protocol fingerprint: 1b94b320c014fa02eb89bc613d7beef36b1a400d164eeeaad8dd716d6da81435
+- Runtime boundary: upstream app-server/app-server-client/app-server-protocol behavior through the bundled official Windows x64 artifact.
+- Astra adapter: packages/codex-runtime/src/index.ts.
+- Desktop adapter: apps/desktop/electron/codex-task-runner.ts.
+- Runtime artifact: apps/desktop/resources/codex/codex-app-server.exe, digest verified and included in the unpacked package.
+- Local Cargo rebuild: BLOCKED by the previously observed host allocation failure; it is not required for the selected official pinned release artifact.
 
-The machine-verifiable provenance check passed:
+Machine-verifiable provenance: npm.cmd run verify:source-provenance — PASS.
 
-`npm.cmd run verify:source-provenance` — PASS.
+Detailed inventories remain in source-provenance.md, cline-component-provenance.md, and open-source-notices.md.
 
-Full details are in [source-provenance.md](source-provenance.md),
-[cline-component-provenance.md](cline-component-provenance.md), and
-[open-source-notices.md](open-source-notices.md).
+## E. Codex runtime certification
 
-## E. Codex agent architecture and production-path status
+PASS evidence:
 
-Implemented in source:
+- Official pinned Windows runtime acquired and digest-verified.
+- Manifest, source SHA, release metadata, LICENSE, and NOTICE verified.
+- Astra supervisor resolves the bundled resource, not an arbitrary executable from PATH.
+- The supervisor uses an Astra-owned isolated runtime home and strips inherited provider credentials.
+- Real process initialize and thread/start passed through the supervisor, including the unpacked packaged layout.
+- Protocol mismatch and artifact identity checks fail closed.
 
-- typed app-server wire protocol without an invented JSON-RPC envelope;
-- initialize/initialized, thread/start, turn/start, interrupt, and stop;
-- protocol fingerprint validation;
-- bundled-runtime path resolution and manifest validation;
-- isolated Astra-owned runtime home and provider configuration;
-- scoped runtime token bound to task and reservation;
-- Astra Responses gateway transport and SSE normalization;
-- dynamic `web_search` and `web_fetch` tool schemas;
-- command/file approval routing;
-- event translation to Astra task events;
-- completion verification and no silent legacy fallback;
-- official artifact identity, license/NOTICE checks, and packaged-resource launch.
+Not yet certified:
 
-Deterministic adapter tests passed. The actual upstream executable now passes
-initialize and `thread/start` through the Astra supervisor, including from the
-unpacked Windows package layout. Live model inference, dynamic tool execution,
-approval, cancellation, crash recovery, and completion through the Astra
-Gateway remain un-certified because no live Astra model/Gateway environment
-was available. The old Astra loop is not the default production path.
+- a live model-driven turn through Astra Gateway;
+- real Codex-generated local tool requests and results;
+- approval/denial, cancellation, crash recovery, and completion through a live model task;
+- Room, MCP, Plugin, Skill, Web Search, and Web Fetch execution from a live Codex turn;
+- live usage reconciliation and multi-call organization billing.
 
-## F. Cline workspace UI
+The stale statement that Codex must still be built before it can execute is corrected. The official runtime exists and launches. The remaining blocker is model-driven execution through a configured Astra Gateway/model environment.
 
-The production renderer now contains and imports real pinned Cline UI source
-for session status and approval cards through Astra wrappers. The imported
-components do not own runtime, provider, account, billing, Room, or model
-secrets. Astra-native editor, file, terminal, search, Git, and layout surfaces
-remain Astra-owned because the selected Cline sources do not independently
-provide those IDE primitives.
+## F. Cline workspace integration
 
-This is a genuine narrow Cline integration, not a screenshot recreation. It is
-not evidence that the entire Cline AgentChat application has been imported.
+Astra uses a narrow, truthful Cline integration. The pinned Cline session status and approval-card source is present in the renderer build and is adapted through Astra-owned wrappers. Astra-native editor, file tree, terminal, search, Git, layout, Room, billing, and settings surfaces remain Astra-owned where the selected Cline source does not provide those IDE primitives.
 
-## G. Astra Workspace Bridge and model gateway
+The integrated Cline components do not own Cline runtime state, provider authentication, account state, billing, Room permissions, or model secrets. This is actual upstream source use, not a screenshot recreation; it is not a claim that the entire Cline application was imported.
 
-The typed supervisor/runner emits task, model, tool, permission, patch,
-usage, verification, and completion events. Runtime model calls use the
-server-side `/runtime/codex/v1/responses` route, which validates the scoped
-runtime token, task, reservation, current session/device, Room permission, and
-catalogue model before using the server-only Responses gateway client.
+## G. Workspace Bridge, tools, and model gateway
 
-No BYOK path was added. Provider and Gateway secrets are not placed in the
-renderer, preload, Codex runtime configuration, or installer. Live provider
-execution was not available and is therefore not certified.
+The typed desktop IPC/Workspace Bridge exposes only required task, Room, file, approval, billing, and verification operations. Renderer file selection uses native dialogs; arbitrary renderer paths are not treated as authority.
+
+The runtime route validates the scoped Astra runtime token, authenticated session, device, task, reservation, Room membership/permission, and current authorization before protected operations. Runtime requests use server-owned reservation and Room context; the desktop does not receive provider or Gateway secrets and no BYOK path was added.
+
+The live model path is implementation-complete enough for deterministic API tests, but live Gateway execution remains BLOCKED because no configured live Astra model/provider environment was supplied.
 
 ## H. Web Research
 
-The existing Web Research implementation remains intact and its deterministic
-coverage includes typed `web_search`/`web_fetch`, provider abstraction,
-normalization, provenance, SSRF/DNS/redirect/size limits, Room permission
-checks, budgets, and prompt-injection handling. The Codex adapter now exposes
-those tools through Astra routes and returns normalized results to Codex.
+The existing Astra Web Research implementation remains intact. It includes typed web_search and web_fetch, provider abstraction, normalization, provenance, Room permissions, budgets, SSRF/DNS/redirect/size/content-type limits, sanitization, and untrusted-content handling. Codex tool requests are translated to Astra server-side Web Research routes and carry Room context.
 
-Deterministic Web Research coverage was previously 5 files / 36 tests and is
-included in the full suite below. Live provider certification is BLOCKED because
-no search endpoint/key is configured. The Codex dynamic-tool route is wired,
-but a full Codex-to-web model-driven run remains BLOCKED without a live Astra
-Gateway/model environment.
+Deterministic Web Research coverage is included in the full suite and passes. Live provider certification is BLOCKED because no search endpoint/key is configured. A deterministic provider is evidence of integration behavior, not live provider certification.
 
-## I. Rooms, local tools, and billing
+## I. Room project, host, and membership implementation
 
-Existing Astra Room and billing code was preserved. The new runtime route
-resolves billing from server-side task/reservation state and never trusts a
-client wallet ID. Personal, Team, and Business context logic remains in the
-existing billing services.
+The Room model now has an authoritative primary project/binding shape:
 
-The migration has not yet proven a complete desktop Codex Room task. In
-particular, the desktop reservation path currently does not submit the full
-Team/Business Room context needed for an end-to-end organization-wallet run,
-and Codex cannot execute until its artifact is built. Therefore organization
-wallet isolation, fresh suspension during Codex tools, remote-host execution,
-MCP/Plugin/Skill execution through Codex, Room Files import, and host handoff
-remain un-certified even where existing Astra domain code exists.
+- one primary_project_id per Room;
+- host device binding and workspace fingerprint/version;
+- deterministic host availability state;
+- explicit Room-scoped membership separate from organization seats;
+- server-side role/permission checks;
+- transactional host handoff path with audit event;
+- host-local execution requirement for desktop imports and tasks.
 
-## J. Feature 1–65 certification matrix
+Organization membership no longer grants access to every Room. A user must have explicit Room membership. A Room task derives organization billing from the Room and does not trust a client wallet ID.
 
-Status values are release statuses, not claims based on a UI control or type
-definition. `PARTIAL` means some existing or deterministic implementation is
-present but the authoritative production path is not fully proven. `MISSING`
-means no verified implementation was found for the complete contract.
+When the host is not the current authorized device or is not ONLINE, the desktop path refuses local Room execution rather than silently selecting a different machine.
 
-|  ID | Requirement                     | Status  | Implementation evidence                                 | Test evidence                                   | Remaining limitation                                             |
-| --: | ------------------------------- | ------- | ------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------- |
-|   1 | Native Windows application      | PARTIAL | Electron shell; verified unsigned Astra Code installer  | Full build PASS; package PASS                   | Code signing, clean install, and Windows desktop E2E remain open |
-|   2 | Codex-derived agent foundation  | PARTIAL | Pinned Codex checkout; official app-server; supervisor  | 4 deterministic + live launch/session PASS      | Live model/tool/approval/completion run unavailable              |
-|   3 | Cline workspace foundation      | PARTIAL | Pinned Cline status/approval components in renderer     | Renderer build PASS; provenance PASS            | Narrow UI subset; full workspace/runtime integration unproven    |
-|   4 | Professional editor             | PARTIAL | Existing Astra workspace/editor                         | Full suite PASS                                 | No Windows desktop E2E in this run                               |
-|   5 | Coding agent panel              | PARTIAL | Astra panel consumes mapped runtime events              | Full suite PASS; runtime session PASS           | Live model-driven event stream unavailable                       |
-|   6 | Server-controlled AI routing    | PARTIAL | Runtime token route and Responses gateway               | API integration tests PASS                      | Live provider execution unavailable                              |
-|   7 | Local tool execution            | PARTIAL | Existing workspace policy plus Codex approval adapter   | Workspace/full suite PASS; runtime session PASS | Actual model-driven Codex tool execution unverified              |
-|   8 | End-to-end streaming            | PARTIAL | Responses SSE client and event bridge                   | Gateway response tests PASS                     | No live model stream                                             |
-|   9 | Real model names                | PARTIAL | Existing server catalogue and runtime model binding     | Existing suite PASS                             | No live resolved-model receipt                                   |
-|  10 | Explicit Auto                   | PARTIAL | Adapter omits model only for explicit `AUTO`            | Existing routing tests PASS                     | Not exercised by live Codex                                      |
-|  11 | Credit system                   | PARTIAL | Existing fixed-point billing plus usage receipt parsing | Billing/full suite PASS                         | Live provider usage not reconciled                               |
-|  12 | Credit reservation              | PARTIAL | Existing reservations; token bound to reservation       | API integration PASS                            | Full autonomous multi-call run blocked                           |
-|  13 | Pre-task estimate               | PARTIAL | Existing task budget/credit UI                          | Existing suite PASS                             | No desktop acceptance run                                        |
-|  14 | Live credit meter               | PARTIAL | Runtime usage event and receipt loading                 | Adapter/API tests PASS                          | Exact provider usage unavailable live                            |
-|  15 | Credit overrun checkpoint       | PARTIAL | Existing budget/checkpoint foundations                  | Existing suite PASS                             | Not proven through Codex loop                                    |
-|  16 | Runaway protection              | PARTIAL | Existing agent budget/protection code                   | Existing suite PASS                             | Not proven through Codex loop                                    |
-|  17 | Authoritative pricing           | PARTIAL | Existing plans/billing package                          | Existing suite PASS                             | Commercial live configuration not certified                      |
-|  18 | Credit rollover                 | PARTIAL | Existing billing domain                                 | Existing suite PASS                             | No live billing-cycle certification                              |
-|  19 | Top-up credits                  | PARTIAL | Existing billing domain                                 | Existing suite PASS                             | Razorpay/live entitlement blocked                                |
-|  20 | Settings dashboard              | PARTIAL | Existing Astra settings/admin surfaces                  | Web/desktop builds PASS                         | No visual/browser certification in this run                      |
-|  21 | Dashboard through Settings      | PARTIAL | Existing renderer navigation                            | Build/full suite PASS                           | Session-preservation E2E unverified                              |
-|  22 | Normal settings                 | PARTIAL | Existing settings implementation                        | Full suite PASS                                 | Role/visibility E2E unverified                                   |
-|  23 | Team settings                   | PARTIAL | Existing organization settings                          | Full suite PASS                                 | Room billing UI not Codex-proven                                 |
-|  24 | Business settings               | PARTIAL | Existing organization/admin surfaces                    | Full suite PASS                                 | Live policy/SSO capabilities unverified                          |
-|  25 | Super Admin                     | PARTIAL | Existing admin package/RBAC                             | Full suite PASS                                 | Production admin E2E not run                                     |
-|  26 | Shared login                    | PARTIAL | Existing Astra auth                                     | Full suite PASS                                 | OAuth/live auth not certified                                    |
-|  27 | Auth design                     | PARTIAL | Existing auth UI                                        | Web build PASS                                  | Browser matrix not run                                           |
-|  28 | Personal multi-device           | PARTIAL | Existing device/session domain                          | Full suite PASS                                 | Live multi-device test not run                                   |
-|  29 | Own-device remote               | PARTIAL | Existing remote protocol                                | Full suite PASS                                 | Live relay/host test not run                                     |
-|  30 | Cross-person remote restriction | PARTIAL | Existing access policy                                  | Full suite PASS                                 | Live Room relay path unverified                                  |
-|  31 | One primary Room project        | MISSING | No complete verified production path found              | No dedicated passing test                       | Room project binding still incomplete                            |
-|  32 | Project filesystem isolation    | PARTIAL | Existing workspace confinement                          | Existing security tests PASS                    | Not repeated through compiled Codex                              |
-|  33 | Org membership != Room          | PARTIAL | Existing Room/member domain                             | Existing suite PASS                             | Full production-path proof absent                                |
-|  34 | Room roles                      | PARTIAL | Existing role model                                     | Existing suite PASS                             | Not exercised by Codex runtime                                   |
-|  35 | Viewer                          | PARTIAL | Existing permission checks                              | Existing suite PASS                             | Production-path denial unverified                                |
-|  36 | Agent User                      | PARTIAL | Existing agent permission model                         | Existing suite PASS                             | Production-path grant unverified                                 |
-|  37 | Editor                          | PARTIAL | Existing role model                                     | Existing suite PASS                             | Direct editing through Codex unverified                          |
-|  38 | Admin                           | PARTIAL | Existing member/admin operations                        | Existing suite PASS                             | Live authorization not certified                                 |
-|  39 | Suspension                      | PARTIAL | Existing suspension logic                               | Existing suite PASS                             | Mid-Codex revocation blocked                                     |
-|  40 | Removal                         | PARTIAL | Existing member removal logic                           | Existing suite PASS                             | Mid-Codex revocation blocked                                     |
-|  41 | Leave Room                      | PARTIAL | Existing leave/last-admin logic                         | Existing suite PASS                             | No live Room E2E                                                 |
-|  42 | Multiple Rooms                  | PARTIAL | Existing Room membership model                          | Existing suite PASS                             | Workspace isolation E2E unverified                               |
-|  43 | Reference project support       | MISSING | No complete verified implementation found               | No dedicated passing test                       | Not implemented as certified V1 capability                       |
-|  44 | Reference assets                | MISSING | No complete verified implementation found               | No dedicated passing test                       | Room Files/reference pipeline absent                             |
-|  45 | Room Files                      | MISSING | No complete verified subsystem found                    | No dedicated passing test                       | Upload/quarantine/storage not complete                           |
-|  46 | File intent                     | MISSING | No complete verified implementation found               | No dedicated passing test                       | REFERENCE/ADD_TO_PROJECT contract incomplete                     |
-|  47 | Controlled import               | MISSING | No complete verified implementation found               | No dedicated passing test                       | Host import authority not complete                               |
-|  48 | Import preview                  | MISSING | No complete verified implementation found               | No dedicated passing test                       | Conflict manifest UX absent                                      |
-|  49 | Room Files UI                   | MISSING | No complete verified implementation found               | No dedicated passing test                       | UI and metadata workflow absent                                  |
-|  50 | ZIP security                    | MISSING | No complete verified import pipeline found              | No dedicated passing test                       | Quarantine/ZIP attack certification absent                       |
-|  51 | Offline host                    | PARTIAL | Existing remote/host state concepts                     | Existing suite PASS                             | Not proven through Codex task                                    |
-|  52 | Availability modes              | PARTIAL | Existing architecture documents host-local state        | Existing suite PASS                             | Sync/backup policy not certified                                 |
-|  53 | Handoff                         | MISSING | No complete verified handoff implementation             | No dedicated passing test                       | Explicit host transfer absent                                    |
-|  54 | Hard sandbox                    | PARTIAL | Existing workspace policy and approval path             | Existing security tests PASS                    | Codex/MCP/Plugin/Skill path not exercised                        |
-|  55 | Suspicious activity             | MISSING | No complete verified security-event implementation      | No dedicated passing test                       | Deterministic event layer incomplete                             |
-|  56 | Admin alerts                    | PARTIAL | Existing admin/security surfaces                        | Existing suite PASS                             | High-risk Room event path incomplete                             |
-|  57 | Event severity                  | MISSING | No complete verified severity policy                    | No dedicated passing test                       | Severity enforcement incomplete                                  |
-|  58 | No LLM-only suspension          | MISSING | No complete verified policy certification               | No dedicated passing test                       | Security automation not certified                                |
-|  59 | Invitees need no org plan       | PARTIAL | Existing invitations/org membership                     | Existing suite PASS                             | Live invitation flow not run                                     |
-|  60 | Host need no org plan           | PARTIAL | Existing device/Room separation                         | Existing suite PASS                             | Host/org billing E2E not run                                     |
-|  61 | Contexts separate               | PARTIAL | Existing personal/org billing services                  | Existing suite PASS                             | Full Codex context transition blocked                            |
-|  62 | No entitlement leakage          | PARTIAL | Existing server authorization                           | Existing suite PASS                             | Production Room path blocked                                     |
-|  63 | Personal wallet                 | PARTIAL | Existing personal reservation/settlement                | Existing suite PASS                             | Live Codex multi-call proof blocked                              |
-|  64 | Organization wallet             | PARTIAL | Runtime API accepts server-owned reservation context    | API tests PASS                                  | Desktop Room reservation/Codex run not proven                    |
-|  65 | Usage attribution               | PARTIAL | Usage receipts and task/reservation IDs                 | API integration tests PASS                      | Full member/Room/host/model receipt path blocked                 |
+## J. Room Files and controlled import
 
-## K. Deterministic verification
+Implemented paths include:
 
-| Command                                                  | Result                                                                               |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `npm.cmd test`                                           | PASS — 86 files, 265 tests                                                           |
-| `npm.cmd run typecheck`                                  | PASS                                                                                 |
-| `npm.cmd run lint`                                       | PASS                                                                                 |
-| `npm.cmd run format:check`                               | PASS                                                                                 |
-| `npm.cmd run verify:source-provenance`                   | PASS                                                                                 |
-| `npm.cmd run build:packages`                             | PASS                                                                                 |
-| `npm.cmd run build`                                      | PASS — API, Electron, web prerender (54 routes), and admin                           |
-| `npm.cmd run build:renderer --workspace @lyntar/desktop` | PASS — 23 modules                                                                    |
-| `npm.cmd audit --omit=dev`                               | PASS — 0 vulnerabilities                                                             |
-| `git diff --check`                                       | PASS — only normal Windows LF/CRLF warnings                                          |
-| `npm.cmd run build:codex-runtime`                        | PASS — official pinned Windows x64 release acquired and verified                     |
-| Local Cargo build of vendored Codex with Rust 1.95.0     | BLOCKED — host allocation failure / `STATUS_STACK_BUFFER_OVERRUN` in upstream crates |
-| `node scripts/verify-codex-runtime-artifact.mjs`         | PASS — executable, manifest, LICENSE, NOTICE, and hashes verified                    |
-| `npm.cmd run certify:codex-runtime`                      | PASS — real initialize and `thread/start` against pinned executable                  |
-| `npm.cmd run package:win:unsigned`                       | PASS — `Astra-Code-0.1.0-win-x64-unsigned.exe`                                       |
+- metadata and content storage in the Room domain;
+- REFERENCE and ADD_TO_PROJECT intent;
+- uploader, normalized name, content type, size, checksum, and security state;
+- upload/list/content/delete API routes and desktop IPC;
+- quarantine/validation states;
+- import proposal and manifest with create/overwrite/conflict/rejected counts;
+- explicit approval and completion;
+- host-local write through workspace confinement;
+- binary/text batch writes with rollback behavior;
+- ZIP inspection/extraction in a controlled buffer before project writes;
+- security events for invalid uploads and blocked behavior.
 
-## L. External and live certification
+Room Files are not arbitrary host filesystem access. Reference files remain outside the project unless an approved import is completed by the authorized host path.
 
-| Service/capability                     | Status  | Evidence/limitation                                                     |
-| -------------------------------------- | ------- | ----------------------------------------------------------------------- |
-| Cline pinned source acquisition        | PASS    | Immutable checkout and license/provenance validation                    |
-| Cline renderer subset                  | PASS    | Production renderer build includes selected copied/adapted components   |
-| Codex pinned source acquisition        | PASS    | Immutable checkout and protocol fingerprint                             |
-| Codex artifact acquisition/identity    | PASS    | Official pinned release, digest, manifest, LICENSE, and NOTICE verified |
-| Codex runtime launch/session           | PASS    | Real packaged executable initialize and `thread/start` passed           |
-| Codex model/tool/approval completion   | BLOCKED | No live Astra model/Gateway environment supplied                        |
-| Astra Responses/Gateway live model     | BLOCKED | No live provider credentials/configuration supplied                     |
-| Web Search deterministic integration   | PASS    | Existing deterministic suite; full suite passed                         |
-| Web Search provider live certification | BLOCKED | No endpoint/key configured                                              |
-| PostgreSQL live certification          | BLOCKED | No disposable live database run in this pass                            |
-| Razorpay sandbox                       | BLOCKED | No sandbox credentials/run evidence                                     |
-| Resend delivery                        | BLOCKED | No verified sender/delivery evidence                                    |
-| Google OAuth                           | BLOCKED | No configured live OAuth certification                                  |
-| Remote relay                           | BLOCKED | No staging relay/two-device certification                               |
-| Windows unsigned packaging             | PASS    | Real unsigned installer built with packaged Codex runtime               |
-| Windows code signing                   | BLOCKED | No signing credential                                                   |
-| Auto-update                            | BLOCKED | No signed artifact to certify                                           |
-| Production DNS/domain/deployment       | BLOCKED | No deployment identifiers or domain supplied                            |
+## K. ZIP/archive security
 
-## M. Security and licensing notes
+The archive validator rejects traversal, absolute/drive/UNC/device paths, reserved names, duplicate and case-colliding paths, encrypted/unsupported entries, CRC failures, symlink-like metadata, excessive entry count, excessive expanded size, oversized entries, and compression-ratio abuse. Safe extraction returns buffers and a manifest; it does not directly unpack into the project.
 
-The runtime token is server-issued, scoped, task/reservation-bound, and does
-not contain a provider key. The Codex supervisor strips inherited provider
-environment variables and writes an Astra-owned runtime home. The runtime API
-revalidates the underlying Astra session and reservation.
+Deterministic malicious-archive and import tests pass. Fuzzing and a live multi-device import run remain un-certified.
 
-The strongest remaining security objection is that Room/MCP/Plugin/Skill and
-host-revocation behavior has not been exercised through a model-driven Codex
-task. The real runtime launch/session boundary is proven; the remaining
-tool-path proof requires a live Astra model/Gateway environment. Cline and
-Codex Apache-2.0 files and the Codex NOTICE are retained in both the vendored
-inventory and packaged Codex resources; no endorsement is implied.
+## L. Security events and severity
 
-## N. Remaining production blockers
+The deterministic event layer records blocked path/project/Room/host/runtime and archive actions with actor, Room, device, task, requested action/resource, decision, evidence, timestamp, and severity. High-risk evidence is redacted for common secret patterns.
 
-1. Run the live model-driven Codex turn/tool/approval/cancel/completion path
-   through the Astra Gateway with bounded credentials and spend.
-2. Complete the desktop-to-Room billing context path and prove personal vs
-   Team/Business wallet isolation across multi-call Codex tasks.
-3. Exercise path, command, web, MCP, Plugin, Skill, suspension, removal, and
-   host-offline policies through the real Codex adapter.
-4. Complete/certify Room Files, quarantine, import preview, ZIP security,
-   security events, and host handoff where advertised.
-5. Run live Astra Gateway/provider, Web Search, PostgreSQL, OAuth, payment,
-   email, relay, and updater certifications where required for launch.
-6. Produce and sign a final Windows installer, then tie it to an immutable
-   release commit and record its SHA-256.
+Severity mapping is deterministic: INFO, LOW, MEDIUM, HIGH, CRITICAL. An LLM classification alone cannot suspend a member. The current implementation records and exposes security events; a dedicated live admin alert UI and live organization deployment remain un-certified.
 
-## O. Final release decision
+## M. Feature 1–65 matrix
+
+The following matrix contains every feature row. PASS means implementation and deterministic acceptance evidence are complete. PARTIAL means code and some tests exist but a required live, desktop, remote, or external acceptance gate is still open. NOT APPLICABLE is used only where the V1 contract explicitly uses Room Files instead of a second writable project root.
+
+|  ID | Requirement                     | Status         | Implementation evidence                                                    | Test evidence                                  | Remaining requirement                                 |
+| --: | ------------------------------- | -------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------- |
+|   1 | Native Windows application      | PARTIAL        | Electron shell and unsigned x64 NSIS installer                             | Full/package builds PASS                       | Trusted signing, clean install, and clean-machine E2E |
+|   2 | Codex-derived agent foundation  | PARTIAL        | Pinned official app-server, supervisor, protocol checks                    | Artifact and real initialize/thread-start PASS | Live model/tool/approval/completion task              |
+|   3 | Cline workspace foundation      | PARTIAL        | Pinned Cline status/approval source in production renderer                 | Provenance and renderer build PASS             | Broader workspace E2E beyond selected components      |
+|   4 | Professional editor             | PARTIAL        | Existing Astra editor/workspace                                            | Full suite/build PASS                          | Packaged Windows interaction certification            |
+|   5 | Coding agent panel              | PARTIAL        | Runtime event mapping and Cline-derived activity components                | Full suite/runtime session PASS                | Live model event stream                               |
+|   6 | Server-controlled AI routing    | PARTIAL        | Runtime API, server model validation, Gateway adapter                      | API tests PASS                                 | Live Gateway/provider execution                       |
+|   7 | Local tool execution            | PARTIAL        | Workspace confinement, local write/command policy, Codex adapter           | Workspace/security tests PASS                  | Actual model-driven Codex tools                       |
+|   8 | End-to-end streaming            | PARTIAL        | SSE transport and event bridge                                             | Gateway adapter tests PASS                     | Live streamed model response                          |
+|   9 | Real model names                | PARTIAL        | Server catalogue and model binding                                         | Routing tests PASS                             | Live resolved provider/model receipt                  |
+|  10 | Explicit Auto                   | PARTIAL        | AUTO is handled as an explicit selection                                   | Routing tests PASS                             | Live route/resolution evidence                        |
+|  11 | Credit system                   | PARTIAL        | Usage/reservation/settlement domain                                        | Billing suite PASS                             | Live provider usage reconciliation                    |
+|  12 | Credit reservation              | PARTIAL        | Reservation-bound runtime token and wallet logic                           | Billing/API tests PASS                         | Multi-call live Codex task                            |
+|  13 | Pre-task estimate               | PARTIAL        | Existing task budget/credit UI                                             | Existing suite PASS                            | Packaged desktop acceptance                           |
+|  14 | Live credit meter               | PARTIAL        | Usage events and receipt path                                              | API/adapter tests PASS                         | Live provider meter reconciliation                    |
+|  15 | Credit overrun checkpoint       | PARTIAL        | Existing budget/checkpoint policy                                          | Existing suite PASS                            | Live autonomous-loop checkpoint                       |
+|  16 | Runaway protection              | PARTIAL        | Existing task/tool/retry budgets                                           | Existing suite PASS                            | Live model loop exercise                              |
+|  17 | Authoritative pricing           | PARTIAL        | Existing plan/pricing authority                                            | Billing tests PASS                             | Live checkout/payment certification                   |
+|  18 | Credit rollover                 | PARTIAL        | Existing billing rules                                                     | Billing tests PASS                             | Live billing-cycle exercise                           |
+|  19 | Top-up credits                  | PARTIAL        | Existing top-up domain                                                     | Billing tests PASS                             | Razorpay sandbox/payment certification                |
+|  20 | Settings dashboard              | PARTIAL        | Existing Astra settings/admin surfaces                                     | Web/desktop builds PASS                        | Browser/packaged visual certification                 |
+|  21 | Dashboard through Settings      | PARTIAL        | Existing workspace/settings navigation                                     | Full suite PASS                                | State-preservation E2E                                |
+|  22 | Normal settings                 | PARTIAL        | User settings sections and RBAC                                            | Full suite PASS                                | Role/visibility E2E                                   |
+|  23 | Team settings                   | PARTIAL        | Organization/Room settings                                                 | Full suite PASS                                | Live Team Room workflow                               |
+|  24 | Business settings               | PARTIAL        | Business/admin policy surfaces                                             | Full suite PASS                                | Live policy/SSO certification                         |
+|  25 | Super Admin                     | PARTIAL        | Backend RBAC/admin package                                                 | Full suite PASS                                | Live admin deployment E2E                             |
+|  26 | Shared login                    | PARTIAL        | Shared Astra auth surface                                                  | Full suite PASS                                | Live OAuth/session certification                      |
+|  27 | Auth design                     | PARTIAL        | Astra auth UI                                                              | Web build PASS                                 | Browser matrix                                        |
+|  28 | Personal multi-device           | PARTIAL        | Device/session domain                                                      | Full suite PASS                                | Two-device live run                                   |
+|  29 | Own-device remote               | PARTIAL        | Remote protocol/device authorization                                       | Full suite PASS                                | Staging relay and device E2E                          |
+|  30 | Cross-person remote restriction | PARTIAL        | Room-scoped access policy                                                  | Access tests PASS                              | Live cross-person relay test                          |
+|  31 | One primary Room project        | PARTIAL        | primary_project_id, host binding, project/host validation                  | Migration/API/Room tests PASS                  | Live bound-host Codex task                            |
+|  32 | Project filesystem isolation    | PARTIAL        | Canonical path/workspace confinement and host checks                       | Security/ZIP tests PASS                        | Actual live Codex hostile-path run                    |
+|  33 | Organization membership != Room | PASS           | room_members is separate from organization seats                           | Membership regression and migration tests PASS | Live PostgreSQL certification                         |
+|  34 | Room roles                      | PARTIAL        | Owner/Admin/Editor/Agent User/Viewer permissions                           | Remote access tests PASS                       | Live Codex role exercise                              |
+|  35 | Viewer                          | PARTIAL        | Server-side prompt/tool denial                                             | Permission tests PASS                          | Production-path Viewer denial                         |
+|  36 | Agent User                      | PARTIAL        | Room agent permission checks                                               | Permission tests PASS                          | Live allowed/denied Codex task                        |
+|  37 | Editor                          | PARTIAL        | Granular edit/import permissions                                           | Permission/import tests PASS                   | Live editor task                                      |
+|  38 | Admin                           | PARTIAL        | Member/invite/handoff/admin authorization                                  | Remote access tests PASS                       | Live admin Room workflow                              |
+|  39 | Suspension                      | PARTIAL        | Fresh authorization and status checks                                      | Suspension/security tests PASS                 | Live mid-Codex revocation                             |
+|  40 | Removal                         | PARTIAL        | Room membership removal and revocation path                                | Membership tests PASS                          | Live mid-task removal                                 |
+|  41 | Leave Room                      | PARTIAL        | Leave and last-admin protection                                            | Remote access tests PASS                       | Live Room E2E                                         |
+|  42 | Multiple Rooms                  | PARTIAL        | Room-scoped membership and context                                         | Membership/API tests PASS                      | Live cross-Room context isolation                     |
+|  43 | Reference project support       | NOT APPLICABLE | V1 uses controlled Room Files/reference assets, not a second writable root | Room Files/reference tests PASS                | No second writable project root is advertised         |
+|  44 | Reference assets                | PARTIAL        | Room File metadata, reference intent, content retrieval                    | Room File/API tests PASS                       | Durable/live storage and packaged UX                  |
+|  45 | Room Files                      | PARTIAL        | DB migration, in-memory service, Postgres adapter, API, IPC, UI            | API/schema/IPC tests PASS                      | Live PostgreSQL and packaged UI certification         |
+|  46 | File intent                     | PASS           | REFERENCE and ADD_TO_PROJECT are typed and server-validated                | Room File tests PASS                           | None for deterministic contract                       |
+|  47 | Controlled import               | PARTIAL        | Quarantine, preview, approval, host-local write, completion audit          | Import/rollback tests PASS                     | Live packaged host import                             |
+|  48 | Import preview                  | PASS           | Manifest includes create/overwrite/conflict/rejected entries               | Preview/import API tests PASS                  | Live browser/desktop visual review                    |
+|  49 | Room Files UI                   | PARTIAL        | Renderer list/upload/delete/preview/import controls                        | Renderer/build and IPC tests PASS              | Packaged UI E2E                                       |
+|  50 | ZIP security                    | PASS           | Quarantine parser and bounded safe extraction                              | Malicious ZIP/path tests PASS                  | Additional fuzz/live archive corpus                   |
+|  51 | Offline host                    | PARTIAL        | Host availability and local-host refusal path                              | Remote/API tests PASS                          | Live relay disconnection during Codex                 |
+|  52 | Availability modes              | PARTIAL        | ONLINE/OFFLINE/UNAVAILABLE/REVOKED/unknown handling                        | API/domain tests PASS                          | Live relay/backup policy certification                |
+|  53 | Host handoff                    | PARTIAL        | Authoritative handoff route, binding version, audit, DB schema             | Handoff/API tests PASS                         | Two-device activation certification                   |
+|  54 | Hard sandbox                    | PARTIAL        | Deterministic path, import, command, and fresh auth policy                 | Security tests PASS                            | Actual live Codex/MCP/Plugin/Skill adversarial run    |
+|  55 | Suspicious activity             | PASS           | Deterministic security-event recording and redaction                       | Security-event tests PASS                      | Live admin deployment alerting                        |
+|  56 | Admin alerts                    | PARTIAL        | Authorized security-event listing/API context                              | Security-event/API tests PASS                  | Dedicated admin alert UI/live deployment              |
+|  57 | Event severity                  | PASS           | Deterministic severity mapping                                             | Severity tests PASS                            | None for deterministic contract                       |
+|  58 | No LLM-only suspension          | PASS           | Security event layer never suspends from one model signal                  | Regression test PASS                           | Human/admin operational certification                 |
+|  59 | Invitees need no org plan       | PARTIAL        | Org seat and Room invitation paths separate personal plan                  | Invitation tests PASS                          | Live email/invitation redemption                      |
+|  60 | Host need no org plan           | PARTIAL        | Host device and paying organization are separate                           | Billing/Room tests PASS                        | Live organization-host Codex task                     |
+|  61 | Personal/org contexts separate  | PARTIAL        | Server Room-derived wallet resolution                                      | Billing tests PASS                             | Live multi-context Codex task                         |
+|  62 | No entitlement leakage          | PARTIAL        | Room-scoped permission and wallet resolution                               | Spoof/membership tests PASS                    | Live cross-organization task                          |
+|  63 | Personal wallet                 | PARTIAL        | Personal reservation/settlement path                                       | Billing tests PASS                             | Live model usage                                      |
+|  64 | Organization wallet             | PARTIAL        | Room-only billing resolves organization wallet                             | Room reservation/spoof tests PASS              | Desktop-to-Codex Team/Business run                    |
+|  65 | Usage attribution               | PARTIAL        | Task/reservation/Room/member/host attribution fields                       | Billing/API tests PASS                         | Live provider receipts and analytics                  |
+
+## N. Deterministic verification
+
+| Command                                                | Result                                                                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| npm.cmd test                                           | PASS — 87 files, 278 tests                                                                                        |
+| npm.cmd run typecheck                                  | PASS                                                                                                              |
+| npm.cmd run lint                                       | PASS                                                                                                              |
+| npm.cmd run format:check                               | PASS                                                                                                              |
+| npm.cmd run verify:source-provenance                   | PASS                                                                                                              |
+| npm.cmd run build:packages                             | PASS                                                                                                              |
+| npm.cmd run build                                      | PASS — API, Electron, web prerender (54 routes), and admin                                                        |
+| npm.cmd run build:renderer --workspace @lyntar/desktop | PASS during renderer/package build — 23 renderer modules                                                          |
+| npm.cmd audit --omit=dev                               | PASS — 0 vulnerabilities                                                                                          |
+| git diff --check                                       | PASS — only normal Windows line-ending warnings                                                                   |
+| node scripts/verify-codex-runtime-artifact.mjs         | PASS — executable, manifest, LICENSE, NOTICE, and hashes                                                          |
+| npm.cmd run certify:codex-runtime                      | PASS — real initialize and thread/start against pinned executable                                                 |
+| npm.cmd run package:win:unsigned                       | PASS — new installer, 166,058,420 bytes, SHA-256 F30AC3D22DDCA82DEAA6923E3DE1D3FBBB09B1BC93E9A64C9F46F9035F7C5169 |
+| Focused Room/project/billing/security suites           | PASS — 7 files, 27 tests                                                                                          |
+| Local Cargo build of vendored Codex                    | BLOCKED — host allocation failure; official artifact is used and verified                                         |
+
+## O. Live/external certification
+
+| Capability                               | Status  | Environment/evidence                                        |
+| ---------------------------------------- | ------- | ----------------------------------------------------------- |
+| Codex runtime launch/session             | PASS    | Real pinned Windows executable; initialize and thread/start |
+| Codex live model completion              | BLOCKED | No configured live Astra Gateway/model environment          |
+| Codex local tools/approvals/cancellation | BLOCKED | Requires live model-driven Codex turn                       |
+| Codex Room execution                     | BLOCKED | Requires live model plus host/relay environment             |
+| Astra Gateway/provider                   | BLOCKED | No production/staging credentials/configuration supplied    |
+| Web Search deterministic integration     | PASS    | Full deterministic suite                                    |
+| Web Search live provider                 | BLOCKED | No endpoint/key configured                                  |
+| PostgreSQL live                          | BLOCKED | No disposable PostgreSQL environment supplied               |
+| Razorpay sandbox                         | BLOCKED | No sandbox credentials supplied                             |
+| Resend delivery                          | BLOCKED | No verified sender/provider configuration supplied          |
+| Google OAuth                             | BLOCKED | No live OAuth client/redirect certification supplied        |
+| Remote relay                             | BLOCKED | No staging relay/two-device environment supplied            |
+| Two-device remote                        | BLOCKED | Requires two authorized live devices                        |
+| Personal wallet deterministic            | PASS    | Billing integration tests                                   |
+| Team wallet deterministic                | PASS    | Room-only reservation and spoof tests                       |
+| Business wallet deterministic            | PASS    | Room-only reservation and spoof tests                       |
+| Windows unsigned package                 | PASS    | Real NSIS installer produced                                |
+| Windows code signing                     | BLOCKED | No legitimate certificate/private key                       |
+| Auto-update                              | BLOCKED | Signed update artifact and update endpoint unavailable      |
+| Clean Windows install                    | BLOCKED | No isolated clean Windows certification environment         |
+
+## P. Security and financial integrity
+
+Deterministic checks cover Room-scoped membership, path confinement, archive validation, import rollback, SSRF/Web Research safeguards, runtime-token freshness, wallet-context spoof rejection, security-event redaction, and idempotent domain paths already present in Astra. Room membership is separate from organization seat membership.
+
+The principal surviving objection is not a hidden fallback: the model-driven Codex path has not been exercised against a live Astra model/Gateway. Until that is available, real tool, approval, cancellation, usage, Room, MCP/Plugin/Skill, revocation, and provider-cost claims cannot be promoted to live certification.
+
+## Q. Remaining production blockers
+
+1. Live Astra Gateway/model environment
+   Type: CREDENTIAL / EXTERNAL INFRASTRUCTURE
+   Evidence: official Codex process launch passes, but no live model turn is available.
+   Required action: run a bounded real model task through Astra auth, reservation, Gateway, stream, tool, usage, settlement, and completion.
+
+2. Live Room/host/relay certification
+   Type: EXTERNAL INFRASTRUCTURE
+   Evidence: Room/project/host code and deterministic tests pass; no staging relay, second device, or live host execution environment is configured.
+   Required action: certify personal/Team/Business Room tasks, suspension, removal, host offline, handoff, and two-device isolation.
+
+3. Live PostgreSQL certification
+   Type: EXTERNAL INFRASTRUCTURE
+   Evidence: migrations and Postgres adapters are present; no disposable database run was available.
+   Required action: run migrations and restart/concurrency/FK/uniqueness tests against disposable PostgreSQL with representative data.
+
+4. Payments, mail, and OAuth
+   Type: CREDENTIAL / EXTERNAL INFRASTRUCTURE
+   Evidence: deterministic application tests pass; Razorpay, Resend, and Google OAuth live credentials/configuration were not supplied.
+   Required action: run sandbox/payment/webhook, delivery, and OAuth callback certification.
+
+5. Trusted Windows signing and clean install
+   Type: CREDENTIAL / EXTERNAL INFRASTRUCTURE
+   Evidence: unsigned installer builds and includes the pinned runtime; no trusted signing key or isolated clean Windows environment is available.
+   Required action: sign final binaries, verify Authenticode, install on a clean Windows 10/11 x64 environment, and test launch/auth/restart/uninstall.
+
+6. Auto-update certification
+   Type: EXTERNAL INFRASTRUCTURE
+   Evidence: no signed update artifact/endpoint was supplied.
+   Required action: certify only if updater is in the V1 shipping scope.
+
+## R. Final release decision
 
 # NOT PRODUCTION READY
 
-This verdict is based on the exact evidence above. The repository build,
-deterministic suite, official Codex runtime launch, and unsigned Windows
-package are healthy, but live model execution, launch-critical external
-integrations, signing, and several Room production paths remain unproven or
-blocked.
+The implementation gaps previously marked MISSING in the Room/project, Room Files, import, ZIP-security, host-handoff, and security-event areas have been implemented and deterministically tested. The exact unsigned installer was rebuilt. The release remains blocked by the live model/Gateway path and other launch-critical infrastructure/certificate gates listed above; no live PASS has been manufactured.

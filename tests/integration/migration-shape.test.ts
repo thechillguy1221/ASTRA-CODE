@@ -48,4 +48,29 @@ describe('database migration foundation', () => {
     expect(migration).toContain('UNIQUE (organization_id, idempotency_key)');
     expect(migration).toContain('FOR UPDATE');
   });
+
+  it('contains the authoritative Room project, Room Files, import, and security-event schema', async () => {
+    const migration = await readFile(
+      'packages/db/migrations/0013_room_projects_files_security.sql',
+      'utf8',
+    );
+    expect(migration).toContain('primary_project_id');
+    expect(migration).toContain('workspace_fingerprint');
+    expect(migration).toContain('host_binding_version');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS room_files');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS room_file_imports');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS room_security_events');
+    expect(migration).toContain("CHECK (intent IN ('REFERENCE', 'ADD_TO_PROJECT'))");
+    expect(migration).toContain(
+      "CHECK (status IN ('PREVIEW', 'APPROVED', 'REJECTED', 'IMPORTED', 'FAILED'))",
+    );
+  });
+
+  it('separates organization seats from explicit Room memberships', async () => {
+    const migration = await readFile('packages/db/migrations/0014_room_memberships.sql', 'utf8');
+    expect(migration).toContain('CREATE TABLE IF NOT EXISTS room_members');
+    expect(migration).toContain('UNIQUE (room_id, user_id)');
+    expect(migration.toLowerCase()).toContain('organization membership grants a seat');
+    expect(migration.toLowerCase()).toContain('already-redeemed invitations');
+  });
 });

@@ -151,6 +151,96 @@ describe('personal devices and Team/Business Room authorization', () => {
     expect(order).toEqual(['first-start', 'first-end', 'second-start', 'second-end']);
   });
 
+  it('keeps organization seats separate from explicit Room membership', () => {
+    const access = new RemoteAccessService();
+    const host = access.registerDevice({
+      userId: 'owner',
+      label: 'owner host',
+      platform: 'win32',
+      architecture: 'x64',
+      publicKeyPem: 'owner-room-key',
+    });
+    const organization = access.createOrganization({
+      ownerUserId: 'owner',
+      displayName: 'Scoped Rooms',
+      plan: TEAM,
+    });
+    const first = access.createRoom({
+      actorUserId: 'owner',
+      organizationId: organization.id,
+      hostDeviceId: host.id,
+      name: 'First',
+      workspaceRootRelative: 'Projects/First',
+    });
+    const second = access.createRoom({
+      actorUserId: 'owner',
+      organizationId: organization.id,
+      hostDeviceId: host.id,
+      name: 'Second',
+      workspaceRootRelative: 'Projects/Second',
+    });
+    const invitation = access.inviteMember({
+      actorUserId: 'owner',
+      roomId: first.id,
+      email: 'member@example.test',
+      idempotencyKey: 'scoped-room-invite',
+    });
+    access.redeemInvitation({
+      userId: 'member',
+      email: 'member@example.test',
+      token: invitation.token ?? '',
+    });
+
+    expect(access.listRoomMembers('member', first.id)).toHaveLength(2);
+    expect(() =>
+      access.authorizeRoomAction({
+        actorUserId: 'member',
+        roomId: second.id,
+        permission: 'room.view',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'MEMBER_NOT_FOUND' }));
+  });
+
+  it('records high-risk evidence without allowing an LLM signal to suspend a member', () => {
+    const access = new RemoteAccessService();
+    const host = access.registerDevice({
+      userId: 'owner-security',
+      label: 'security host',
+      platform: 'win32',
+      architecture: 'x64',
+      publicKeyPem: 'security-key',
+    });
+    const organization = access.createOrganization({
+      ownerUserId: 'owner-security',
+      displayName: 'Security policy',
+      plan: TEAM,
+    });
+    const room = access.createRoom({
+      actorUserId: 'owner-security',
+      organizationId: organization.id,
+      hostDeviceId: host.id,
+      name: 'Security room',
+      workspaceRootRelative: 'Projects/Security',
+    });
+    access.recordSecurityEvent({
+      organizationId: organization.id,
+      roomId: room.id,
+      actorUserId: 'owner-security',
+      eventType: 'POLICY_BYPASS_ATTEMPT',
+      requestedAction: 'model.classification',
+      decision: 'BLOCKED',
+      outcome: 'Recorded only; no automatic membership mutation',
+    });
+
+    expect(
+      access.authorizeRoomAction({
+        actorUserId: 'owner-security',
+        roomId: room.id,
+        permission: 'room.view',
+      }).userId,
+    ).toBe('owner-security');
+  });
+
   it('keeps invitation redemption bound to the invited identity', () => {
     const access = new RemoteAccessService();
     const host = access.registerDevice({

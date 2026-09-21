@@ -1,5 +1,15 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { deviceFingerprint } from './pairing.js';
+import {
+  assertSafeProjectRelativePath,
+  buildRoomFileImportManifest,
+  normalizeRoomFileUpload,
+  RoomFileError,
+  type RoomFileImportManifest,
+  type RoomFileImportProposal,
+  type RoomFileIntent,
+  type RoomFileRecord,
+} from './room-files.js';
 
 export const ROOM_PERMISSIONS = [
   'room.view',
@@ -25,6 +35,9 @@ export const ROOM_PERMISSIONS = [
 export type RoomPermission = (typeof ROOM_PERMISSIONS)[number];
 export type RoomRole = 'VIEWER' | 'AGENT_USER' | 'EDITOR' | 'ADMIN';
 export type MemberStatus = 'ACTIVE' | 'SUSPENDED' | 'REMOVED';
+export type RoomHostAvailability =
+  'ONLINE' | 'OFFLINE' | 'UNAVAILABLE' | 'REVOKED' | 'DISCONNECTED' | 'UNKNOWN';
+export type RoomSecuritySeverity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 const ROLE_PERMISSIONS: Record<RoomRole, readonly RoomPermission[]> = {
   VIEWER: ['room.view', 'files.read', 'git.read'],
@@ -80,6 +93,8 @@ export interface RemoteOrganization {
 export interface RoomMember {
   id: string;
   organizationId: string;
+  /** Null for the organization seat record; set for an explicit Room membership. */
+  roomId: string | null;
   userId: string;
   email: string;
   role: RoomRole | 'OWNER';
@@ -97,8 +112,13 @@ export interface RemoteRoom {
   hostDeviceId: string;
   name: string;
   workspaceRootRelative: string;
+  projectId: string;
+  workspaceFingerprint: string | null;
+  hostAvailability: RoomHostAvailability;
+  hostBindingVersion: number;
   status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface RoomInvitation {
@@ -120,6 +140,25 @@ export interface RoomAuditEvent {
   action: string;
   targetType: string;
   targetId: string;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RoomSecurityEvent {
+  id: string;
+  organizationId: string;
+  roomId: string | null;
+  actorUserId: string | null;
+  deviceId: string | null;
+  projectId: string | null;
+  taskId: string | null;
+  eventType: string;
+  severity: RoomSecuritySeverity;
+  requestedAction: string;
+  requestedResource: string | null;
+  decision: 'BLOCKED' | 'ALLOWED' | 'FLAGGED';
+  outcome: string;
+  evidence: Record<string, unknown>;
   createdAt: string;
 }
 
@@ -165,6 +204,81 @@ export interface RemoteAccessPort {
     workspaceRootRelative: string;
   }): RemoteRoom | Promise<RemoteRoom>;
   getRoom(roomId: string): RemoteRoom | Promise<RemoteRoom>;
+  listRooms(actorUserId: string): RemoteRoom[] | Promise<RemoteRoom[]>;
+  handoffRoom(input: {
+    actorUserId: string;
+    roomId: string;
+    hostDeviceId: string;
+    workspaceRootRelative: string;
+    workspaceFingerprint: string;
+  }): RemoteRoom | Promise<RemoteRoom>;
+  uploadRoomFile(input: {
+    actorUserId: string;
+    roomId: string;
+    originalName: string;
+    contentType: string;
+    content: Buffer;
+    intent: RoomFileIntent;
+  }): RoomFileRecord | Promise<RoomFileRecord>;
+  listRoomFiles(actorUserId: string, roomId: string): RoomFileRecord[] | Promise<RoomFileRecord[]>;
+  getRoomFile(input: {
+    actorUserId: string;
+    roomId: string;
+    fileId: string;
+  }):
+    | { record: RoomFileRecord; content: Buffer }
+    | Promise<{ record: RoomFileRecord; content: Buffer }>;
+  deleteRoomFile(input: {
+    actorUserId: string;
+    roomId: string;
+    fileId: string;
+  }): void | Promise<void>;
+  createRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    fileId: string;
+    destinationRelative: string;
+    existingPaths?: string[];
+  }): RoomFileImportProposal | Promise<RoomFileImportProposal>;
+  approveRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+  }): RoomFileImportProposal | Promise<RoomFileImportProposal>;
+  rejectRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+  }): RoomFileImportProposal | Promise<RoomFileImportProposal>;
+  completeRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+    hostDeviceId: string;
+    writtenPaths: string[];
+  }): RoomFileImportProposal | Promise<RoomFileImportProposal>;
+  listRoomFileImports(
+    actorUserId: string,
+    roomId: string,
+  ): RoomFileImportProposal[] | Promise<RoomFileImportProposal[]>;
+  recordSecurityEvent(input: {
+    organizationId: string;
+    roomId?: string | null;
+    actorUserId?: string | null;
+    deviceId?: string | null;
+    projectId?: string | null;
+    taskId?: string | null;
+    eventType: string;
+    requestedAction: string;
+    requestedResource?: string | null;
+    decision: RoomSecurityEvent['decision'];
+    outcome: string;
+    evidence?: Record<string, unknown>;
+  }): RoomSecurityEvent | Promise<RoomSecurityEvent>;
+  listSecurityEvents(
+    actorUserId: string,
+    roomId: string,
+  ): RoomSecurityEvent[] | Promise<RoomSecurityEvent[]>;
   listRoomMembers(actorUserId: string, roomId: string): RoomMember[] | Promise<RoomMember[]>;
   inviteMember(input: {
     actorUserId: string;
@@ -227,6 +341,13 @@ export class RemoteAccessError extends Error {
       | 'SEAT_LIMIT'
       | 'ROOM_NOT_FOUND'
       | 'ROOM_PATH_INVALID'
+      | 'ROOM_HOST_INVALID'
+      | 'ROOM_HOST_OFFLINE'
+      | 'ROOM_FILE_NOT_FOUND'
+      | 'ROOM_FILE_FORBIDDEN'
+      | 'ROOM_FILE_STATE_INVALID'
+      | 'ROOM_IMPORT_NOT_FOUND'
+      | 'ROOM_IMPORT_CONFLICT'
       | 'MEMBER_NOT_FOUND'
       | 'MEMBER_SUSPENDED'
       | 'MEMBER_REMOVED'
@@ -286,6 +407,68 @@ export function roomRolePermissions(role: RoomRole | 'OWNER'): RoomPermission[] 
   return [...ROLE_PERMISSIONS[role]];
 }
 
+export function roomHostAvailability(
+  device: Pick<RemoteDeviceRecord, 'lastSeenAt' | 'revokedAt'>,
+  now = new Date(),
+): RoomHostAvailability {
+  if (device.revokedAt) return 'REVOKED';
+  if (!device.lastSeenAt) return 'UNKNOWN';
+  const ageMs = now.getTime() - new Date(device.lastSeenAt).getTime();
+  if (ageMs <= 2 * 60 * 1000) return 'ONLINE';
+  if (ageMs <= 10 * 60 * 1000) return 'DISCONNECTED';
+  return 'OFFLINE';
+}
+
+export function roomSecuritySeverity(
+  eventType: string,
+  decision: RoomSecurityEvent['decision'],
+): RoomSecuritySeverity {
+  if (
+    eventType === 'CREDENTIAL_EXFILTRATION_ATTEMPT' ||
+    eventType === 'PRIVILEGE_ESCALATION_ATTEMPT'
+  )
+    return 'CRITICAL';
+  if (
+    eventType === 'PATH_ESCAPE_ATTEMPT' ||
+    eventType === 'UNAUTHORIZED_PROJECT_ACCESS' ||
+    eventType === 'UNAUTHORIZED_HOST_CONNECTION' ||
+    eventType === 'BILLING_CONTEXT_SPOOF' ||
+    eventType === 'POLICY_BYPASS_ATTEMPT' ||
+    eventType === 'SUSPICIOUS_ARCHIVE'
+  )
+    return 'HIGH';
+  if (decision === 'BLOCKED') return 'MEDIUM';
+  return 'INFO';
+}
+
+export function sanitizeSecurityEvidence(value: Record<string, unknown>): Record<string, unknown> {
+  const redact = (candidate: unknown): unknown => {
+    if (typeof candidate === 'string') {
+      if (
+        /(?:password|secret|token|api[_-]?key|authorization|cookie|private[_-]?key)/i.test(
+          candidate,
+        ) ||
+        /(?:sk-[A-Za-z0-9]|AKIA[0-9A-Z]{12,}|-----BEGIN [A-Z ]+PRIVATE KEY-----)/.test(candidate)
+      )
+        return '[REDACTED]';
+      return candidate.slice(0, 2_000);
+    }
+    if (Array.isArray(candidate)) return candidate.slice(0, 50).map(redact);
+    if (candidate && typeof candidate === 'object') {
+      const result: Record<string, unknown> = {};
+      for (const [key, child] of Object.entries(candidate)) {
+        result[key] =
+          /(?:password|secret|token|api[_-]?key|authorization|cookie|private[_-]?key)/i.test(key)
+            ? '[REDACTED]'
+            : redact(child);
+      }
+      return result;
+    }
+    return candidate;
+  };
+  return redact(value) as Record<string, unknown>;
+}
+
 export class RemoteAccessService {
   private readonly devices = new Map<string, RemoteDeviceRecord>();
   private readonly organizations = new Map<string, RemoteOrganization>();
@@ -294,6 +477,9 @@ export class RemoteAccessService {
   private readonly invitations = new Map<string, { record: RoomInvitation; tokenHash: string }>();
   private readonly invitationByIdempotency = new Map<string, string>();
   private readonly audit: RoomAuditEvent[] = [];
+  private readonly roomFiles = new Map<string, { record: RoomFileRecord; content: Buffer }>();
+  private readonly roomImports = new Map<string, RoomFileImportProposal>();
+  private readonly securityEvents: RoomSecurityEvent[] = [];
   private readonly now: () => Date;
   private readonly invitationTtlMs: number;
 
@@ -396,6 +582,7 @@ export class RemoteAccessService {
     const owner: RoomMember = {
       id: randomUUID(),
       organizationId: organization.id,
+      roomId: null,
       userId: input.ownerUserId,
       email: '',
       role: 'OWNER',
@@ -463,10 +650,28 @@ export class RemoteAccessService {
       hostDeviceId: input.hostDeviceId,
       name: input.name.trim(),
       workspaceRootRelative: assertRoomWorkspacePath(input.workspaceRootRelative),
+      projectId: randomUUID(),
+      workspaceFingerprint: null,
+      hostAvailability: roomHostAvailability(hostDevice, this.now()),
+      hostBindingVersion: 1,
       status: 'ACTIVE',
       createdAt: this.now().toISOString(),
+      updatedAt: this.now().toISOString(),
     };
     this.rooms.set(room.id, room);
+    const ownerSeat = this.findMember(organization.id, input.actorUserId, null);
+    if (!ownerSeat)
+      throw new RemoteAccessError('MEMBER_NOT_FOUND', 'Organization owner seat is unavailable');
+    const roomOwner: RoomMember = {
+      ...ownerSeat,
+      id: randomUUID(),
+      roomId: room.id,
+      permissions: roomRolePermissions('OWNER'),
+      joinedAt: room.createdAt,
+      suspendedAt: null,
+      removedAt: null,
+    };
+    this.members.set(roomOwner.id, roomOwner);
     this.recordAudit(organization.id, room.id, input.actorUserId, 'room.created', 'room', room.id);
     return { ...room };
   }
@@ -533,19 +738,37 @@ export class RemoteAccessService {
       );
     const room = this.requireRoom(invitation.roomId);
     this.assertOrganizationActive(room.organizationId);
-    const existing = this.findMember(room.organizationId, input.userId);
-    if (existing) {
-      if (existing.status === 'REMOVED')
+    const existingRoomMember = this.findMember(room.organizationId, input.userId, room.id);
+    if (existingRoomMember) {
+      if (existingRoomMember.status === 'REMOVED')
         throw new RemoteAccessError('MEMBER_REMOVED', 'Member was removed');
-      if (existing.status === 'SUSPENDED')
+      if (existingRoomMember.status === 'SUSPENDED')
         throw new RemoteAccessError('MEMBER_SUSPENDED', 'Member is suspended');
       invitation.redeemedBy = input.userId;
       invitation.redeemedAt ??= this.now().toISOString();
-      return { ...existing, permissions: [...existing.permissions] };
+      return { ...existingRoomMember, permissions: [...existingRoomMember.permissions] };
+    }
+    let organizationMember = this.findMember(room.organizationId, input.userId, null);
+    if (!organizationMember) {
+      organizationMember = {
+        id: randomUUID(),
+        organizationId: room.organizationId,
+        roomId: null,
+        userId: input.userId,
+        email: invitation.invitedEmail,
+        role: 'AGENT_USER',
+        status: 'ACTIVE',
+        permissions: roomRolePermissions('AGENT_USER'),
+        joinedAt: this.now().toISOString(),
+        suspendedAt: null,
+        removedAt: null,
+      };
+      this.members.set(organizationMember.id, organizationMember);
     }
     const member: RoomMember = {
       id: randomUUID(),
       organizationId: room.organizationId,
+      roomId: room.id,
       userId: input.userId,
       email: invitation.invitedEmail,
       role: 'AGENT_USER',
@@ -573,7 +796,9 @@ export class RemoteAccessService {
     const room = this.requireRoom(roomId);
     this.assertPermission(actorUserId, room.organizationId, 'room.view', room.id);
     return [...this.members.values()]
-      .filter((member) => member.organizationId === room.organizationId)
+      .filter(
+        (member) => member.organizationId === room.organizationId && member.roomId === room.id,
+      )
       .map((member) => ({ ...member, permissions: [...member.permissions] }));
   }
 
@@ -585,7 +810,7 @@ export class RemoteAccessService {
   }): RoomMember {
     const room = this.requireRoom(input.roomId);
     this.assertPermission(input.actorUserId, room.organizationId, 'members.manage', room.id);
-    const member = this.requireMember(room.organizationId, input.userId);
+    const member = this.requireMember(room.organizationId, input.userId, room.id);
     if (member.status === 'REMOVED')
       throw new RemoteAccessError('MEMBER_REMOVED', 'Member was removed');
     member.role = input.role;
@@ -615,10 +840,11 @@ export class RemoteAccessService {
 
   leaveRoom(input: { userId: string; roomId: string }): void {
     const room = this.requireRoom(input.roomId);
-    const member = this.requireMember(room.organizationId, input.userId);
+    const member = this.requireMember(room.organizationId, input.userId, room.id);
     if (
       member.role === 'OWNER' &&
-      this.activeMembers(room.organizationId).filter((item) => item.role === 'OWNER').length <= 1
+      this.roomMembers(room.id).filter((item) => item.role === 'OWNER' && item.status === 'ACTIVE')
+        .length <= 1
     )
       throw new RemoteAccessError(
         'LAST_ADMIN',
@@ -645,8 +871,397 @@ export class RemoteAccessService {
     return this.assertPermission(input.actorUserId, room.organizationId, input.permission, room.id);
   }
 
+  handoffRoom(input: {
+    actorUserId: string;
+    roomId: string;
+    hostDeviceId: string;
+    workspaceRootRelative: string;
+    workspaceFingerprint: string;
+  }): RemoteRoom {
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'room.settings.manage', room.id);
+    const device = this.requireDevice(input.hostDeviceId);
+    if (device.revokedAt) throw new RemoteAccessError('DEVICE_REVOKED', 'Host device is revoked');
+    const member = this.findMember(room.organizationId, device.userId, room.id);
+    if (!member || member.status !== 'ACTIVE')
+      throw new RemoteAccessError(
+        'ROOM_HOST_INVALID',
+        'Destination host is not an active Room member',
+      );
+    const workspaceFingerprint = input.workspaceFingerprint.trim();
+    if (!workspaceFingerprint || workspaceFingerprint.length > 512)
+      throw new RemoteAccessError('ROOM_HOST_INVALID', 'Workspace fingerprint is invalid');
+    room.hostUserId = device.userId;
+    room.hostDeviceId = device.id;
+    room.workspaceRootRelative = assertRoomWorkspacePath(input.workspaceRootRelative);
+    room.workspaceFingerprint = workspaceFingerprint;
+    room.hostBindingVersion += 1;
+    room.hostAvailability = roomHostAvailability(device, this.now());
+    room.updatedAt = this.now().toISOString();
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.project.host_handoff',
+      'room_project',
+      room.projectId,
+    );
+    return { ...room };
+  }
+
+  uploadRoomFile(input: {
+    actorUserId: string;
+    roomId: string;
+    originalName: string;
+    contentType: string;
+    content: Buffer;
+    intent: RoomFileIntent;
+  }): RoomFileRecord {
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.write', room.id);
+    let normalized;
+    try {
+      normalized = normalizeRoomFileUpload(input);
+    } catch (error) {
+      if (error instanceof RoomFileError) {
+        void this.recordSecurityEvent({
+          organizationId: room.organizationId,
+          roomId: room.id,
+          actorUserId: input.actorUserId,
+          projectId: room.projectId,
+          eventType: error.code.startsWith('ARCHIVE')
+            ? 'SUSPICIOUS_ARCHIVE'
+            : 'POLICY_BYPASS_ATTEMPT',
+          requestedAction: 'room.file.upload',
+          requestedResource: input.originalName,
+          decision: 'BLOCKED',
+          outcome: error.message,
+        });
+      }
+      throw error;
+    }
+    const now = this.now().toISOString();
+    const record: RoomFileRecord = {
+      id: randomUUID(),
+      organizationId: room.organizationId,
+      roomId: room.id,
+      uploaderUserId: input.actorUserId,
+      originalName: input.originalName,
+      safeName: normalized.safeName,
+      contentType: normalized.contentType,
+      sizeBytes: normalized.sizeBytes,
+      checksumSha256: normalized.checksumSha256,
+      intent: input.intent,
+      securityState: 'SAFE',
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+    };
+    this.roomFiles.set(record.id, { record, content: Buffer.from(input.content) });
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.uploaded',
+      'room_file',
+      record.id,
+    );
+    return { ...record };
+  }
+
+  listRoomFiles(actorUserId: string, roomId: string): RoomFileRecord[] {
+    const room = this.requireRoom(roomId);
+    this.assertPermission(actorUserId, room.organizationId, 'files.read', room.id);
+    return [...this.roomFiles.values()]
+      .filter(({ record }) => record.roomId === room.id && record.deletedAt === null)
+      .map(({ record }) => ({ ...record }));
+  }
+
+  getRoomFile(input: { actorUserId: string; roomId: string; fileId: string }): {
+    record: RoomFileRecord;
+    content: Buffer;
+  } {
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.read', room.id);
+    const entry = this.roomFiles.get(input.fileId);
+    if (!entry || entry.record.roomId !== room.id || entry.record.deletedAt)
+      throw new RemoteAccessError('ROOM_FILE_NOT_FOUND', 'Room file not found');
+    return { record: { ...entry.record }, content: Buffer.from(entry.content) };
+  }
+
+  deleteRoomFile(input: { actorUserId: string; roomId: string; fileId: string }): void {
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.write', room.id);
+    const entry = this.roomFiles.get(input.fileId);
+    if (!entry || entry.record.roomId !== room.id || entry.record.deletedAt)
+      throw new RemoteAccessError('ROOM_FILE_NOT_FOUND', 'Room file not found');
+    entry.record.securityState = 'DELETED';
+    entry.record.deletedAt = this.now().toISOString();
+    entry.record.updatedAt = entry.record.deletedAt;
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.deleted',
+      'room_file',
+      input.fileId,
+    );
+  }
+
+  createRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    fileId: string;
+    destinationRelative: string;
+    existingPaths?: string[];
+  }): RoomFileImportProposal {
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.write', room.id);
+    const file = this.getRoomFile({
+      actorUserId: input.actorUserId,
+      roomId: room.id,
+      fileId: input.fileId,
+    });
+    if (file.record.intent !== 'ADD_TO_PROJECT' || file.record.securityState !== 'SAFE')
+      throw new RemoteAccessError(
+        'ROOM_FILE_STATE_INVALID',
+        'Room file is not ready for project import',
+      );
+    let manifest: RoomFileImportManifest;
+    try {
+      manifest = buildRoomFileImportManifest({
+        fileId: file.record.id,
+        safeName: file.record.safeName,
+        contentType: file.record.contentType,
+        content: file.content,
+        destinationRelative: input.destinationRelative,
+        ...(input.existingPaths ? { existingPaths: input.existingPaths } : {}),
+      });
+    } catch (error) {
+      if (error instanceof RoomFileError) {
+        void this.recordSecurityEvent({
+          organizationId: room.organizationId,
+          roomId: room.id,
+          actorUserId: input.actorUserId,
+          projectId: room.projectId,
+          eventType: error.code.startsWith('ARCHIVE')
+            ? 'SUSPICIOUS_ARCHIVE'
+            : 'PATH_ESCAPE_ATTEMPT',
+          requestedAction: 'room.file.import.preview',
+          requestedResource: input.destinationRelative,
+          decision: 'BLOCKED',
+          outcome: error.message,
+        });
+      }
+      throw error;
+    }
+    const now = this.now().toISOString();
+    const proposal: RoomFileImportProposal = {
+      id: randomUUID(),
+      organizationId: room.organizationId,
+      roomId: room.id,
+      fileId: file.record.id,
+      requestedBy: input.actorUserId,
+      destinationRelative: assertSafeProjectRelativePath(input.destinationRelative, true),
+      status: 'PREVIEW',
+      manifest,
+      approvedBy: null,
+      approvedAt: null,
+      completedBy: null,
+      completedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.roomImports.set(proposal.id, proposal);
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.import.previewed',
+      'room_file_import',
+      proposal.id,
+    );
+    return this.cloneImport(proposal);
+  }
+
+  approveRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+  }): RoomFileImportProposal {
+    const proposal = this.requireImport(input.roomId, input.importId);
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.write', room.id);
+    if (proposal.status !== 'PREVIEW')
+      throw new RemoteAccessError(
+        'ROOM_FILE_STATE_INVALID',
+        'Import is no longer awaiting approval',
+      );
+    if (proposal.manifest.rejectedCount > 0)
+      throw new RemoteAccessError(
+        'ROOM_IMPORT_CONFLICT',
+        'Import preview contains rejected entries',
+      );
+    if (proposal.manifest.overwriteCount > 0)
+      this.assertPermission(input.actorUserId, room.organizationId, 'destructive.approve', room.id);
+    proposal.status = 'APPROVED';
+    proposal.approvedBy = input.actorUserId;
+    proposal.approvedAt = this.now().toISOString();
+    proposal.updatedAt = proposal.approvedAt;
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.import.approved',
+      'room_file_import',
+      proposal.id,
+    );
+    return this.cloneImport(proposal);
+  }
+
+  rejectRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+  }): RoomFileImportProposal {
+    const proposal = this.requireImport(input.roomId, input.importId);
+    const room = this.requireRoom(input.roomId);
+    this.assertPermission(input.actorUserId, room.organizationId, 'files.write', room.id);
+    if (proposal.status === 'IMPORTED')
+      throw new RemoteAccessError('ROOM_FILE_STATE_INVALID', 'Imported content cannot be rejected');
+    proposal.status = 'REJECTED';
+    proposal.updatedAt = this.now().toISOString();
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.import.rejected',
+      'room_file_import',
+      proposal.id,
+    );
+    return this.cloneImport(proposal);
+  }
+
+  completeRoomFileImport(input: {
+    actorUserId: string;
+    roomId: string;
+    importId: string;
+    hostDeviceId: string;
+    writtenPaths: string[];
+  }): RoomFileImportProposal {
+    const proposal = this.requireImport(input.roomId, input.importId);
+    const room = this.requireRoom(input.roomId);
+    if (proposal.status !== 'APPROVED')
+      throw new RemoteAccessError(
+        'ROOM_FILE_STATE_INVALID',
+        'Import is not approved for host execution',
+      );
+    if (room.hostDeviceId !== input.hostDeviceId)
+      throw new RemoteAccessError(
+        'ROOM_HOST_INVALID',
+        'Import host does not match the Room project host',
+      );
+    const device = this.requireDevice(input.hostDeviceId);
+    this.assertDeviceOwner(device, input.actorUserId);
+    if (roomHostAvailability(device, this.now()) !== 'ONLINE')
+      throw new RemoteAccessError('ROOM_HOST_OFFLINE', 'Room project host is not online');
+    const expected = new Set(
+      proposal.manifest.entries
+        .filter((entry) => entry.action !== 'REJECTED')
+        .map((entry) => entry.path.toLowerCase()),
+    );
+    const actual = new Set(
+      input.writtenPaths.map((path) => assertSafeProjectRelativePath(path).toLowerCase()),
+    );
+    if (expected.size !== actual.size || [...expected].some((path) => !actual.has(path)))
+      throw new RemoteAccessError(
+        'ROOM_IMPORT_CONFLICT',
+        'Host import result does not match the approved manifest',
+      );
+    proposal.status = 'IMPORTED';
+    proposal.completedBy = input.actorUserId;
+    proposal.completedAt = this.now().toISOString();
+    proposal.updatedAt = proposal.completedAt;
+    this.recordAudit(
+      room.organizationId,
+      room.id,
+      input.actorUserId,
+      'room.file.import.completed',
+      'room_file_import',
+      proposal.id,
+    );
+    return this.cloneImport(proposal);
+  }
+
+  listRoomFileImports(actorUserId: string, roomId: string): RoomFileImportProposal[] {
+    const room = this.requireRoom(roomId);
+    this.assertPermission(actorUserId, room.organizationId, 'files.read', room.id);
+    return [...this.roomImports.values()]
+      .filter((proposal) => proposal.roomId === room.id)
+      .map((proposal) => this.cloneImport(proposal));
+  }
+
+  recordSecurityEvent(input: {
+    organizationId: string;
+    roomId?: string | null;
+    actorUserId?: string | null;
+    deviceId?: string | null;
+    projectId?: string | null;
+    taskId?: string | null;
+    eventType: string;
+    requestedAction: string;
+    requestedResource?: string | null;
+    decision: RoomSecurityEvent['decision'];
+    outcome: string;
+    evidence?: Record<string, unknown>;
+  }): RoomSecurityEvent {
+    const event: RoomSecurityEvent = {
+      id: randomUUID(),
+      organizationId: input.organizationId,
+      roomId: input.roomId ?? null,
+      actorUserId: input.actorUserId ?? null,
+      deviceId: input.deviceId ?? null,
+      projectId: input.projectId ?? null,
+      taskId: input.taskId ?? null,
+      eventType: input.eventType,
+      severity: roomSecuritySeverity(input.eventType, input.decision),
+      requestedAction: input.requestedAction,
+      requestedResource: input.requestedResource ?? null,
+      decision: input.decision,
+      outcome: input.outcome,
+      evidence: sanitizeSecurityEvidence(input.evidence ?? {}),
+      createdAt: this.now().toISOString(),
+    };
+    this.securityEvents.push(event);
+    return { ...event, evidence: { ...event.evidence } };
+  }
+
+  listSecurityEvents(actorUserId: string, roomId: string): RoomSecurityEvent[] {
+    const room = this.requireRoom(roomId);
+    this.assertPermission(actorUserId, room.organizationId, 'audit.view', room.id);
+    return this.securityEvents
+      .filter((event) => event.roomId === room.id)
+      .map((event) => ({ ...event, evidence: { ...event.evidence } }));
+  }
+
   getRoom(roomId: string): RemoteRoom {
-    return { ...this.requireRoom(roomId) };
+    const room = this.requireRoom(roomId);
+    const device = this.devices.get(room.hostDeviceId);
+    room.hostAvailability = device ? roomHostAvailability(device, this.now()) : 'UNAVAILABLE';
+    return { ...room };
+  }
+
+  listRooms(actorUserId: string): RemoteRoom[] {
+    return [...this.rooms.values()]
+      .filter((room) => {
+        try {
+          this.assertPermission(actorUserId, room.organizationId, 'room.view', room.id);
+          return room.status === 'ACTIVE';
+        } catch {
+          return false;
+        }
+      })
+      .map((room) => this.getRoom(room.id));
   }
 
   listAudit(organizationId: string): RoomAuditEvent[] {
@@ -655,13 +1270,30 @@ export class RemoteAccessService {
       .map((event) => ({ ...event }));
   }
 
+  private requireImport(roomId: string, importId: string): RoomFileImportProposal {
+    const proposal = this.roomImports.get(importId);
+    if (!proposal || proposal.roomId !== roomId)
+      throw new RemoteAccessError('ROOM_IMPORT_NOT_FOUND', 'Room file import proposal not found');
+    return proposal;
+  }
+
+  private cloneImport(proposal: RoomFileImportProposal): RoomFileImportProposal {
+    return {
+      ...proposal,
+      manifest: {
+        ...proposal.manifest,
+        entries: proposal.manifest.entries.map((entry) => ({ ...entry })),
+      },
+    };
+  }
+
   private updateMemberStatus(
     input: { actorUserId: string; roomId: string; userId: string },
     status: MemberStatus,
   ): void {
     const room = this.requireRoom(input.roomId);
     this.assertPermission(input.actorUserId, room.organizationId, 'members.manage', room.id);
-    const member = this.requireMember(room.organizationId, input.userId);
+    const member = this.requireMember(room.organizationId, input.userId, room.id);
     if (member.role === 'OWNER')
       throw new RemoteAccessError(
         'LAST_ADMIN',
@@ -687,7 +1319,7 @@ export class RemoteAccessService {
     roomId?: string,
   ): RoomMember {
     this.assertOrganizationActive(organizationId);
-    const member = this.requireMember(organizationId, userId);
+    const member = this.requireMember(organizationId, userId, roomId);
     if (member.status === 'SUSPENDED')
       throw new RemoteAccessError('MEMBER_SUSPENDED', 'Room member is suspended');
     if (member.status === 'REMOVED')
@@ -704,18 +1336,36 @@ export class RemoteAccessService {
 
   private activeMembers(organizationId: string): RoomMember[] {
     return [...this.members.values()].filter(
-      (member) => member.organizationId === organizationId && member.status !== 'REMOVED',
+      (member) =>
+        member.organizationId === organizationId &&
+        member.roomId === null &&
+        member.status !== 'REMOVED',
     );
   }
 
-  private findMember(organizationId: string, userId: string): RoomMember | undefined {
+  private roomMembers(roomId: string): RoomMember[] {
+    return [...this.members.values()].filter((member) => member.roomId === roomId);
+  }
+
+  private findMember(
+    organizationId: string,
+    userId: string,
+    roomId: string | null,
+  ): RoomMember | undefined {
     return [...this.members.values()].find(
-      (member) => member.organizationId === organizationId && member.userId === userId,
+      (member) =>
+        member.organizationId === organizationId &&
+        member.userId === userId &&
+        member.roomId === roomId,
     );
   }
 
-  private requireMember(organizationId: string, userId: string): RoomMember {
-    const member = this.findMember(organizationId, userId);
+  private requireMember(
+    organizationId: string,
+    userId: string,
+    roomId: string | null = null,
+  ): RoomMember {
+    const member = this.findMember(organizationId, userId, roomId);
     if (!member) throw new RemoteAccessError('MEMBER_NOT_FOUND', 'Room member not found');
     return member;
   }

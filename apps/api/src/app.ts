@@ -92,7 +92,7 @@ const unavailableGateway: GatewayModelClient = {
 };
 
 export function buildApi(dependencies: ApiDependencies = {}): FastifyInstance {
-  const app = Fastify({ logger: false });
+  const app = Fastify({ logger: false, bodyLimit: 40 * 1024 * 1024 });
   const defaultJsonParser = app.getDefaultJsonParser('error', 'error');
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, rawBody, done) => {

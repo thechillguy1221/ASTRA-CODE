@@ -184,18 +184,14 @@ export async function registerBillingRoutes(
     const parsed = ReservationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
     try {
-      const organizationContext = parsed.data.organizationId
-        ? { organizationId: parsed.data.organizationId, roomId: parsed.data.roomId }
-        : null;
-      if (organizationContext && !organizationContext.roomId)
+      if (parsed.data.organizationId && !parsed.data.roomId)
         return reply.code(400).send({ error: 'ROOM_REQUIRED_FOR_ORGANIZATION_BILLING' });
-      const organizationRoom = organizationContext
-        ? await dependencies.remote.getRoom(organizationContext.roomId as string)
+      const organizationRoom = parsed.data.roomId
+        ? await dependencies.remote.getRoom(parsed.data.roomId)
         : null;
       if (
-        organizationContext &&
-        (!organizationRoom ||
-          organizationRoom.organizationId !== organizationContext.organizationId)
+        parsed.data.organizationId &&
+        (!organizationRoom || organizationRoom.organizationId !== parsed.data.organizationId)
       )
         return reply.code(403).send({ error: 'ROOM_ORGANIZATION_MISMATCH' });
       if (organizationRoom)
@@ -204,6 +200,15 @@ export async function registerBillingRoutes(
           roomId: organizationRoom.id,
           permission: 'agent.prompt',
         });
+      if (
+        organizationRoom &&
+        parsed.data.hostDeviceId &&
+        parsed.data.hostDeviceId !== organizationRoom.hostDeviceId
+      )
+        return reply.code(403).send({ error: 'ROOM_HOST_INVALID' });
+      const organizationContext = organizationRoom
+        ? { organizationId: organizationRoom.organizationId, roomId: organizationRoom.id }
+        : null;
       const wallet = organizationContext
         ? await dependencies.organizationBilling.getWallet(organizationContext.organizationId)
         : await dependencies.billing.getWallet(identity.user.id);
@@ -224,7 +229,7 @@ export async function registerBillingRoutes(
             organizationId: organizationContext.organizationId,
             actorUserId: identity.user.id,
             roomId: organizationRoom?.id ?? null,
-            hostDeviceId: parsed.data.hostDeviceId ?? organizationRoom?.hostDeviceId ?? null,
+            hostDeviceId: organizationRoom?.hostDeviceId ?? null,
             planId: identity.user.planId,
             taskId: parsed.data.taskId,
             modelId: selectedModelId,

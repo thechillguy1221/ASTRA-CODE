@@ -3,7 +3,11 @@ import type { AuthService } from '@lyntar/auth';
 import { BillingService, OrganizationBillingService } from '@lyntar/billing';
 import type { ModelCatalogStore, UsageReceiptStore } from '@lyntar/db';
 import { parseUsageReceipt, type ResponsesGatewayClient } from '@lyntar/model-gateway';
-import type { RemoteAccessPort } from '@lyntar/remote-protocol';
+import {
+  ROOM_PERMISSIONS,
+  type RemoteAccessPort,
+  type RoomPermission,
+} from '@lyntar/remote-protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { CodexRuntimeTokenService } from './codex-runtime-auth.js';
@@ -16,6 +20,12 @@ const RuntimeTokenRequestSchema = z.object({
 const RuntimeQuerySchema = z.object({
   task_id: z.string().min(1),
   reservation_id: z.string().min(1),
+});
+
+const RuntimeAuthorizeSchema = z.object({
+  permission: z.string().min(1).max(80),
+  action: z.string().min(1).max(120),
+  resource: z.string().max(4_000).optional(),
 });
 
 function bearerToken(request: FastifyRequest): string | null {
@@ -129,6 +139,69 @@ export async function registerCodexRuntimeRoutes(
       scope: issued.claims.scope,
       expiresAt: new Date(issued.claims.expiresAt).toISOString(),
     });
+  });
+
+  app.post('/v1/runtime/codex/authorize', async (request, reply) => {
+    const token = bearerToken(request);
+    if (!token) return reply.code(401).send({ error: 'RUNTIME_AUTH_REQUIRED' });
+    let stored;
+    try {
+      stored = dependencies.runtimeTokens.verify(token);
+    } catch {
+      return reply.code(401).send({ error: 'RUNTIME_TOKEN_INVALID' });
+    }
+    let identity;
+    try {
+      identity = await dependencies.auth.authenticate(stored.accessToken);
+    } catch {
+      return reply.code(401).send({ error: 'SESSION_INVALID' });
+    }
+    if (
+      identity.user.id !== stored.claims.userId ||
+      identity.device.deviceSessionId !== stored.claims.deviceSessionId
+    )
+      return reply.code(401).send({ error: 'RUNTIME_TOKEN_CONTEXT_INVALID' });
+    const parsed = RuntimeAuthorizeSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid_request' });
+    if (!ROOM_PERMISSIONS.includes(parsed.data.permission as RoomPermission))
+      return reply.code(400).send({ error: 'permission_invalid' });
+    const reservation = await requireAuthorizedReservation(dependencies, reply, {
+      taskId: stored.claims.taskId,
+      reservationId: stored.claims.reservationId,
+      userId: identity.user.id,
+    });
+    if (!reservation) return;
+    try {
+      if (reservation.organizationId) {
+        if (!reservation.roomId) throw new Error('Room context is required');
+        const room = await dependencies.remote.getRoom(reservation.roomId);
+        if (room.organizationId !== reservation.organizationId)
+          throw new Error('Room organization mismatch');
+        await dependencies.remote.authorizeRoomAction({
+          actorUserId: identity.user.id,
+          roomId: room.id,
+          permission: parsed.data.permission as RoomPermission,
+        });
+      }
+      return reply.send({ allowed: true });
+    } catch (error) {
+      if (reservation.organizationId && reservation.roomId) {
+        await Promise.resolve(
+          dependencies.remote.recordSecurityEvent({
+            organizationId: reservation.organizationId,
+            roomId: reservation.roomId,
+            actorUserId: identity.user.id,
+            taskId: reservation.taskId,
+            eventType: 'UNAUTHORIZED_TOOL_REQUEST',
+            requestedAction: parsed.data.action,
+            requestedResource: parsed.data.resource ?? null,
+            decision: 'BLOCKED',
+            outcome: error instanceof Error ? error.message : 'Room policy denied the operation',
+          }),
+        ).catch(() => undefined);
+      }
+      return reply.code(403).send({ error: 'TOOL_AUTHORIZATION_REQUIRED' });
+    }
   });
 
   app.post<{ Querystring: { task_id?: string; reservation_id?: string } }>(

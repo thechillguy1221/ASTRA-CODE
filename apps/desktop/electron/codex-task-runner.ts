@@ -43,6 +43,8 @@ interface ActiveCodexTask {
   taskId: string;
   prompt: string;
   modelId: string;
+  roomId?: string;
+  runtimeAuthToken?: string;
   workspaceId: string;
   agentSessionId: string;
   threadId: string;
@@ -141,6 +143,7 @@ export class CodexTaskRunner {
     agentSessionId: string;
     prompt: string;
     modelId: string;
+    roomId?: string | undefined;
     budget: TaskBudget;
     reservationId?: string;
   }): Promise<IpcTaskResult> {
@@ -206,6 +209,8 @@ export class CodexTaskRunner {
             taskId: input.taskId,
             prompt: input.prompt,
             modelId: input.modelId,
+            ...(input.roomId ? { roomId: input.roomId } : {}),
+            ...(runtimeAuthToken ? { runtimeAuthToken } : {}),
             workspaceId: input.workspaceId,
             agentSessionId: input.agentSessionId,
             threadId: thread.threadId,
@@ -431,6 +436,7 @@ export class CodexTaskRunner {
         ? {
             taskId: active.taskId,
             query: args.query,
+            ...(active.roomId ? { roomId: active.roomId } : {}),
             ...(typeof args.max_results === 'number' ? { maxResults: args.max_results } : {}),
             ...(typeof args.recency === 'string' ? { recency: args.recency } : {}),
             ...(Array.isArray(args.domains) ? { domains: args.domains } : {}),
@@ -442,6 +448,7 @@ export class CodexTaskRunner {
         : {
             taskId: active.taskId,
             url: args.url,
+            ...(active.roomId ? { roomId: active.roomId } : {}),
             ...(typeof args.purpose === 'string' ? { purpose: args.purpose } : {}),
             ...(typeof args.max_bytes === 'number' ? { maxBytes: args.max_bytes } : {}),
           };
@@ -490,6 +497,29 @@ export class CodexTaskRunner {
     const summary = isCommand
       ? 'Codex requested a local command'
       : 'Codex requested project changes';
+    const authorizationPermission = isCommand
+      ? risk === 'destructive'
+        ? 'destructive.approve'
+        : 'terminal.run'
+      : 'files.write';
+    const authorized = await this.authorizeRuntimeAction(
+      active,
+      authorizationPermission,
+      command ?? (typeof params.reason === 'string' ? params.reason : 'workspace change'),
+      action,
+    );
+    if (!authorized) {
+      active.client.respond(request.id, { decision: 'decline' });
+      emit('permission.denied', {
+        requestId,
+        action,
+        summary,
+        reason: 'Astra Room policy denied this operation',
+        ...(command ? { command } : {}),
+        risk: risk === 'destructive' ? 'destructive' : 'sensitive',
+      });
+      return;
+    }
     if (risk === 'prohibited') {
       active.client.respond(request.id, {
         decision: isCommand ? 'decline' : 'decline',
@@ -538,6 +568,28 @@ export class CodexTaskRunner {
     active.client.respond(request.id, {
       decision: approvalDecision(approved, risk === 'destructive'),
     });
+  }
+
+  private async authorizeRuntimeAction(
+    active: ActiveCodexTask,
+    permission: string,
+    resource: string,
+    action: string,
+  ): Promise<boolean> {
+    if (!active.runtimeAuthToken) return true;
+    try {
+      const response = await fetch(`${this.options.apiBaseUrl}/v1/runtime/codex/authorize`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${active.runtimeAuthToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ permission, action, resource }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   private async finalize(

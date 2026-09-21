@@ -73,6 +73,24 @@ export function buildCapabilityApiForTest(): LyntarIpcApi {
       },
       async revoke() {},
     },
+    rooms: {
+      async list() {
+        return [];
+      },
+      async listFiles() {
+        return [];
+      },
+      async uploadFile() {
+        throw new Error('No test API configured');
+      },
+      async deleteFile() {},
+      async previewImport() {
+        throw new Error('No test API configured');
+      },
+      async importFile() {
+        throw new Error('No test API configured');
+      },
+    },
     modes: {
       async learnFile() {
         throw new Error('No test workspace configured');
@@ -170,6 +188,43 @@ export async function registerIpcHandlers(runtime: DesktopRuntime): Promise<void
   ipcMain.handle('devices.revoke', (_event, deviceId: unknown) => {
     if (typeof deviceId !== 'string' || !deviceId) throw new Error('Device ID is invalid');
     return runtime.revokeDevice(deviceId);
+  });
+  ipcMain.handle('rooms.list', () => {
+    parseCommand('rooms.list');
+    return runtime.listRooms();
+  });
+  ipcMain.handle('rooms.files.list', (_event, roomId: unknown) => {
+    const command = parseCommand('rooms.files.list', { roomId });
+    return runtime.listRoomFiles(command.roomId);
+  });
+  ipcMain.handle('rooms.files.upload', async (_event, input: unknown) => {
+    const command = parseCommand(
+      'rooms.files.upload',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    const result = await dialog.showOpenDialog({ properties: ['openFile'] });
+    const selectedPath = result.filePaths[0];
+    if (result.canceled || !selectedPath) return null;
+    return runtime.uploadRoomFile(command.roomId, command.intent, selectedPath);
+  });
+  ipcMain.handle('rooms.files.delete', (_event, roomId: unknown, fileId: unknown) => {
+    const command = parseCommand('rooms.files.delete', { roomId, fileId });
+    return runtime.deleteRoomFile(command.roomId, command.fileId);
+  });
+  ipcMain.handle('rooms.files.preview', (_event, input: unknown) => {
+    const command = parseCommand(
+      'rooms.files.preview',
+      input && typeof input === 'object' ? (input as Record<string, unknown>) : {},
+    );
+    return runtime.previewRoomFileImport(
+      command.roomId,
+      command.fileId,
+      command.destinationRelative,
+    );
+  });
+  ipcMain.handle('rooms.files.import', (_event, roomId: unknown, importId: unknown) => {
+    const command = parseCommand('rooms.files.import', { roomId, importId });
+    return runtime.importRoomFile(command.roomId, command.importId);
   });
   ipcMain.handle('modes.learnFile', (_event, input: unknown) => {
     const command = parseCommand(

@@ -265,4 +265,111 @@ describe('billing API', () => {
       consumedCredits: '0',
     });
   });
+
+  it('resolves the organization wallet from Room context without trusting client organization or host identifiers', async () => {
+    const authStore = new InMemoryAuthStore();
+    const auth = new AuthService({ store: authStore });
+    const plans = createDefaultPlanCatalog();
+    const billing = new BillingService({ store: new InMemoryBillingStore(), plans });
+    const organizationBilling = new OrganizationBillingService({
+      store: new InMemoryOrganizationBillingStore(),
+      plans,
+    });
+    const remote = new RemoteAccessService();
+    const app = buildApi({
+      auth,
+      billing,
+      organizationBilling,
+      plans,
+      remote,
+      exposeDevelopmentTokens: true,
+    });
+    const registration = await auth.register({
+      email: 'room-context@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'Windows', platform: 'win32', architecture: 'x64', appVersion: '0.1.0' },
+    });
+    await auth.verifyEmail(registration.verificationToken);
+    const currentUser = await authStore.getUser(registration.user.id);
+    await authStore.updateUser({ ...currentUser!, planId: 'TEAM' });
+    const login = await auth.login({
+      email: 'room-context@example.test',
+      password: 'correct horse battery staple',
+      device: { label: 'Windows', platform: 'win32', architecture: 'x64', appVersion: '0.1.0' },
+    });
+    const device = await remote.registerDevice({
+      userId: login.user.id,
+      label: 'Room host',
+      platform: 'win32',
+      architecture: 'x64',
+      publicKeyPem: 'room-context-key',
+    });
+    const organization = await remote.createOrganization({
+      ownerUserId: login.user.id,
+      displayName: 'Context Team',
+      plan: {
+        id: 'TEAM',
+        seats: 5,
+        monthlyCredits: '6000',
+        pooledCredits: true,
+        crossPersonRooms: true,
+      },
+    });
+    const room = await remote.createRoom({
+      actorUserId: login.user.id,
+      organizationId: organization.id,
+      hostDeviceId: device.id,
+      name: 'Context Room',
+      workspaceRootRelative: 'Projects/Context',
+    });
+    await organizationBilling.grantCredits({
+      organizationId: organization.id,
+      actorUserId: login.user.id,
+      amountCredits: '100',
+      transactionType: 'SUBSCRIPTION_GRANT',
+      idempotencyKey: 'context-grant',
+      reason: 'Room context test',
+    });
+    const personalBefore = await billing.getWallet(login.user.id);
+
+    const roomReservation = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/reservations',
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      payload: {
+        roomId: room.id,
+        taskId: 'room-context-task',
+        modelId: 'approved-core',
+        mode: 'BUILD',
+        amountCredits: '10',
+        idempotencyKey: 'room-context-reservation',
+      },
+    });
+    expect(roomReservation.statusCode).toBe(201);
+    expect(roomReservation.json().reservation.organizationId).toBe(organization.id);
+    await expect(organizationBilling.getWallet(organization.id)).resolves.toMatchObject({
+      availableCredits: '90',
+      reservedCredits: '10',
+    });
+    await expect(billing.getWallet(login.user.id)).resolves.toMatchObject({
+      availableCredits: personalBefore.availableCredits,
+      reservedCredits: personalBefore.reservedCredits,
+    });
+
+    const spoofedOrganization = await app.inject({
+      method: 'POST',
+      url: '/v1/billing/reservations',
+      headers: { authorization: `Bearer ${login.accessToken}` },
+      payload: {
+        organizationId: 'not-the-room-organization',
+        roomId: room.id,
+        taskId: 'room-context-spoof',
+        modelId: 'approved-core',
+        mode: 'BUILD',
+        amountCredits: '1',
+        idempotencyKey: 'room-context-spoof',
+      },
+    });
+    expect(spoofedOrganization.statusCode).toBe(403);
+  });
 });

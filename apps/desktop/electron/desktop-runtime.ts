@@ -1,5 +1,6 @@
 import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { basename, extname, join } from 'node:path';
 import {
   AgentTaskRunner,
   InMemorySessionStore,
@@ -15,6 +16,9 @@ import { CodexTaskRunner } from './codex-task-runner.js';
 import {
   AuthSessionResultSchema,
   DesktopDeviceSchema,
+  DesktopRoomSchema,
+  DesktopRoomFileSchema,
+  DesktopRoomFileImportSchema,
   PublicUserSchema,
   IpcTaskResultSchema,
   ModelCatalogEntrySchema,
@@ -25,6 +29,9 @@ import {
   WalletSchema,
   type AgentEvent,
   type DesktopDevice,
+  type DesktopRoom,
+  type DesktopRoomFile,
+  type DesktopRoomFileImport,
   type PublicUser,
   type Wallet,
   type IpcTaskResult,
@@ -41,6 +48,7 @@ import {
   type VivaEvaluation,
   type TaskBudget,
 } from '@lyntar/contracts';
+import { assertSafeProjectRelativePath, extractRoomArchive } from '@lyntar/remote-protocol';
 import {
   classifyCommand,
   GitWorkspace,
@@ -64,6 +72,7 @@ interface DesktopTaskRunner {
     agentSessionId: string;
     prompt: string;
     modelId: string;
+    roomId?: string | undefined;
     budget: TaskBudget;
     reservationId?: string;
   }): Promise<unknown>;
@@ -183,6 +192,39 @@ function normalizeWindowsPath(value: string): string {
     .replaceAll('/', '\\')
     .replace(/[\\]+$/, '')
     .toLowerCase();
+}
+
+function contentTypeForPath(filePath: string): string {
+  switch (extname(filePath).toLowerCase()) {
+    case '.json':
+      return 'application/json';
+    case '.txt':
+    case '.md':
+    case '.ts':
+    case '.tsx':
+    case '.js':
+    case '.jsx':
+    case '.css':
+    case '.html':
+    case '.yml':
+    case '.yaml':
+      return 'text/plain';
+    case '.svg':
+      return 'image/svg+xml';
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.webp':
+      return 'image/webp';
+    case '.pdf':
+      return 'application/pdf';
+    case '.zip':
+      return 'application/zip';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 export class DesktopRuntime {
@@ -520,7 +562,12 @@ export class DesktopRuntime {
     if (!response.ok) throw new Error(`Device list failed with ${response.status}`);
     const body = (await response.json()) as { devices?: unknown };
     if (!Array.isArray(body.devices)) throw new Error('Device list response is invalid');
-    return body.devices.map((device) => DesktopDeviceSchema.parse(device));
+    const devices = body.devices.map((device) => DesktopDeviceSchema.parse(device));
+    const identity = await this.credentials.getDeviceIdentity();
+    if (identity && devices.some((device) => device.id === identity.deviceId)) {
+      await this.heartbeatDevice(identity.deviceId).catch(() => undefined);
+    }
+    return devices;
   }
 
   async registerDevice(): Promise<DesktopDevice> {
@@ -546,7 +593,23 @@ export class DesktopRuntime {
     const device = DesktopDeviceSchema.parse(body.device);
     if (device.id !== identity.deviceId)
       await this.credentials.setDeviceIdentity({ ...identity, deviceId: device.id });
-    return device;
+    return this.heartbeatDevice(device.id);
+  }
+
+  private async heartbeatDevice(deviceId: string): Promise<DesktopDevice> {
+    const session = this.authSession ?? (await this.credentials.get());
+    if (!session) throw new Error('Authentication is required to heartbeat a device');
+    this.authSession = session;
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/devices/${encodeURIComponent(deviceId)}/heartbeat`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      },
+    );
+    if (!response.ok) throw new Error(`Device heartbeat failed with ${response.status}`);
+    const body = (await response.json()) as { device?: unknown };
+    return DesktopDeviceSchema.parse(body.device);
   }
 
   async revokeDevice(deviceId: string): Promise<void> {
@@ -561,6 +624,218 @@ export class DesktopRuntime {
       },
     );
     if (!response.ok) throw new Error(`Device revocation failed with ${response.status}`);
+  }
+
+  async listRooms(): Promise<DesktopRoom[]> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) return [];
+    const response = await fetch(`${this.apiBaseUrl}/v1/rooms`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+    });
+    if (!response.ok) throw new Error(`Room list failed with ${response.status}`);
+    const body = (await response.json()) as { rooms?: unknown };
+    return Array.isArray(body.rooms)
+      ? body.rooms.flatMap((room) => {
+          const parsed = DesktopRoomSchema.safeParse(room);
+          return parsed.success ? [parsed.data] : [];
+        })
+      : [];
+  }
+
+  async listRoomFiles(roomId: string): Promise<DesktopRoomFile[]> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) return [];
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/files`,
+      { headers: { Authorization: `Bearer ${session.accessToken}` } },
+    );
+    if (!response.ok) throw new Error(`Room file list failed with ${response.status}`);
+    const body = (await response.json()) as { files?: unknown };
+    return Array.isArray(body.files)
+      ? body.files.flatMap((file) => {
+          const parsed = DesktopRoomFileSchema.safeParse(file);
+          return parsed.success ? [parsed.data] : [];
+        })
+      : [];
+  }
+
+  async uploadRoomFile(
+    roomId: string,
+    intent: 'REFERENCE' | 'ADD_TO_PROJECT',
+    filePath: string,
+  ): Promise<DesktopRoomFile> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) throw new Error('Authentication is required to upload a Room file');
+    const content = await readFile(filePath);
+    if (content.byteLength > 25 * 1024 * 1024) throw new Error('Room files are limited to 25 MB');
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/files`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify({
+          originalName: basename(filePath),
+          contentType: contentTypeForPath(filePath),
+          contentBase64: content.toString('base64'),
+          intent,
+        }),
+      },
+    );
+    if (!response.ok) throw new Error(`Room file upload failed with ${response.status}`);
+    const body = (await response.json()) as { file?: unknown };
+    return DesktopRoomFileSchema.parse(body.file);
+  }
+
+  async deleteRoomFile(roomId: string, fileId: string): Promise<void> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) throw new Error('Authentication is required to delete a Room file');
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(fileId)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      },
+    );
+    if (!response.ok) throw new Error(`Room file deletion failed with ${response.status}`);
+  }
+
+  async previewRoomFileImport(
+    roomId: string,
+    fileId: string,
+    destinationRelative: string,
+  ): Promise<DesktopRoomFileImport> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) throw new Error('Authentication is required to preview a Room import');
+    if (!this.workspace) throw new Error('Open the bound Room workspace first');
+    await this.assertLocalRoomHost(roomId);
+    const existingPaths = await this.workspace.listFiles();
+    const response = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(fileId)}/import-preview`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify({ destinationRelative, existingPaths }),
+      },
+    );
+    if (!response.ok) throw new Error(`Room import preview failed with ${response.status}`);
+    const body = (await response.json()) as { proposal?: unknown };
+    return DesktopRoomFileImportSchema.parse(body.proposal);
+  }
+
+  async importRoomFile(roomId: string, importId: string): Promise<DesktopRoomFileImport> {
+    const session = this.authSession ?? (await this.credentials.get());
+    this.authSession = session;
+    if (!session) throw new Error('Authentication is required to import a Room file');
+    if (!this.workspace) throw new Error('Open the bound Room workspace first');
+    const hostDeviceId = await this.assertLocalRoomHost(roomId);
+    const importsResponse = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/file-imports`,
+      { headers: { Authorization: `Bearer ${session.accessToken}` } },
+    );
+    if (!importsResponse.ok)
+      throw new Error(`Room import lookup failed with ${importsResponse.status}`);
+    const importsBody = (await importsResponse.json()) as { proposals?: unknown };
+    const proposal = Array.isArray(importsBody.proposals)
+      ? importsBody.proposals
+          .map((candidate) => DesktopRoomFileImportSchema.safeParse(candidate))
+          .find((candidate) => candidate.success && candidate.data.id === importId)
+      : undefined;
+    if (!proposal?.success) throw new Error('Room import proposal was not found');
+
+    let approved = proposal.data;
+    if (approved.status === 'PREVIEW') {
+      const response = await fetch(
+        `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/file-imports/${encodeURIComponent(importId)}/approve`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.accessToken}` },
+        },
+      );
+      if (!response.ok) throw new Error(`Room import approval failed with ${response.status}`);
+      const body = (await response.json()) as { proposal?: unknown };
+      approved = DesktopRoomFileImportSchema.parse(body.proposal);
+    }
+    if (approved.status !== 'APPROVED')
+      throw new Error(`Room import is not executable (${approved.status})`);
+
+    const contentResponse = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(approved.fileId)}/content`,
+      { headers: { Authorization: `Bearer ${session.accessToken}` } },
+    );
+    if (!contentResponse.ok)
+      throw new Error(`Room import content fetch failed with ${contentResponse.status}`);
+    const contentBody = (await contentResponse.json()) as {
+      file?: unknown;
+      contentBase64?: unknown;
+    };
+    const source = DesktopRoomFileSchema.parse(contentBody.file);
+    if (typeof contentBody.contentBase64 !== 'string')
+      throw new Error('Room import content is invalid');
+    const sourceContent = Buffer.from(contentBody.contentBase64, 'base64');
+    const isZip =
+      source.contentType === 'application/zip' ||
+      source.safeName.toLowerCase().endsWith('.zip') ||
+      sourceContent.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) ||
+      sourceContent.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    const extracted = isZip
+      ? extractRoomArchive(sourceContent)
+      : [{ path: source.safeName, content: sourceContent }];
+    const manifestByPath = new Map(
+      approved.manifest.entries.map((entry) => [entry.path.toLowerCase(), entry]),
+    );
+    const writes = extracted.map((entry) => {
+      const path = assertSafeProjectRelativePath(
+        approved.destinationRelative ? `${approved.destinationRelative}/${entry.path}` : entry.path,
+      );
+      const manifestEntry = manifestByPath.get(path.toLowerCase());
+      if (!manifestEntry || manifestEntry.action === 'REJECTED')
+        throw new Error(`Room import manifest does not authorize ${path}`);
+      const checksum = createHash('sha256').update(entry.content).digest('hex');
+      if (checksum !== manifestEntry.checksumSha256)
+        throw new Error(`Room import checksum mismatch for ${path}`);
+      return { path, content: entry.content };
+    });
+    await this.workspace.writeBufferBatch(writes);
+    const completionResponse = await fetch(
+      `${this.apiBaseUrl}/v1/rooms/${encodeURIComponent(roomId)}/file-imports/${encodeURIComponent(importId)}/complete`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+        body: JSON.stringify({
+          hostDeviceId,
+          writtenPaths: writes.map((write) => write.path),
+        }),
+      },
+    );
+    if (!completionResponse.ok)
+      throw new Error(`Room import completion failed with ${completionResponse.status}`);
+    const completionBody = (await completionResponse.json()) as { proposal?: unknown };
+    return DesktopRoomFileImportSchema.parse(completionBody.proposal);
+  }
+
+  private async assertLocalRoomHost(roomId: string): Promise<string> {
+    const room = (await this.listRooms()).find((candidate) => candidate.id === roomId);
+    if (!room) throw new Error('Room is not available to this account');
+    if (room.hostAvailability !== 'ONLINE')
+      throw new Error(`Room host is ${room.hostAvailability.toLowerCase()}`);
+    const devices = await this.listDevices();
+    if (!devices.some((device) => device.id === room.hostDeviceId))
+      throw new Error('This desktop is not the bound Room project host');
+    return room.hostDeviceId;
   }
 
   private async getOrCreateDeviceIdentity(): Promise<DeviceIdentity> {
@@ -580,6 +855,7 @@ export class DesktopRuntime {
     taskId: string;
     prompt: string;
     modelId: string;
+    roomId?: string | undefined;
     budget: Parameters<AgentTaskRunner['start']>[0]['budget'];
   }): Promise<IpcTaskResult> {
     if (!this.runner) throw new Error('Open a workspace first');
@@ -611,6 +887,7 @@ export class DesktopRuntime {
   private async reserveTask(input: {
     taskId: string;
     modelId: string;
+    roomId?: string | undefined;
     budget: Parameters<AgentTaskRunner['start']>[0]['budget'];
   }): Promise<string> {
     const session = this.authSession;
@@ -625,6 +902,7 @@ export class DesktopRuntime {
       body: JSON.stringify({
         taskId: input.taskId,
         modelId: input.modelId,
+        ...(input.roomId ? { roomId: input.roomId } : {}),
         mode: 'BUILD',
         amountCredits,
         idempotencyKey: `desktop:${input.taskId}:reservation`,

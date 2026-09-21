@@ -12,8 +12,13 @@ const api: LyntarIpcApi = {
     search: (query: string) => ipcRenderer.invoke('workspace.search', query),
   },
   agent: {
-    startTask: (input: { taskId: string; prompt: string; modelId: string; budget: TaskBudget }) =>
-      ipcRenderer.invoke('agent.startTask', input),
+    startTask: (input: {
+      taskId: string;
+      prompt: string;
+      modelId: string;
+      roomId?: string;
+      budget: TaskBudget;
+    }) => ipcRenderer.invoke('agent.startTask', input),
     cancelTask: (taskId: string) => ipcRenderer.invoke('agent.cancelTask', taskId),
     approveAction: (taskId: string, requestId: string) =>
       ipcRenderer.invoke('agent.approveAction', taskId, requestId),
@@ -44,6 +49,18 @@ const api: LyntarIpcApi = {
     list: () => ipcRenderer.invoke('devices.list'),
     register: () => ipcRenderer.invoke('devices.register'),
     revoke: (deviceId: string) => ipcRenderer.invoke('devices.revoke', deviceId),
+  },
+  rooms: {
+    list: () => ipcRenderer.invoke('rooms.list'),
+    listFiles: (roomId: string) => ipcRenderer.invoke('rooms.files.list', roomId),
+    uploadFile: (input: { roomId: string; intent: 'REFERENCE' | 'ADD_TO_PROJECT' }) =>
+      ipcRenderer.invoke('rooms.files.upload', input),
+    deleteFile: (roomId: string, fileId: string) =>
+      ipcRenderer.invoke('rooms.files.delete', roomId, fileId),
+    previewImport: (input: { roomId: string; fileId: string; destinationRelative: string }) =>
+      ipcRenderer.invoke('rooms.files.preview', input),
+    importFile: (roomId: string, importId: string) =>
+      ipcRenderer.invoke('rooms.files.import', roomId, importId),
   },
   modes: {
     learnFile: (input: {

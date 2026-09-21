@@ -107,6 +107,18 @@ describe('Codex runtime API boundary', () => {
     });
     expect(tokenResponse.statusCode).toBe(201);
     const runtimeToken = (tokenResponse.json() as { token: string }).token;
+    const authorizedTool = await app.inject({
+      method: 'POST',
+      url: '/v1/runtime/codex/authorize',
+      headers: { authorization: `Bearer ${runtimeToken}` },
+      payload: {
+        permission: 'terminal.run',
+        action: 'command.execute',
+        resource: 'npm test',
+      },
+    });
+    expect(authorizedTool.statusCode).toBe(200);
+    expect(authorizedTool.json()).toEqual({ allowed: true });
     const response = await app.inject({
       method: 'POST',
       url: `/runtime/codex/v1/responses?task_id=codex-task-1&reservation_id=${reservationId}`,

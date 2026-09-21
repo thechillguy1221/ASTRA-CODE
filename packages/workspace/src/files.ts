@@ -20,6 +20,11 @@ export interface FilePatchBatch {
   files: FilePatch[];
 }
 
+export interface BinaryFilePatch {
+  path: string;
+  content: Buffer;
+}
+
 export interface PatchResult {
   paths: string[];
   rolledBack: boolean;
@@ -144,6 +149,56 @@ export class LocalWorkspace {
         }
       }
       throw new PatchApplicationError('Patch batch was rolled back', { cause: error });
+    }
+  }
+
+  async writeBufferBatch(files: BinaryFilePatch[], signal?: AbortSignal): Promise<PatchResult> {
+    if (files.length === 0) return { paths: [], rolledBack: false };
+    throwIfAborted(signal);
+    const writes = await Promise.all(
+      files.map(async (file) => ({
+        file,
+        absolute: await assertWorkspacePath(this.canonical, file.path, 'write'),
+      })),
+    );
+    const backups: Backup[] = [];
+    const temporaryFiles: string[] = [];
+
+    try {
+      for (const { file, absolute } of writes) {
+        throwIfAborted(signal);
+        const confirmed = await assertWorkspacePath(this.canonical, file.path, 'write');
+        if (confirmed.toLowerCase() !== absolute.toLowerCase())
+          throw new WorkspaceEscapeError(file.path);
+        try {
+          backups.push({ path: confirmed, existed: true, bytes: await readFile(confirmed) });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+          backups.push({ path: confirmed, existed: false });
+        }
+
+        await mkdir(dirname(confirmed), { recursive: true });
+        const temporary = `${confirmed}.${randomUUID()}.lyntar-tmp`;
+        temporaryFiles.push(temporary);
+        await writeFile(temporary, file.content);
+        throwIfAborted(signal);
+        const beforeCommit = await assertWorkspacePath(this.canonical, file.path, 'write');
+        if (beforeCommit.toLowerCase() !== confirmed.toLowerCase())
+          throw new WorkspaceEscapeError(file.path);
+        await rm(beforeCommit, { force: true });
+        await rename(temporary, beforeCommit);
+      }
+      throwIfAborted(signal);
+      return { paths: writes.map(({ file }) => file.path), rolledBack: false };
+    } catch (error) {
+      for (const temporary of temporaryFiles)
+        await rm(temporary, { force: true }).catch(() => undefined);
+      for (const backup of backups.reverse()) {
+        if (backup.existed && backup.bytes !== undefined)
+          await writeFile(backup.path, backup.bytes);
+        else await rm(backup.path, { force: true });
+      }
+      throw new PatchApplicationError('Binary file batch was rolled back', { cause: error });
     }
   }
 
